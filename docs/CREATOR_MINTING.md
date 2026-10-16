@@ -17,6 +17,13 @@ This document audits the existing on-chain API against the FL Studio → rights-
 
 EVM addresses must be `0x` plus forty hexadecimal digits. **`0x0z...` is invalid** due to `z`. Use `0x0z:artist-name` as a verified display alias, separate from EIP-55 addresses, and define chain/address mappings in a globally resolvable signed namespace. A deterministic vanity `0x0...` prefix is possible but must never be confused with a brand identity or legal ownership. ENS-style names are another option.
 
+## Machine-readable schemas
+
+- [Yellow Brick metadata v1](../schemas/brick-metadata-v1.schema.json): typed identity, credits, music, claims, assets, relationships, payouts and extensibility.
+- [Building context v1](../schemas/building-context-v1.schema.json): context, member roles, permission/evidence references, and extensions.
+
+Both are provisional design schemas, not EVM token standards and not proof of rights. The MP3 prototype parses standard ID3v2.3/v2.4 title, artist, album, genre, BPM, key, ISRC and APIC cover art where readable; cover art still requires its own rights review. Full DDEX import/export and FL Studio direct integration are not implemented.
+
 ## Metadata surface (expandable, public vs private)
 
 | Domain | Fields and semantics |
