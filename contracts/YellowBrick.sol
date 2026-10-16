@@ -12,6 +12,10 @@ contract YellowBrick {
     string public metadataURI;
     uint64 public metadataVersion;
     bool private initialized;
+    bytes32 public metadataDigest; // SHA-256 or keccak256 commitment identified by off-chain schema
+
+    event MetadataCommitted(uint64 indexed version, bytes32 indexed digest);
+
 
     event BrickInitialized(bytes32 indexed ipId, address indexed originator, bytes32 indexed contentHash);
     event MetadataUpdated(uint64 indexed version, string uri);
@@ -26,6 +30,20 @@ contract YellowBrick {
     constructor() { initialized = true; }
 
     function initialize(bytes32 id, bytes32 hash, address creator, string calldata uri) external {
+        _initialize(id, hash, creator, uri);
+    }
+
+    /// @notice Prefer a content-addressed URI and an explicit digest of its exact metadata bytes.
+    function initializeWithDigest(bytes32 id, bytes32 hash, address creator, string calldata uri, bytes32 digest)
+        external
+    {
+        require(digest != bytes32(0), "Brick: empty digest");
+        _initialize(id, hash, creator, uri);
+        metadataDigest = digest;
+        emit MetadataCommitted(1, digest);
+    }
+
+    function _initialize(bytes32 id, bytes32 hash, address creator, string memory uri) internal {
         require(!initialized, "Brick: initialized");
         require(id != bytes32(0) && hash != bytes32(0) && creator != address(0), "Brick: bad identity");
         initialized = true;
@@ -38,11 +56,23 @@ contract YellowBrick {
         emit BrickInitialized(id, creator, hash);
     }
 
+    /// @dev Legacy updates clear the digest; an old commitment cannot describe new metadata.
     function updateMetadata(string calldata uri) external onlyController {
         require(bytes(uri).length > 0, "Brick: empty metadata");
         metadataURI = uri;
         metadataVersion++;
+        metadataDigest = bytes32(0);
         emit MetadataUpdated(metadataVersion, uri);
+        emit MetadataCommitted(metadataVersion, bytes32(0));
+    }
+
+    function updateMetadataWithDigest(string calldata uri, bytes32 digest) external onlyController {
+        require(bytes(uri).length > 0 && digest != bytes32(0), "Brick: missing metadata commitment");
+        metadataURI = uri;
+        metadataVersion++;
+        metadataDigest = digest;
+        emit MetadataUpdated(metadataVersion, uri);
+        emit MetadataCommitted(metadataVersion, digest);
     }
 
     function proposeController(address next) external onlyController {
