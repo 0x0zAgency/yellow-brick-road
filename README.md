@@ -4,7 +4,15 @@
 
 **The Intellectual Property Protocol for the internet. 🟨**
 
-Independent IP contracts first. Albums, collections, datasets and regeneration megabuildings second. AI is an application, not the identity of the Road.
+> **The asset carries the rights. Not the platform.**
+
+The internet gave every document an address. Blockchains gave digital assets owners. The missing layer is executable intellectual property: persistent identity, verifiable ownership claims, machine-readable usage terms, attribution, and a means to settle value. **Platforms execute, objects govern.**
+
+### Our founding manifesto
+
+**[Read the original AI Rights Object Standard manifesto →](MANIFESTO.md)**
+
+The full manifesto is preserved in its author's original words. The Yellow Brick Road is our effort to build on this rights-aware-asset architecture, with AI as an important application of a general IP protocol.
 
 ## Protocol principles
 
