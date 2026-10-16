@@ -50,8 +50,8 @@ A hash of a source file is not an encryption mechanism. Public fingerprints of u
 
 | Contract | Currently provides | Missing for this flow |
 |---|---|---|
-| `YellowBrick` | Immutable originator, content hash and ID, mutable controller, versioned metadata URI | Metadata digest/version commitment, signed field-level updates, provenance/dispute status, permission-controlled sensitive URI; contract represents a work, not an ERC-721 token |
-| `YellowBrickFactory` | Predictable CREATE2 clone by calling signer, creator == `msg.sender` | Signed mint intents/permit + relayer entry, safe batch mint/partial failure handling, chain-aware receipts, fee sponsorship, factory and schema version registry |
+| `YellowBrick` | Immutable originator, content hash and ID, mutable controller, versioned metadata URI and **optional metadata digest** with committed updates | Field-level signatures, provenance/dispute status, permission-controlled sensitive URI; contract represents a work, not an ERC-721 token |
+| `YellowBrickFactory` | Predictable CREATE2 clone by calling signer, creator == `msg.sender`; **new digest-committed registration path** | Signed mint intents/permit + relayer entry, safe batch mint/partial failure handling, chain-aware receipts, fee sponsorship, factory and schema version registry |
 | `YellowBrickBuilding` | Typed Building, one relationship + evidence hash per Brick, append-only history | Rich per-member **context**, multiple roles for the same Brick, versioned membership/permissions, signer consent when needed, building metadata digest |
 | `YellowBrickLicense` | Controller-issued, licensee-specific fixed-price use and hashed terms | License families/usage units, permission type, rights layers, territory, identity proof, attribution, revocation semantics for prior model training, delegated signatures |
 | `RoadRoyaltySettlement` | License-keyed pay-per-use, split snapshots, replay protection, pull claims, zero Road fee | Multi-Brick/payee pooled settlements, invoice/usage batch Merkle proofs, model lineage evidence policy, accounting denominators, disputable claims, escrow for contested rights |
@@ -66,4 +66,4 @@ The `Mint Studio` UI provides artist identity choice, local file hashing, text m
 
 It **does not** encrypt, upload to IPFS, allocate wallets, call contracts, sign messages, create approvals, collect payments, nor claim successful minting. All those actions require explicit cryptographic, backend and chain integrations, audits and user confirmation.
 
-**Next contract implementation order:** signed creator mint permit + metadata digest; versioned rights-aware Building member roles; approved encrypted storage provider registry; encrypted asset gateway and audited capability access; testnet mint and verified receipt; authenticated licensing/usage reporting.
+**Next contract implementation order:** signed creator mint permit + deterministic metadata digest policy; versioned rights-aware Building member roles; approved encrypted storage provider registry; encrypted asset gateway and audited capability access; testnet mint and verified receipt; authenticated licensing/usage reporting.
