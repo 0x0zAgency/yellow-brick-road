@@ -22,6 +22,7 @@ Open the URL printed by Vite (normally http://localhost:5173). For a production-
 
 ## Screens
 
+- **Manifesto:** Why / What / How / Where landing page with the original AI Rights manifesto, Brick–Building–Road diagrams, and AI source-to-royalty lifecycle.
 - **Overview:** Catalog metrics, featured protocol explanation, activity and budget preview.
 - **Mint Studio:** FL Studio musician wizard with wallet identity modes, browser-local SHA-256 hashing, AES-256-GCM encrypted downloads, Session Blueprint native DAW project files, MP3 ID3 metadata/cover extraction, separate rights objects, storage-intent review, and JSON pre-mint packet export. **No uploading, token-gated access, wallet creation, signing or blockchain minting happens.** [Creator flow and audit](../docs/CREATOR_MINTING.md).
 - **IP Registry:** Search/filter works, inspect metadata, and save local IP drafts.
@@ -51,3 +52,9 @@ The original Solidity system includes working *local blockchain* contracts, but 
 - `web/dist` and `web/node_modules` should never be committed.
 - Demo content is synthetic, not claims to real IP ownership or real use.
 - The root repository currently contains an existing CC0 license; some Solidity files use MIT SPDX headers. Resolve the final code licensing position before wider reuse.
+
+## ENS and demo uploads
+
+Connect a wallet to display its **verified Ethereum-mainnet primary ENS name** when available. Reverse results are checked against forward resolution. Otherwise the interface displays a shortened wallet address; ENS remains a display identity only. Supply an Ethereum mainnet endpoint via `VITE_ENS_RPC_URL` for reliable hosted resolution (no private key). Wallet account changes invalidate a previous name.
+
+In Mint Studio, **all five file selectors accept any extension** for testing. File-role labels are advisory, not a type-validation guarantee. The existing browser hashing/encryption size cap still applies; format-aware parsers may skip unsupported content. The demo does not publish files, mint contracts or verify authorship.

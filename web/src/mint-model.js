@@ -1,10 +1,10 @@
 /** Pure model for creator-side registration packets. No chain or upload operations. */
 export const assetSlots=[
- {id:'master',label:'Master recording',accept:'.wav,.aiff,.aif,.flac,audio/wav',required:true,visibility:'encrypted',brick:'master'},
- {id:'preview',label:'MP3 / listener preview',accept:'.mp3,audio/mpeg',required:false,visibility:'public',brick:'master'},
- {id:'artwork',label:'Cover artwork',accept:'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp',required:false,visibility:'public',brick:'artwork'},
- {id:'project',label:'Session Blueprint / native project file',accept:'.flp,.als,.rpp,.logicx,.cpr,.npr,.ptx,.sesx,.band,.rns,.reason,.song,.bwproject,.aup3,.aup,.osp,.omf,.zip',required:false,visibility:'encrypted',brick:'master'},
- {id:'metadata',label:'Metadata text / JSON',accept:'.txt,.json,application/json,text/plain',required:false,visibility:'encrypted',brick:'master'}
+ {id:'master',label:'Master recording',accept:'*/*',required:true,visibility:'encrypted',brick:'master'},
+ {id:'preview',label:'MP3 / listener preview',accept:'*/*',required:false,visibility:'public',brick:'master'},
+ {id:'artwork',label:'Cover artwork',accept:'*/*',required:false,visibility:'public',brick:'artwork'},
+ {id:'project',label:'Session Blueprint / native project file',accept:'*/*',required:false,visibility:'encrypted',brick:'master'},
+ {id:'metadata',label:'Metadata text / JSON',accept:'*/*',required:false,visibility:'encrypted',brick:'master'}
 ];
 export const trainingModes=[
  {value:'not-authorized',label:'No AI training permission'},
@@ -48,5 +48,5 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
   master.relationships.push({type:'embodies-composition',target:'composition',context:'recording-embodies-work',authorization:'rights-review'});
  }
  const building={standard:'0x0z-road-building',schemaVersion:'1.0.0',type:'recording-session',name:metadata.title.trim()+' / session',members:bricks.map(b=>({ref:b.localId,role:b.role,permission:'unverified'})),context:{daw:metadata.daw||'Unknown DAW',purpose:'creation-and-release',rightsEvidence:'requires-signed-authorizations'}};
- return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,account:{mode:identity.mode,alias:aliasFor(metadata.artist),address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:false,encrypted:false,clientSideEncryptedAssets:files.filter(f=>f.access.ciphertextDigest).map(f=>({role:f.role,digest:f.access.ciphertextDigest}))},bricks,building,notices:['No files uploaded by this prototype. Local encrypted exports are not token-gated or published.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
+ return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,account:{mode:identity.mode,alias:aliasFor(metadata.artist),ensName:(isEvmAddress(identity.address)&&identity.ensName)||null,address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:false,encrypted:false,clientSideEncryptedAssets:files.filter(f=>f.access.ciphertextDigest).map(f=>({role:f.role,digest:f.access.ciphertextDigest}))},bricks,building,notices:['No files uploaded by this prototype. Local encrypted exports are not token-gated or published.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
 }
