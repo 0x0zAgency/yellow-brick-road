@@ -2,7 +2,7 @@ import {useEffect,useMemo,useState} from 'react';
 import {ArrowRight,ArrowUpRight,Blocks,BookOpen,Check,CheckCircle2,ChevronRight,Coins,FileText,GitBranch,Globe2,Image as ImageIcon,Layers3,LayoutDashboard,Menu,Music2,Network,Plus,RadioTower,Search,ShieldCheck,Sparkles,Wallet,X} from 'lucide-react';
 import {seedBricks,seedBuildings,seedLicenses,seedProposals,seedNodes} from './data.js';
 import {filterBricks,members,feeCap,split,money,makeDraft} from './model.js';
-import MintStudio from './MintStudio.jsx';
+import MintStudio from './MintStudioDemo.jsx';
 import Manifesto from './Manifesto.jsx';
 import {useEnsIdentity} from './useEnsIdentity.js';
 
@@ -12,7 +12,7 @@ function readDrafts(key){try{const v=JSON.parse(localStorage.getItem(key));retur
 function Artwork({brick,small=false}){const Icon=brick.category==='Music'?Music2:brick.category==='Visual'?ImageIcon:brick.category==='Writing'?FileText:Sparkles;return <div className={'art '+(brick.tone||'draft')+(small?' small-art':'')}><span className="art-code">{small?'':brick.category+' / IP'}</span><Icon size={small?19:37} strokeWidth={1.25}/><span className="art-index">{small?'':'0x / '+brick.id.toUpperCase()}</span></div>}
 function SectionTitle({title,note,extra}){return <div className="section-title"><div><h2>{title}</h2><p>{note}</p></div>{extra}</div>}
 function Panel({children,extra=''}){return <section className={'panel '+extra}>{children}</section>}
-function Header({page,wallet,identity,onConnect,openMenu}){return <header className="topbar"><div className="breadcrumbs"><button className="mobile-toggle" onClick={openMenu} aria-label="Open navigation"><Menu size={21}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{nav.find(x=>x[0]===page)?.[1]}</strong></div><div className="top-actions"><span className="demo-tag"><i/> DEMO ENVIRONMENT</span><button className="wallet" onClick={onConnect} title={wallet?(identity.ensName?identity.ensName+" · ":"")+wallet+" · Read-only identity; no transactions.":"Connect wallet (no transactions)"}><Wallet size={15}/>{wallet?<span className="road-wallet-label"><strong>{identity.displayName}</strong>{identity.ensName&&<small>{wallet.slice(0,6)}…{wallet.slice(-4)} · verified ENS</small>}</span>:"Connect wallet"}</button></div></header>}
+function Header({page,wallet,identity,onConnect,openMenu}){return <header className="topbar"><div className="breadcrumbs"><button className="mobile-toggle" onClick={openMenu} aria-label="Open navigation"><Menu size={21}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{nav.find(x=>x[0]===page)?.[1]}</strong></div><div className="top-actions"><span className="demo-tag"><i/> DEMO ENVIRONMENT</span><button className="wallet" onClick={onConnect} title={wallet?"Connected identity (demo)":"Connect wallet (demo)"}><Wallet size={15}/>{wallet?identity.displayName:"Connect wallet"}</button></div></header>}
 function Modal({item,close,saveBrick,saveBuilding,bricks,buildings}){
  const [form,setForm]=useState({title:'',creator:'',category:'Music',detail:'',type:'Album'});
  const [selected,setSelected]=useState([]);
@@ -77,5 +77,5 @@ export default function App(){
  {page==='buildings'&&<Buildings buildings={buildings} bricks={bricks} open={open}/>}
  {page==='royalties'&&<Royalties bricks={bricks} open={open}/>}
  {page==='governance'&&<Governance/>}{page==='network'&&<RoadNetwork/>}
- <footer className="foot">Built by: <a href="https://github.com/0x0zAgency" target="_blank" rel="noreferrer">0x0z</a> ❤️ · Public IP infrastructure <a href="https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/CONSTITUTION.md" target="_blank" rel="noreferrer">Draft constitution <ArrowUpRight size={13}/></a></footer></main></div>{notice&&<div className="toast-note" role="status"><CheckCircle2 size={17}/>{notice}<button onClick={()=>setNotice('')}><X size={14}/></button></div>}{modal&&<Modal item={modal} close={()=>setModal(null)} saveBrick={saveBrick} saveBuilding={saveBuilding} bricks={bricks} buildings={buildings}/>}</div>;
+ <footer className="foot"><span className="footer-demo-warning">FOR DEMO PURPOSES</span> · Built by: <a href="https://github.com/0x0zAgency" target="_blank" rel="noreferrer">0x0z</a> ❤️ · Public IP infrastructure <a href="https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/CONSTITUTION.md" target="_blank" rel="noreferrer">Draft constitution <ArrowUpRight size={13}/></a></footer></main></div>{notice&&<div className="toast-note" role="status"><CheckCircle2 size={17}/>{notice}<button onClick={()=>setNotice('')}><X size={14}/></button></div>}{modal&&<Modal item={modal} close={()=>setModal(null)} saveBrick={saveBrick} saveBuilding={saveBuilding} bricks={bricks} buildings={buildings}/>}</div>;
 }
