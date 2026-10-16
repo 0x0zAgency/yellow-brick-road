@@ -6,13 +6,17 @@ The first web interfaces for the Yellow Brick Road IP protocol.
 
 ## Start
 
-Requirements: Node.js 22.12+ (Node.js 24 recommended), npm.
+Requirements: **Node.js 22.12 or newer** (Node.js **24 recommended**), npm. The repo includes `web/.nvmrc` to select Node 24 with nvm.
 
 ```sh
 cd web
+nvm install
+nvm use
 npm install
 npm run dev
 ```
+
+If `nvm` is not installed, install Node.js 24 by another method and omit the two `nvm` commands. If you see `node:util does not provide an export named styleText`, your Node.js runtime is too old. Check `node -v`, upgrade, remove `web/node_modules` and reinstall.
 
 Open the URL printed by Vite (normally http://localhost:5173). For a production-style static bundle, run `npm run build`; it writes `web/dist/`. Run `npm run test` to exercise the fee, split and catalog models.
 
