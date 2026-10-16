@@ -1,0 +1,7 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {extractId3} from '../src/mp3-tags.js';
+const enc=new TextEncoder();
+const frame=(id,body)=>{const b=enc.encode(id),n=body.length;return Uint8Array.from([...b,(n>>>24)&255,(n>>>16)&255,(n>>>8)&255,n&255,0,0,...body])};
+const tag=(frames)=>{const content=Uint8Array.from(frames.flatMap(f=>[...f]));const n=content.length;return Uint8Array.from([73,68,51,3,0,0,(n>>>21)&127,(n>>>14)&127,(n>>>7)&127,n&127,...content])};
+test('reads ID3 text frames from uploaded MP3',()=>{const data=tag([frame('TIT2',Uint8Array.from([3,...enc.encode('Dance With Me')])),frame('TPE1',Uint8Array.from([3,...enc.encode('Producer 0z')])),frame('TBPM',Uint8Array.from([3,...enc.encode('124')]))]);const result=extractId3(data);assert.deepEqual(result.fields,{title:'Dance With Me',artist:'Producer 0z',bpm:'124'})});
+test('extracts embedded APIC art independently',()=>{const art=Uint8Array.from([1,2,3,4]);const header=Uint8Array.from([0,...enc.encode('image/png'),0,3,0,...art]);const output=extractId3(tag([frame('APIC',header)]));assert.equal(output.artwork.mime,'image/png');assert.deepEqual([...output.artwork.bytes],[...art])});
+test('malformed or untagged MP3 data cannot produce claims',()=>{assert.deepEqual(extractId3(Uint8Array.from([0,1,2])).fields,{});const bad=Uint8Array.from([73,68,51,3,0,128,0,0,0,20]);assert.deepEqual(extractId3(bad).fields,{})});
