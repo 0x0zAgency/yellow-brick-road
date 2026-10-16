@@ -1,0 +1,24 @@
+name: Web UI
+on:
+  push:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web.yml'
+  pull_request:
+    paths:
+      - 'web/**'
+      - '.github/workflows/web.yml'
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install UI dependencies
+        run: npm --prefix web install --no-audit --no-fund
+      - name: Test model logic
+        run: npm --prefix web test
+      - name: Build Vite frontend
+        run: npm --prefix web run build

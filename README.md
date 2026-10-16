@@ -44,6 +44,20 @@ The demo registers a Yellow Brick, includes it in an album, issues an economic l
 
 This is a local Hardhat demonstration. **No production assets or real dollars are involved.**
 
+## Web interface (React + Vite + Bootstrap)
+
+A responsive **0x🟨 Road Explorer** prototype now lives in [`web/`](web/README.md). It includes a dashboard, searchable IP registry, composable structures, royalty-split simulator, weighted governance demo, and Road node views.
+
+Run it locally:
+
+```sh
+cd web
+npm install
+npm run dev
+```
+
+The UI uses **synthetic sample records** and browser-local draft storage; drafts, votes, licensing examples, balances and node status are **not on-chain**. Connecting a wallet only requests an account address and does not deploy contracts or sign transactions. [Web UI documentation](web/README.md) explains the limitations.
+
 ## Documentation
 
 - [Architecture](docs/ARCHITECTURE.md)

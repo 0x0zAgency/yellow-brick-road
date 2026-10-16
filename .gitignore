@@ -7,3 +7,7 @@ coverage.json
 .env.*
 !.env.example
 .DS_Store
+
+web/dist/
+web/.env
+web/.env.local

@@ -1,0 +1,48 @@
+# 0x🟨 Road Explorer
+
+The first web interfaces for the Yellow Brick Road IP protocol.
+
+**Stack:** React 19, Vite 8, Bootstrap 5.3 and Lucide icons. The frontend is independent of the existing Hardhat/Solidity toolchain.
+
+## Start
+
+Requirements: Node.js 22.12+ (Node.js 24 recommended), npm.
+
+```sh
+cd web
+npm install
+npm run dev
+```
+
+Open the URL printed by Vite (normally http://localhost:5173). For a production-style static bundle, run `npm run build`; it writes `web/dist/`. Run `npm run test` to exercise the fee, split and catalog models.
+
+## Screens
+
+- **Overview:** Catalog metrics, featured protocol explanation, activity and budget preview.
+- **IP Registry:** Search/filter works, inspect metadata, and save local IP drafts.
+- **Structures:** Inspect independent brick membership and create local album/collection/regeneration reference sets.
+- **Licenses & royalties:** Example license declarations and a working $1 split calculator; mock totals, no transfers.
+- **Governance:** Demo proposals and local-only ballots, a fee quote and budget-cap simulator.
+- **Road network:** Illustrative Road operators and the distinction between actual blockchain nodes and IP contracts.
+
+## What is real and what isn't
+
+**Real:** responsive frontend code, persisted local drafts, search/filter, relationship composition, calculations, and browser-wallet connection *for account identification only*.
+
+**Not real:** the sample licenses, on-chain contract addresses, royalties, token transfers, votes, node status, budgets or sample events. No production blockchain contracts are configured or deployed from this interface. No wallet signing or blockchain writing occurs.
+
+The original Solidity system includes working *local blockchain* contracts, but this frontend deliberately does not claim to connect to deployed versions. Connecting a wallet uses `eth_requestAccounts` and is optional. No private keys are stored. Browser-local drafts are only available on that device and can disappear when local data is cleared.
+
+### Follow-up integrations
+
+1. Select a chain/testnet and deploy versioned contracts for an actual pilot.
+2. Index factory `BrickDeployed`, building relationships and license/royalty events through a verifiable read-only API.
+3. Add explicit network, factory and rights-module configuration, wallet chain checking, transaction review and gas estimates before enabling any on-chain writes.
+4. Introduce authenticated rights grants and a secure settlement/treasury integration with budget caps before displaying any real royalty balance.
+5. Implement real participant identity and qualified node attestation beyond the demo.
+
+## Notes
+
+- `web/dist` and `web/node_modules` should never be committed.
+- Demo content is synthetic, not claims to real IP ownership or real use.
+- The root repository currently contains an existing CC0 license; some Solidity files use MIT SPDX headers. Resolve the final code licensing position before wider reuse.
