@@ -3,7 +3,7 @@ export const assetSlots=[
  {id:'master',label:'Master recording',accept:'.wav,.aiff,.aif,.flac,audio/wav',required:true,visibility:'encrypted',brick:'master'},
  {id:'preview',label:'MP3 / listener preview',accept:'.mp3,audio/mpeg',required:false,visibility:'public',brick:'master'},
  {id:'artwork',label:'Cover artwork',accept:'image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp',required:false,visibility:'public',brick:'artwork'},
- {id:'project',label:'FL Studio project / stems',accept:'.flp,.zip,.rar,.7z,.wav',required:false,visibility:'encrypted',brick:'master'},
+ {id:'project',label:'Session Blueprint / native project file',accept:'.flp,.als,.rpp,.logicx,.cpr,.npr,.ptx,.sesx,.band,.rns,.reason,.song,.bwproject,.aup3,.aup,.osp,.omf,.zip',required:false,visibility:'encrypted',brick:'master'},
  {id:'metadata',label:'Metadata text / JSON',accept:'.txt,.json,application/json,text/plain',required:false,visibility:'encrypted',brick:'master'}
 ];
 export const trainingModes=[
@@ -20,7 +20,7 @@ export function parseMetadataText(text){
 }
 export function assetRecord(slot,item){
  if(!item?.hash)return null;
- return {role:slot.id,name:item.name,mediaType:item.type||'application/octet-stream',byteLength:item.size,integrity:{algorithm:'sha2-256',digest:'0x'+item.hash},access:{visibility:slot.visibility,storageStatus:'not-uploaded',encryption:slot.visibility==='encrypted'?'required-before-upload':'none'},cid:null};
+ return {role:slot.id,name:item.name,mediaType:item.type||'application/octet-stream',byteLength:item.size,integrity:{algorithm:'sha2-256',digest:'0x'+item.hash},access:{visibility:slot.visibility,storageStatus:'not-uploaded',encryption:slot.visibility==='encrypted'?(item.encryption?.sha256?'AES-256-GCM / local-exported':'required-before-upload'):'none',ciphertextDigest:item.encryption?.sha256?'0x'+item.encryption.sha256:null},cid:null};
 }
 export function validateMintInput({metadata,assets,identity,royalties}){
  const errors=[];
@@ -48,5 +48,5 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
   master.relationships.push({type:'embodies-composition',target:'composition',context:'recording-embodies-work',authorization:'rights-review'});
  }
  const building={standard:'0x0z-road-building',schemaVersion:'1.0.0',type:'recording-session',name:metadata.title.trim()+' / FL Studio session',members:bricks.map(b=>({ref:b.localId,role:b.role,permission:'unverified'})),context:{daw:'FL Studio',purpose:'creation-and-release',rightsEvidence:'requires-signed-authorizations'}};
- return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,account:{mode:identity.mode,alias:aliasFor(metadata.artist),address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:false,encrypted:false},bricks,building,notices:['No files uploaded or encrypted by this prototype.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
+ return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,account:{mode:identity.mode,alias:aliasFor(metadata.artist),address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:false,encrypted:false,clientSideEncryptedAssets:files.filter(f=>f.access.ciphertextDigest).map(f=>({role:f.role,digest:f.access.ciphertextDigest}))},bricks,building,notices:['No files uploaded by this prototype. Local encrypted exports are not token-gated or published.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
 }
