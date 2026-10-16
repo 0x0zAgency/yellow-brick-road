@@ -19,6 +19,7 @@ Open the URL printed by Vite (normally http://localhost:5173). For a production-
 ## Screens
 
 - **Overview:** Catalog metrics, featured protocol explanation, activity and budget preview.
+- **Mint Studio:** FL Studio musician wizard with wallet identity modes, browser-local SHA-256 hashing, MP3 ID3 metadata/cover extraction, separate rights objects, storage-intent review, and JSON pre-mint packet export. **No uploading, encryption, wallet creation, signing or blockchain minting happens.** [Creator flow and audit](../docs/CREATOR_MINTING.md).
 - **IP Registry:** Search/filter works, inspect metadata, and save local IP drafts.
 - **Structures:** Inspect independent brick membership and create local album/collection/regeneration reference sets.
 - **Licenses & royalties:** Example license declarations and a working $1 split calculator; mock totals, no transfers.
