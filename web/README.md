@@ -23,7 +23,7 @@ Open the URL printed by Vite (normally http://localhost:5173). For a production-
 ## Screens
 
 - **Overview:** Catalog metrics, featured protocol explanation, activity and budget preview.
-- **Mint Studio:** FL Studio musician wizard with wallet identity modes, browser-local SHA-256 hashing, MP3 ID3 metadata/cover extraction, separate rights objects, storage-intent review, and JSON pre-mint packet export. **No uploading, encryption, wallet creation, signing or blockchain minting happens.** [Creator flow and audit](../docs/CREATOR_MINTING.md).
+- **Mint Studio:** FL Studio musician wizard with wallet identity modes, browser-local SHA-256 hashing, AES-256-GCM encrypted downloads, Session Blueprint native DAW project files, MP3 ID3 metadata/cover extraction, separate rights objects, storage-intent review, and JSON pre-mint packet export. **No uploading, token-gated access, wallet creation, signing or blockchain minting happens.** [Creator flow and audit](../docs/CREATOR_MINTING.md).
 - **IP Registry:** Search/filter works, inspect metadata, and save local IP drafts.
 - **Structures:** Inspect independent brick membership and create local album/collection/regeneration reference sets.
 - **Licenses & royalties:** Example license declarations and a working $1 split calculator; mock totals, no transfers.
@@ -32,7 +32,7 @@ Open the URL printed by Vite (normally http://localhost:5173). For a production-
 
 ## What is real and what isn't
 
-**Real:** responsive frontend code, persisted local drafts, search/filter, relationship composition, calculations, and browser-wallet connection *for account identification only*.
+**Encryption:** Optional local AES-256-GCM protected downloads with a passphrase-derived key (PBKDF2-SHA-256, 310,000 iterations, fresh salt and IV per asset). No server receives the files or passphrase. There is no recovery or token-based unlocking yet. Protect your passphrase and retain your original file.\n\n**Real:** responsive frontend code, persisted local drafts, search/filter, relationship composition, calculations, and browser-wallet connection *for account identification only*.
 
 **Not real:** the sample licenses, on-chain contract addresses, royalties, token transfers, votes, node status, budgets or sample events. No production blockchain contracts are configured or deployed from this interface. No wallet signing or blockchain writing occurs.
 
