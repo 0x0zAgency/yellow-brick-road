@@ -3,7 +3,7 @@ export const assetSlots=[
  {id:'master',label:'Master recording',accept:'*/*',required:true,visibility:'encrypted',brick:'master'},
  {id:'preview',label:'MP3 / listener preview',accept:'*/*',required:false,visibility:'public',brick:'master'},
  {id:'artwork',label:'Cover artwork',accept:'*/*',required:false,visibility:'public',brick:'artwork'},
- {id:'project',label:'Session Blueprint / native project file',accept:'*/*',required:false,visibility:'encrypted',brick:'master'},
+ {id:'project',label:'Project File / native DAW project',accept:'*/*',required:false,visibility:'encrypted',brick:'master'},
  {id:'metadata',label:'Metadata text / JSON',accept:'*/*',required:false,visibility:'encrypted',brick:'master'}
 ];
 export const trainingModes=[
