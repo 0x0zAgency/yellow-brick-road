@@ -60,6 +60,20 @@ describe("Road utility governance, node eligibility, and fee caps", function() {
     assert.equal((await treasury.collected()).toNumber(),1500);
     assert.equal((await usd.balanceOf(treasury.address)).toNumber(),1500);
   });
+  it("stops fees at period expiry and rolls unspent treasury funds forward",async function(){
+    await approveProposal(citizenA,treasury.address,treasury.interface.encodeFunctionData("openBudget",[2000,100]));
+    await (await treasury.connect(outsider).collect(100000,1000)).wait();
+    assert.equal((await usd.balanceOf(treasury.address)).toNumber(),1000);
+    await advance(31*24*60*60);
+    assert.equal((await treasury.quote(1000000)).toNumber(),0);
+    await approveProposal(citizenA,treasury.address,treasury.interface.encodeFunctionData("openBudget",[2500,100]));
+    // Authorized budget 2,500 minus 1,000 unspent reserves = 1,500 new capacity.
+    assert.equal((await treasury.target()).toNumber(),1500);
+    assert.equal((await treasury.collected()).toNumber(),0);
+    await (await treasury.connect(outsider).collect(200000,2000)).wait();
+    assert.equal((await treasury.collected()).toNumber(),1500);
+    assert.equal((await usd.balanceOf(treasury.address)).toNumber(),2500);
+  });
   it("only enrolled operator service payments pass voted eligibility and replay protection",async function(){
     await approveProposal(citizenA,treasury.address,treasury.interface.encodeFunctionData("openBudget",[1000,100]));
     await (await treasury.connect(outsider).collect(100000,1000)).wait();
