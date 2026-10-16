@@ -27,11 +27,10 @@ describe("Road license and royalties", function() {
       [creator.address, coauthor.address], [8000, 2000])).wait();
     await (await usd.mint(buyer.address, 10 * PRICE)).wait();
     await (await usd.connect(buyer).approve(settlement.address, 10 * PRICE)).wait();
-    const issue = licenses.connect(creator).issueLicense(brick.address, buyer.address,
-      usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1"));
     licenseId = await licenses.connect(creator).callStatic.issueLicense(brick.address, buyer.address,
       usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1"));
-    await (await issue).wait();
+    await (await licenses.connect(creator).issueLicense(brick.address, buyer.address,
+      usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1"))).wait();
   });
   it("routes one mock-dollar as exact 80/20 royalties, no Road fee", async function() {
     await (await settlement.connect(buyer).settle(licenseId, hash("use-1"), hash("attestation-1"))).wait();
