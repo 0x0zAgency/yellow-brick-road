@@ -5,7 +5,7 @@ This document audits the existing on-chain API against the FL Studio → rights-
 ## User journey
 
 1. **Identity:** connect a self-custodied EVM wallet, or start assisted onboarding. Assisted wallets must be created or derived by a security-reviewed wallet service (ideally account abstraction / user-controlled recovery) and assigned with auditable batch receipts. A node must **never** export private keys or become a permanent unilateral rights custodian. The current frontend simulates this choice only.
-2. **Collect:** accept master WAV/AIFF/FLAC, MP3 preview with embedded ID3 metadata, cover image, FL Studio project/stems, metadata TXT/JSON. Read sidecar metadata only with user consent; reconcile with embedded tags and user edits. A sample rate and codec extractor is a later integration.
+2. **Collect:** accept master WAV/AIFF/FLAC, MP3 preview with embedded ID3 metadata, cover image, native DAW Session Blueprint project file, metadata TXT/JSON. Read sidecar metadata only with user consent; reconcile with embedded tags and user edits. A sample rate and codec extractor is a later integration.
 3. **Model separate IP:** original composition (musical work) and its recording (master) are distinct rights objects where applicable; cover artwork is independently owned and licensed. WAV/MP3 are asset representations of the master, not automatically separate rights objects. A Building defines the FL Studio session, release, album, or training context and its relationship/role/rights evidence.
 4. **Validate and preview:** capture creators, contributors, rights claims, rights territories and dates, shares, identifiers, derivation, third-party samples and clearances, AI license options. Do not assert copyright adjudication or verified credits.
 5. **Store:** produce a *public*, separately minimized metadata manifest and encrypted *private* assets before network upload. Prefer encrypted bytes on IPFS with CID of **ciphertext**, plus salted/blinded commitments to unreleased originals where appropriate. For alternate storage use a **governance-approved provider registry with immutable policy IDs, audit events and an exit/migration process**. No live storage integration exists.
@@ -64,6 +64,10 @@ A hash of a source file is not an encryption mechanism. Public fingerprints of u
 
 The `Mint Studio` UI provides artist identity choice, local file hashing, text metadata import, track metadata editing, training rights selection, storage intent, optional composition Brick, independent artwork Brick, a simulated Building, validation and a downloadable registration packet.
 
-It **does not** encrypt, upload to IPFS, allocate wallets, call contracts, sign messages, create approvals, collect payments, nor claim successful minting. All those actions require explicit cryptographic, backend and chain integrations, audits and user confirmation.
+It supports local encrypted exports but **does not** upload to IPFS, allocate wallets, call contracts, sign messages, create approvals, collect payments, nor claim successful minting. All those actions require explicit cryptographic, backend and chain integrations, audits and user confirmation.
 
 **Next contract implementation order:** signed creator mint permit + deterministic metadata digest policy; versioned rights-aware Building member roles; approved encrypted storage provider registry; encrypted asset gateway and audited capability access; testnet mint and verified receipt; authenticated licensing/usage reporting.
+
+## Local file encryption and Session Blueprints
+
+A **Session Blueprint** is the saved native project file from the creator's DAW, not a stems export. The demo supports an optional local `.roadenc` AES-256-GCM download with PBKDF2-SHA-256 passphrase derivation, a random salt, and a fresh IV per file. The encryption container is authenticated. Neither upload nor licensed remote access is implemented. Users must retain the passphrase and original file; there is no recovery system. Production needs independent cryptographic review, token-based key delivery, large-file streaming, and an approved storage provider registry.
