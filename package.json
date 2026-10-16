@@ -1,0 +1,16 @@
+{
+  "name": "@0x0z/yellow-brick-road",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IP-first Yellow Brick Road protocol prototype",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "clean": "hardhat clean"
+  },
+  "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "ethers": "^5.7.2",
+    "hardhat": "^2.22.0"
+  }
+}
