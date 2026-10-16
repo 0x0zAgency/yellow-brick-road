@@ -1,27 +1,20 @@
-# Roadmap
+# Yellow Brick Road roadmap
 
-### Phase 1: Individual bricks (prototype)
-- EIP-1167 minimal-proxy IP contracts, deterministic CREATE2 addresses and metadata.
-- No Road platform registration fee; deployer pays base-chain gas.
-- Test repeat registration, independent controllers and permission checks.
+## Completed prototype foundation
+- CREATE2 / EIP-1167 per-work brick contracts, independent owners, no factory markup.
+- Composable album and regeneration buildings referencing existing IP bricks.
+- Opt-in creator-issued license declarations, expiry and revocation.
+- Immutable payout-policy versions and $1 mock-dollar royalty flow split 80/20.
+- Replay-resistant per-license usage identifiers, evidence commitments and pull-based claims.
+- Entirely local deterministic demo (`npm run demo`) and automated Hardhat test cases.
 
-### Phase 2: Buildings (prototype)
-- Deploy album and regeneration structures referencing separate bricks.
-- Test that a brick may appear in several structures without a transfer.
-- Distinguish membership assertion from permission to use.
+## Next
+- Enforce true signed license agreements, separate rights authorities, disputes, recipient authorization and creator revocation semantics.
+- Benchmark fees, limits, token safety, evidence availability and audits. Test with adversarial ERC-20 mock implementations.
+- Road treasury with transparent vote-approved period caps and carried reserves (not implemented).
+- Attested qualifying blockchain-node service and operator eligibility (not implemented).
+- All-user Sybil-resistant weighted governance with open auditability (not implemented).
+- Chain-independent IP IDs, upgrade/portability design, multiple collection structures and UI explorer.
 
-### Phase 3: Licensing, usage and royalties (future)
-- Versioned AI and non-AI licenses and proof-carrying usage events.
-- Source provenance graph with authenticated and replay-protected usage batches.
-- Exact integer accounting for per-IP splits, including an 80/20 test.
-
-### Phase 4: Funded node services (future)
-- Blockchain-node operation verification plus challengeable Road service measurements.
-- Approved-budget maximum collection and cap-boundary tests.
-- Treasury roll-forward, audited service payouts, operator appeals.
-
-### Phase 5: All-user weighted governance (future)
-- Baseline participation, capped earned influence, privacy-respecting anti-Sybil protections.
-- Proposals, timelocks, weighted snapshots, thresholds and public reports.
-
-**Release gates:** clean Solidity compilation and reproducible tests, contract security review, legal analysis, and an independent audit before processing real royalties.
+## Safety / scope
+Current economic flow uses freely-mintable MockUSD and has **zero Road operating fee**. It demonstrates accounting, not copyright or actual model use verification. Smart contracts are experimental, unaudited, and unsuitable for real assets until external security and legal reviews.

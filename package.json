@@ -1,11 +1,12 @@
 {
   "name": "@0x0z/yellow-brick-road",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "IP-first Yellow Brick Road protocol prototype",
+  "description": "Independent intellectual property protocol prototype",
   "scripts": {
     "compile": "hardhat compile",
     "test": "hardhat test",
+    "demo": "hardhat run scripts/demo.js",
     "clean": "hardhat clean"
   },
   "devDependencies": {
