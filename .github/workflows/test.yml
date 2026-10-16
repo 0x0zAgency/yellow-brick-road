@@ -12,3 +12,18 @@ jobs:
       - run: npm run compile
       - run: npm test
       - run: npm run demo
+      - name: Ganache local mint smoke
+        run: |
+          npm run ganache > /tmp/road-ganache.log 2>&1 &
+          GANACHE_PID=$!
+          trap 'kill "$GANACHE_PID" 2>/dev/null || true' EXIT
+          READY=0
+          for attempt in {1..30}; do
+            if curl -fsS -H 'Content-Type: application/json' --data '{"jsonrpc":"2.0","method":"eth_chainId","params":[],"id":1}' http://127.0.0.1:8545 | grep -q '0x539'; then
+              READY=1
+              break
+            fi
+            sleep 1
+          done
+          if [ "$READY" -ne 1 ]; then cat /tmp/road-ganache.log; exit 1; fi
+          npm run ganache:smoke
