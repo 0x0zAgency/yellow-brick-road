@@ -34,6 +34,24 @@ contract YellowBrickFactory {
         emit BrickDeployed(id, brick, msg.sender, contentHash);
     }
 
+    /// @notice Commit an exact metadata document digest at initial registration.
+    /// @dev The on-chain digest proves a commitment, not ownership or truth of claimed facts.
+    function deployBrickWithMetadataDigest(
+        bytes32 contentHash, string calldata uri, bytes32 metadataDigest, bytes32 nonce
+    ) external returns (address brick) {
+        require(contentHash != bytes32(0) && bytes(uri).length > 0 && metadataDigest != bytes32(0),
+                "Factory: invalid metadata registration");
+        bytes32 salt = deploymentSalt(msg.sender, contentHash, nonce);
+        bytes memory code = minimalProxyCode(implementation);
+        assembly { brick := create2(0, add(code, 32), mload(code), salt) }
+        require(brick != address(0), "Factory: duplicate or failed");
+        bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
+        YellowBrick(brick).initializeWithDigest(id, contentHash, msg.sender, uri, metadataDigest);
+        isBrick[brick] = true;
+        brickById[id] = brick;
+        emit BrickDeployed(id, brick, msg.sender, contentHash);
+    }
+
     function predictBrickAddress(address originator, bytes32 contentHash, bytes32 nonce)
         external view returns (address)
     {
