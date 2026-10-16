@@ -1,78 +1,130 @@
 # 0x🟨 Road
 
-**The Yellow Brick Road of 0x0z.**
+**The Intellectual Property Protocol for the Internet.**
 
-**The Intellectual Property Protocol for the internet. 🟨**
+*The Yellow Brick Road of 0x0z.*
 
 > **The asset carries the rights. Not the platform.**
+>
+> **Platforms execute. Objects govern.**
 
-The internet gave every document an address. Blockchains gave digital assets owners. The missing layer is executable intellectual property: persistent identity, verifiable ownership claims, machine-readable usage terms, attribution, and a means to settle value. **Platforms execute, objects govern.**
+## Why: The internet is missing an IP layer
 
-### Our founding manifesto
+The internet was built to move information, not to preserve the rights attached to it.
 
-**[Read the original AI Rights Object Standard manifesto →](MANIFESTO.md)**
+A photograph can be shared, a song sampled, a book digitized, and a creative archive used to train artificial intelligence. The content moves across systems, but its identity, provenance, permissions, attribution, and compensation rarely travel with it.
 
-The full manifesto is preserved in its author's original words. The Yellow Brick Road is our effort to build on this rights-aware-asset architecture, with AI as an important application of a general IP protocol.
+Every platform is left to reconstruct that information, build its own licensing machinery, or ignore it.
 
-## Protocol principles
+**This is not simply a legal problem. It is an architectural problem.** We built digital networks around files, databases, and platforms instead of rights-aware assets.
 
-- **One Yellow Brick = one addressable IP contract** with a creator claim, persistent content commitment and controller.
-- **Buildings reference existing IP.** No implicit rights transfer or permission to use underlying works.
-- **No Road registration charge.** Creators pay blockchain gas to deploy their IP contracts.
-- **No speculative token.** Future Road infrastructure payments can only go to qualified blockchain-node operators for measured useful services. Ordinary creators receive licensed royalties without operating nodes.
-- **Budget-capped usage microfees.** Once authorized utility funding is collected, fee collection stops. A separate treasury prototype now tests capped collection; **the royalty settlement contract still collects zero Road operating fees**. The treasury has not been integrated into actual licensed transactions.
-- **All users vote, weighted.** Each uniquely verified participant has baseline influence; additional influence will be bounded and earned, not bought.
+The internet needs a common intellectual property layer where creative works can identify themselves, communicate permissions, establish relationships, and participate in economic transactions without depending on the platform that holds them.
 
-## Working prototype: bricks, royalties, and public utility
+**The work should carry its rights wherever it goes.**
 
-| Contract | Capability |
-|---|---|
-| [YellowBrick](contracts/YellowBrick.sol) | Independent work contract, originator, content hash, metadata and controller |
-| [YellowBrickFactory](contracts/YellowBrickFactory.sol) | Deterministic EIP-1167 clone deployment |
-| [YellowBrickBuilding](contracts/YellowBrickBuilding.sol) | Typed membership referencing independent brick contracts |
-| [YellowBrickLicense](contracts/YellowBrickLicense.sol) | Controller-declared economic licenses with fixed use price, expiry, committed terms |
-| [RoadRoyaltySettlement](contracts/RoadRoyaltySettlement.sol) | Versioned split policies, replay-protected usage settlement and pull-based royalties |
-| [MockUSD](contracts/test/MockUSD.sol) | Six-decimal, freely minted **test-only** payment asset |
-| [RoadGovernance](contracts/RoadGovernance.sol) | Weighted attested-user votes, two-day voting and one-day execution delay |
-| [RoadNodeRegistry](contracts/RoadNodeRegistry.sol) | Governance-attested operator eligibility and service evidence |
-| [RoadTreasury](contracts/RoadTreasury.sol) | 30-day budget periods, capped utility fees and governed node service payouts |
+[Read the original founding manifesto: The AI Rights Object Standard](MANIFESTO.md).
 
-### Run
+## What: The Yellow Brick Road
 
-Requires Node.js 20+ and npm:
+0x🟨 Road is an open protocol for executable intellectual property. It provides a shared language for an individual work's identity, claimed rights, licensing conditions, attribution, relationships, and settlement.
 
-```sh
-npm install
-npm run compile
-npm test
-npm run demo
-```
+### Yellow Bricks: Identity
 
-The demo registers a Yellow Brick, includes it in an album, issues an economic license to one test user, and accounts for one test-dollar of usage royalties split $0.80/$0.20.
+A **Yellow Brick** is an individually addressable intellectual property object: a song, photograph, manuscript, design, dataset, or software component.
 
-This is a local Hardhat demonstration. **No production assets or real dollars are involved.**
+Each Brick can reference a persistent content commitment, its originator and rights controller, metadata, and machine-readable licensing terms. A Brick is not confined to one album, publisher, application, or platform.
 
-## Web interface (React + Vite + Bootstrap)
+**Bricks establish what the IP is.**
 
-A responsive **0x🟨 Road Explorer** prototype now lives in [`web/`](web/README.md). It includes a dashboard, searchable IP registry, composable structures, royalty-split simulator, weighted governance demo, and Road node views.
+### Buildings: Context
 
-Run it locally:
+A **Building defines the context in which intellectual property is organized, presented, or used.** This is more than a collection of files: it describes the role and relationships of the participating IP.
 
-```sh
-cd web
-npm install
-npm run dev
-```
+A song may appear in an album, a compilation, a film, or a training dataset. Each context describes a different use and may be governed by different permissions.
 
-The UI uses **synthetic sample records** and browser-local draft storage; drafts, votes, licensing examples, balances and node status are **not on-chain**. Connecting a wallet only requests an account address and does not deploy contracts or sign transactions. [Web UI documentation](web/README.md) explains the limitations.
+An **album** organizes recordings, compositions, and artwork into a release. A **compilation** brings works from multiple creators together. A **book** assembles text, illustrations, and photographs. A **photograph** may itself be a finished work incorporating independently identifiable elements. A **schema** defines relationships among information objects. A **training dataset** records the source works, authorized uses, attribution rules, and other agreed conditions of training.
 
-## Documentation
+Buildings describe these relationships without replacing the underlying Bricks. Merely referencing a work does not grant permission: authorization comes from the rights and licenses applicable to that context.
 
-- [Architecture](docs/ARCHITECTURE.md)
-- [Draft public-utility constitution](docs/CONSTITUTION.md)
-- [Roadmap](docs/ROADMAP.md)
-- [Utility governance v0.3 and trust assumptions](docs/UTILITY_GOVERNANCE.md)
+**Buildings establish what the IP is doing.**
 
-**Caveats:** Neither on-chain registration nor a content commitment proves copyright ownership. A usage evidence hash is only an attestation, not proof of neural-model causal influence. The voter enrollment attester and node-service eligibility are still centralized trust assumptions and are not production identity or node proofs. Actual licenses require review of the full terms and the legal rights involved. The contracts are unaudited and not safe for actual royalty custody.
+### The Road: Interoperability
 
-The original CC0 repository LICENSE is preserved; source-level MIT identifiers require a final consistent licensing decision.
+The **Road** is the common protocol connecting Bricks, Buildings, creators, and the systems using their work.
+
+It allows software to find an IP object, understand how it participates in a given context, read applicable rights information, record authorized use, and settle value according to an agreement.
+
+It is not a store, record label, AI company, marketplace, or a single blockchain. It is the common rights layer those systems can speak.
+
+**Bricks are identity. Buildings are context. The Road is interoperability.**
+
+## How: Executable intellectual property
+
+Instead of separating content from rights information, the Road makes rights-readable objects part of the architecture.
+
+An IP object should be able to answer:
+
+**Who owns me?** A persistent identity, provenance record, and evidence of the parties claiming or controlling rights.
+
+**How may I be used?** Machine-readable terms for access, training, publication, reproduction, transformation, and other contexts.
+
+**What is owed, and to whom?** Agreed attribution requirements, eligible recipients, royalty allocations, and auditable settlement records.
+
+The protocol records and communicates rights claims and agreements; it does not independently adjudicate copyright ownership. The platform implements the common protocol instead of inventing a different accounting system for each class of creative work.
+
+**Implement once. Rights travel with the asset.**
+
+### AI training, provenance, and generational rights
+
+Artificial intelligence makes the need for a native intellectual property layer especially urgent.
+
+Creative works enter training datasets carrying identities, owners, histories, and rights. Traditional AI pipelines frequently separate the data from that information, making attribution and compensation difficult to maintain.
+
+The Yellow Brick Road proposes a different architecture.
+
+A creator can authorize the use of a Yellow Brick for AI training under machine-readable terms. Those terms may require attribution, auditable inclusion in training records, limitations on model use, and royalties arising from subsequent generations.
+
+**Training datasets are Buildings:** they establish the context and permissions under which source IP is used. Models can reference the dataset versions and licensed sources used in their development. Generated works can establish additional relationships to their model lineage and applicable source materials.
+
+These relationships can preserve an auditable chain of provenance and contractual obligations through training, model development, generation, and subsequent reuse. A source work does not disappear into an anonymous dataset merely because a machine learned from it.
+
+Importantly, **recorded inclusion in a training set is different from proof that a particular source caused or influenced a particular output**. Today, the exact contribution of every training example to each generation generally cannot be reliably reconstructed. The Road must not pretend otherwise.
+
+Where source-by-source influence is not demonstrable, agreements can instead define transparent royalty pools or predetermined allocation rules for eligible training contributors. More precise contribution methods can be supported if they become verifiable.
+
+The goal is not to make every AI platform independently reconstruct intellectual property rights. It is to give platforms a common protocol through which rights can be understood, honored, attributed, and compensated.
+
+**The knowledge does not lose its history when a machine learns from it.**
+
+### No fees to participate
+
+The Road is designed as public infrastructure, not a tollbooth for intellectual property.
+
+**No fees to create an IP identity, establish relationships, or participate in the protocol.** On-chain transactions still incur the underlying blockchain network's gas costs, which are not Road fees.
+
+Creators receive compensation under their licensing agreements without needing to operate nodes. Any future Road infrastructure fees on eligible commercial transactions must be publicly authorized, limited to genuine operating needs, and stop at a defined funding cap. Those infrastructure charges are separate from royalties owed to rights holders.
+
+The purpose is to make IP portable and economically useful, not to extract rent from its existence.
+
+## A new foundation for the creative economy
+
+AI may be the clearest example of the problem, but the solution applies to music, publishing, photography, film, software, design, research, education, and forms of digital media yet to be invented.
+
+The internet gave every document an address.
+
+Blockchains gave digital assets owners.
+
+**The Road gives intellectual property a shared language for rights and economic participation.**
+
+## Explore
+
+- [The AI Rights Object Standard: Founding Manifesto](MANIFESTO.md)
+- [Protocol Architecture](docs/ARCHITECTURE.md)
+- [Public Utility Constitution](docs/CONSTITUTION.md)
+- [Road Explorer Interface](web/README.md)
+- [Technical Roadmap](docs/ROADMAP.md)
+- [Prototype Utility Governance](docs/UTILITY_GOVERNANCE.md)
+
+0x🟨 Road is an experimental open-source protocol. Current contracts demonstrate IP identity, contextual references, licensing declarations, royalty accounting, and public-utility governance in local test environments. Registration records claims rather than independently proving legal ownership. Model-lineage and rights propagation require trustworthy evidence, legally valid agreements, and further implementation. No production deployment, audited rights enforcement, or real royalty custody is represented here.
+
+**0x🟨 Road. The missing layer of the internet.**
