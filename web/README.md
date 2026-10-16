@@ -58,3 +58,13 @@ The original Solidity system includes working *local blockchain* contracts, but 
 Connect a wallet to display its **verified Ethereum-mainnet primary ENS name** when available. Reverse results are checked against forward resolution. Otherwise the interface displays a shortened wallet address; ENS remains a display identity only. Supply an Ethereum mainnet endpoint via `VITE_ENS_RPC_URL` for reliable hosted resolution (no private key). Wallet account changes invalidate a previous name.
 
 In Mint Studio, **all five file selectors accept any extension** for testing. File-role labels are advisory, not a type-validation guarantee. The existing browser hashing/encryption size cap still applies; format-aware parsers may skip unsupported content. The demo does not publish files, mint contracts or verify authorship.
+
+## Expanded IP categories and blockchain test networks
+
+Mint Studio supports **35 IP categories** covering music and songwriting, writing, images, film, choreography and dance-move evidence, spatial capture, 3D works, software, games, data, design, brands and other evidence. For spatial works the demo records claimed capture/performance times, tracking formats, joint conventions, performer credits and external C2PA / PROV-O attestation links. These are **creator-declared** and not independently verified; recording a dance move does not grant exclusive rights.
+
+The site still performs **simulated uploads and minting**. To run actual contract deployments locally, start Ganache with `npm run ganache` and run `npm run ganache:smoke` separately. Real Ganache **local** transactions produce receipt files, but the Mint Studio UI does not sign or transmit them. See [Ganache instructions](../docs/GANACHE_LOCAL.md).
+
+If you have **Sepolia test ETH**, configure `SEPOLIA_RPC_URL` and run `npm run sepolia:check` from the repository root. This is read-only. No public-chain deployment is performed. See [Sepolia guide](../docs/SEPOLIA_TESTNET.md).
+
+We integrate existing provenance standards rather than inventing competing ones. See [IP categories and provenance](../docs/IP_CATEGORY_PROVENANCE.md).

@@ -361,6 +361,20 @@
     "extensions": {
       "type": "object",
       "additionalProperties": true
+    },
+    "ipCategory": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Road's creator-selected taxonomy ID; not a legal rights determination"
+    },
+    "categoryLabel": {
+      "type": "string",
+      "description": "Human-readable Road IP category"
+    },
+    "evidence": {
+      "type": "object",
+      "description": "Unverified creator declarations and external provenance pointers",
+      "additionalProperties": true
     }
   },
   "additionalProperties": false,

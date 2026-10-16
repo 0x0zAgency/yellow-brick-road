@@ -1,1 +1,9 @@
 .ms-demo-fees{margin-top:20px;padding:20px;border-radius:12px;background:#222b2e;border:1px solid #655a3e;display:grid;gap:16px}.ms-demo-fees h3{color:#efcf7c}.ms-demo-fees label{display:grid;gap:7px;font-size:12px}.ms-demo-fees input[type=range]{width:100%;accent-color:#e8c875}.ms-demo-fees select{background:#151f26;color:white;padding:9px}.ms-demo-overlay{position:fixed;inset:0;display:grid;place-items:center;background:#030708e5;z-index:9999;padding:24px}.ms-demo-dialog{width:min(520px,100%);background:#222d31;border:1px solid #d1ae65;border-radius:18px;padding:35px}.ms-demo-dialog h2{margin:18px 0}.ms-demo-spinner{display:block;width:37px;height:37px;border:3px solid #596568;border-top-color:#edcc75;border-radius:50%;animation:ms-demo-turn 800ms linear infinite}@keyframes ms-demo-turn{to{transform:rotate(360deg)}}
+.ms-ip-choice{padding:19px;margin:18px 0;background:#1f2b2c;border:1px solid #5a563c;border-radius:11px}
+.ms-ip-choice label{display:block;color:#e9ce86;font-size:12px;font-weight:800;margin-bottom:9px}
+.ms-ip-choice select{width:100%;border:1px solid #656e6a;color:#f3f0dd;background:#152127;border-radius:8px;padding:12px}
+.ms-ip-choice small{display:block;color:#b7c6c3;font-size:11px;margin-top:9px}
+.ms-ip-warning{color:#ffd4a1;font-size:12px;line-height:1.6;margin-top:12px}
+.ms-spatial-fields{margin:23px 0;padding:19px;background:#272b28;border:1px solid #685b3e;border-radius:12px}
+.ms-spatial-fields h3{font-size:16px;color:#efd184}
+.ms-spatial-fields p,.ms-spatial-fields small,.ms-ip-hint{font-size:11px;line-height:1.7;color:#aebeb9}

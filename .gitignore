@@ -11,3 +11,6 @@ coverage.json
 web/dist/
 web/.env
 web/.env.local
+
+# Disposable Ganache receipts
+.road-local/

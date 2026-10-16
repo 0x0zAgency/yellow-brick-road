@@ -7,11 +7,16 @@
     "compile": "hardhat compile",
     "test": "hardhat test",
     "demo": "hardhat run scripts/demo.js",
-    "clean": "hardhat clean"
+    "clean": "hardhat clean",
+    "ganache": "ganache --server.host 127.0.0.1 --server.port 8545 --chain.chainId 1337 --chain.hardfork shanghai --wallet.deterministic",
+    "ganache:smoke": "hardhat run scripts/ganache-smoke.js --network ganache",
+    "ganache:test": "hardhat test --network ganache",
+    "sepolia:check": "hardhat run scripts/sepolia-check.js --network sepolia"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "ethers": "^5.7.2",
-    "hardhat": "^2.22.0"
+    "hardhat": "^2.22.0",
+    "ganache": "7.9.2"
   }
 }
