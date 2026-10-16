@@ -48,7 +48,10 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
   master.relationships.push({type:'cover-art',target:'artwork',context:'release-artwork',authorization:'license-needed'});
  }
  if(composition){
-  bricks.push({localId:'composition',role:'Musical work / composition',metadata:{...common,objectType:'musical-work',title:metadata.title.trim(),identifiers:{iswc:metadata.iswc||null},media:[],relationships:[]}});
+  // Writing is separate IP. A performing artist is not assumed to be the songwriter.
+  const songwriters=String(metadata.songwriters||'').split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean).slice(0,64);
+  const writingCreators=songwriters.map(name=>({name,role:'songwriter',wallet:null,alias:null,claimStatus:'unverified'}));
+  bricks.push({localId:'composition',role:'Songwriting / musical work',metadata:{...common,creators:writingCreators,rights:{...common.rights,ownershipStatus:songwriters.length?'self-declared-not-verified':'attribution-pending'},objectType:'musical-work',title:metadata.title.trim(),identifiers:{iswc:metadata.iswc||null},proposedAiLicense:licenseQuote('writing'),payout:{type:'songwriter-split-pending',shares:[]},media:[],relationships:[]}});
   master.relationships.push({type:'embodies-composition',target:'composition',context:'recording-embodies-work',authorization:'rights-review'});
  }
  const building={standard:'0x0z-road-building',schemaVersion:'1.0.0',type:'recording-session',name:metadata.title.trim()+' / session',members:bricks.map(b=>({ref:b.localId,role:b.role,permission:'unverified'})),context:{daw:metadata.daw||'Unknown DAW',purpose:'creation-and-release',rightsEvidence:'requires-signed-authorizations'}};
