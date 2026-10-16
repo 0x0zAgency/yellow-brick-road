@@ -24,7 +24,8 @@ async function main() {
   const price = 1000000;
   const issue = licenses.connect(creator).issueLicense(brick.address, buyer.address,
     usd.address, price, hash("license terms"), 1, 0, hash("first license"));
-  const licenseId = await issue.callStatic(); await (await issue).wait();
+  const licenseId = await licenses.connect(creator).callStatic.issueLicense(brick.address, buyer.address,
+      usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1")); await (await issue).wait();
   await (await usd.mint(buyer.address, price)).wait();
   await (await usd.connect(buyer).approve(settlement.address, price)).wait();
   await (await settlement.connect(buyer).settle(licenseId, hash("use-1"), hash("attestation"))).wait();

@@ -29,7 +29,8 @@ describe("Road license and royalties", function() {
     await (await usd.connect(buyer).approve(settlement.address, 10 * PRICE)).wait();
     const issue = licenses.connect(creator).issueLicense(brick.address, buyer.address,
       usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1"));
-    licenseId = await issue.callStatic();
+    licenseId = await licenses.connect(creator).callStatic.issueLicense(brick.address, buyer.address,
+      usd.address, PRICE, hash("allowed-use-terms"), 1, 0, hash("license-1"));
     await (await issue).wait();
   });
   it("routes one mock-dollar as exact 80/20 royalties, no Road fee", async function() {
