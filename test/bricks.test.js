@@ -53,6 +53,28 @@ describe("Yellow Brick Road", function () {
     assert.equal(await one.originator(), creator.address);
   });
 
+  it("commits exact metadata digests, versions changes and clears stale legacy commitments", async function () {
+    const contentHash = id("finished-audio");
+    const nonce = id("metadata-v1");
+    const digest = id('{"title":"Master V1"}');
+    const predicted = await factory.predictBrickAddress(creator.address, contentHash, nonce);
+    await (await factory.connect(creator).deployBrickWithMetadataDigest(contentHash, "ipfs://metadata-v1", digest, nonce)).wait();
+    const b = await ethers.getContractAt("YellowBrick", predicted);
+    assert.equal(await b.metadataDigest(), digest);
+    assert.equal((await b.metadataVersion()).toNumber(), 1);
+    await rejects(b.connect(stranger).updateMetadataWithDigest("ipfs://tamper", id("tamper")));
+    await rejects(b.connect(creator).updateMetadataWithDigest("ipfs://v2", ethers.constants.HashZero));
+    const digest2 = id('{"title":"Master V2"}');
+    await (await b.connect(creator).updateMetadataWithDigest("ipfs://metadata-v2", digest2)).wait();
+    assert.equal(await b.metadataDigest(), digest2);
+    assert.equal((await b.metadataVersion()).toNumber(), 2);
+    await (await b.connect(creator).updateMetadata("ipfs://uncommitted-legacy")).wait();
+    assert.equal(await b.metadataDigest(), ethers.constants.HashZero);
+    assert.equal((await b.metadataVersion()).toNumber(), 3);
+    await rejects(factory.connect(creator).deployBrick(contentHash, "ipfs://again", nonce));
+    assert.equal(await b.originator(), creator.address);
+  });
+
   it("reuses bricks in an album and regeneration building without taking ownership", async function () {
     const track = (await brick(creator, "track")).deployed;
     const cover = (await brick(artist, "cover")).deployed;
