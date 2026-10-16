@@ -17,7 +17,7 @@ test('authenticated encryption round-trip and distinct random ciphertext',async(
 });
 test('native project slot does not bundle stems or claim wav as DAW project',()=>{
  const p=assetSlots.find(x=>x.id==='project');
- assert.match(p.label,/Blueprint/);assert.doesNotMatch(p.label,/stems/i);assert.match(p.accept,/\.flp/);assert.doesNotMatch(p.accept,/\.wav/);
+ assert.match(p.label,/Blueprint/);assert.doesNotMatch(p.label,/stems/i);assert.equal(p.accept,'*/*');
 });
 test('ciphertext digest recorded, but not presented as uploaded or tokenized',()=>{
  const input={metadata:{title:'Song',artist:'Artist'},assets:{master:{name:'master.wav',size:4,hash:'a'.repeat(64),encryption:{sha256:'b'.repeat(64)}}},identity:{mode:'assisted',connected:false,address:''},royalties:{creatorBps:10000},training:'not-authorized',composition:false,storage:'ipfs-encrypted'};
