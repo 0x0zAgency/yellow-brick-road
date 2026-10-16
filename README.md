@@ -12,10 +12,10 @@ Independent IP contracts first. Albums, collections, datasets and regeneration m
 - **Buildings reference existing IP.** No implicit rights transfer or permission to use underlying works.
 - **No Road registration charge.** Creators pay blockchain gas to deploy their IP contracts.
 - **No speculative token.** Future Road infrastructure payments can only go to qualified blockchain-node operators for measured useful services. Ordinary creators receive licensed royalties without operating nodes.
-- **Budget-capped usage microfees.** Once authorized utility funding is collected, fee collection stops. The actual fee and cap mechanism are future work, and these prototype contracts collect **zero Road operating fees**.
+- **Budget-capped usage microfees.** Once authorized utility funding is collected, fee collection stops. A separate treasury prototype now tests capped collection; **the royalty settlement contract still collects zero Road operating fees**. The treasury has not been integrated into actual licensed transactions.
 - **All users vote, weighted.** Each uniquely verified participant has baseline influence; additional influence will be bounded and earned, not bought.
 
-## First functioning slice
+## Working prototype: bricks, royalties, and public utility
 
 | Contract | Capability |
 |---|---|
@@ -25,6 +25,9 @@ Independent IP contracts first. Albums, collections, datasets and regeneration m
 | [YellowBrickLicense](contracts/YellowBrickLicense.sol) | Controller-declared economic licenses with fixed use price, expiry, committed terms |
 | [RoadRoyaltySettlement](contracts/RoadRoyaltySettlement.sol) | Versioned split policies, replay-protected usage settlement and pull-based royalties |
 | [MockUSD](contracts/test/MockUSD.sol) | Six-decimal, freely minted **test-only** payment asset |
+| [RoadGovernance](contracts/RoadGovernance.sol) | Weighted attested-user votes, two-day voting and one-day execution delay |
+| [RoadNodeRegistry](contracts/RoadNodeRegistry.sol) | Governance-attested operator eligibility and service evidence |
+| [RoadTreasury](contracts/RoadTreasury.sol) | 30-day budget periods, capped utility fees and governed node service payouts |
 
 ### Run
 
@@ -46,7 +49,8 @@ This is a local Hardhat demonstration. **No production assets or real dollars ar
 - [Architecture](docs/ARCHITECTURE.md)
 - [Draft public-utility constitution](docs/CONSTITUTION.md)
 - [Roadmap](docs/ROADMAP.md)
+- [Utility governance v0.3 and trust assumptions](docs/UTILITY_GOVERNANCE.md)
 
-**Caveats:** Neither on-chain registration nor a content commitment proves copyright ownership. A usage evidence hash is only an attestation, not proof of neural-model causal influence. Actual licenses require review of the full terms and the legal rights involved. The contracts are unaudited and not safe for actual royalty custody.
+**Caveats:** Neither on-chain registration nor a content commitment proves copyright ownership. A usage evidence hash is only an attestation, not proof of neural-model causal influence. The voter enrollment attester and node-service eligibility are still centralized trust assumptions and are not production identity or node proofs. Actual licenses require review of the full terms and the legal rights involved. The contracts are unaudited and not safe for actual royalty custody.
 
 The original CC0 repository LICENSE is preserved; source-level MIT identifiers require a final consistent licensing decision.
