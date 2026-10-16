@@ -14,6 +14,7 @@ contract RoadTreasury {
     IRoadNodeEligibility public immutable nodes;
     IRoadPaymentAsset public immutable asset;
     uint64 public currentPeriod;
+    uint64 public periodEnds;
     uint256 public rateBps;
     uint256 public target;
     uint256 public collected;
@@ -34,9 +35,10 @@ contract RoadTreasury {
     function openBudget(uint256 totalAuthorizedFunds,uint256 feeBps) external onlyGovernance {
         require(feeBps <= 100, "Treasury: max 1 percent");
         require(totalAuthorizedFunds > 0,"Treasury: zero budget");
-        require(currentPeriod==0 || collected==target,"Treasury: previous cap not reached");
+        require(currentPeriod==0 || block.timestamp >= periodEnds,"Treasury: period still open");
         require(totalAuthorizedFunds >= asset.balanceOf(address(this)),"Treasury: below reserve");
         currentPeriod++;
+        periodEnds=uint64(block.timestamp+30 days);
         target=totalAuthorizedFunds-asset.balanceOf(address(this));
         collected=0;
         spent=0;
@@ -44,7 +46,7 @@ contract RoadTreasury {
         emit BudgetOpened(currentPeriod,target,feeBps);
     }
     function quote(uint256 transactionAmount) public view returns (uint256) {
-        if(currentPeriod==0 || collected>=target) return 0;
+        if(currentPeriod==0 || block.timestamp>=periodEnds || collected>=target) return 0;
         uint256 proposed=transactionAmount*rateBps/10000;
         uint256 remaining=target-collected;
         return proposed<=remaining?proposed:remaining;
