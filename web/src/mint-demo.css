@@ -7,3 +7,18 @@
 .ms-spatial-fields{margin:23px 0;padding:19px;background:#272b28;border:1px solid #685b3e;border-radius:12px}
 .ms-spatial-fields h3{font-size:16px;color:#efd184}
 .ms-spatial-fields p,.ms-spatial-fields small,.ms-ip-hint{font-size:11px;line-height:1.7;color:#aebeb9}
+
+.ms-chain-mode{border:1px solid #7b6942;background:#242c2c;padding:20px;border-radius:11px;margin-top:20px}
+.ms-chain-mode h3{font-size:15px;color:#e8cc84}
+.ms-chain-mode>label:not(.ms-chain-address){display:flex;align-items:center;gap:10px;color:#e0e8e5;font-size:12px;margin:13px 0}
+.ms-chain-mode input[type=radio]{accent-color:#edc975}
+.ms-chain-mode p{font-size:12px;color:#b5c5c0;line-height:1.7}
+.ms-chain-address{display:grid;gap:7px;font-size:12px;color:#eccd83;margin:15px 0}
+.ms-chain-address input{border:1px solid #78816b;border-radius:8px;padding:11px;background:#151f26;color:#fff;width:100%;min-width:0}
+.ms-receipts{display:grid;gap:10px;margin:17px 0}
+.ms-receipts>div{display:grid;gap:6px;min-width:0;border:1px solid #525d50;background:#202d2c;border-radius:10px;padding:15px}
+.ms-receipts span{color:#d6c58b;font-size:12px}
+.ms-receipts strong,.ms-receipts small,.ms-receipts a{overflow-wrap:anywhere}
+.ms-receipts strong{color:#f2eedb;font-size:13px}
+.ms-receipts small{color:#aebec0;font-size:11px}
+.ms-receipts a{color:#f1cf85;font-size:11px}

@@ -68,3 +68,9 @@ The site still performs **simulated uploads and minting**. To run actual contrac
 If you have **Sepolia test ETH**, configure `SEPOLIA_RPC_URL` and run `npm run sepolia:check` from the repository root. This is read-only. No public-chain deployment is performed. See [Sepolia guide](../docs/SEPOLIA_TESTNET.md).
 
 We integrate existing provenance standards rather than inventing competing ones. See [IP categories and provenance](../docs/IP_CATEGORY_PROVENANCE.md).
+
+## Test-chain minting in Mint Studio
+
+The **Review** step offers **Ganache Local** (chain 1337), **Sepolia** (11155111) and a separate **Simulation** mode. The real modes use the injected browser wallet to call `YellowBrickFactory.deployBrickWithMetadataDigest`, require user approval per Brick, wait for actual EVM receipts and expose transaction hashes and deployed addresses. Ganache factory address comes from `.road-local/ganache-mint-receipts.json` after running `npm run ganache:smoke`. An independently deployed Sepolia factory is needed for Sepolia. Optional public configuration: `VITE_ROAD_GANACHE_FACTORY` and `VITE_ROAD_SEPOLIA_FACTORY`.
+
+See [Wallet-signed test-chain mint instructions](../docs/WALLET_MINT_TEST.md). **No real file upload, key escrow, IPFS hosting or royalty settlement occurs.** On-chain demo metadata URIs are intentionally non-resolving. The human MetaMask interaction must be verified by a tester, in addition to automated wallet-provider and Ganache checks.

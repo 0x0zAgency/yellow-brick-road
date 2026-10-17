@@ -27,3 +27,5 @@ jobs:
           done
           if [ "$READY" -ne 1 ]; then cat /tmp/road-ganache.log; exit 1; fi
           npm run ganache:smoke
+          npm --prefix web install --no-audit --no-fund
+          node web/scripts/ganache-wallet-smoke.mjs
