@@ -7,6 +7,11 @@ export const assetSlots=[
  {id:'project',label:'Project File / native DAW project',accept:'*/*',required:false,visibility:'encrypted',brick:'master'},
  {id:'metadata',label:'Metadata text / JSON',accept:'*/*',required:false,visibility:'encrypted',brick:'master'}
 ];
+/** File roles vary by IP category. Only a primary work is universally required. */
+export function availableAssetSlots(categoryId='sound-recording'){
+ const category=getIpCategory(categoryId);
+ return category.group==='Music & audio' ? assetSlots : assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork');
+}
 export const trainingModes=[
  {value:'not-authorized',label:'No AI training permission'},
  {value:'separate-license',label:'Separate signed training license required'},
@@ -25,10 +30,10 @@ export function assetRecord(slot,item){
 }
 export function validateMintInput({metadata,assets,identity,royalties}){
  const errors=[];
- if(!(metadata.title||'').trim())errors.push('Track title is required.');
+ if(!(metadata.title||'').trim())errors.push('Work title is required.');
  if(!(metadata.artist||'').trim())errors.push('Artist / claimant is required.');
- if(!assets.master?.hash)errors.push('A hashed master audio file is required.');
- if(Object.values(assets).some(a=>a?.status==='hashing'))errors.push('Wait for file hashing to finish.');
+ if(!assets.master?.hash)errors.push('A hashed primary work file is required.');
+ if(availableAssetSlots(metadata.ipCategory).some(slot=>assets[slot.id]?.status==='hashing'))errors.push('Wait for file hashing to finish.');
  if(!identity.connected&&identity.mode==='external')errors.push('Connect an EVM wallet or select the assisted demo.');
  if(identity.mode==='external'&&!isEvmAddress(identity.address))errors.push('A valid 20-byte EVM wallet address is required.');
  if(!Number.isInteger(Number(royalties.creatorBps))||Number(royalties.creatorBps)<0||Number(royalties.creatorBps)>10000)errors.push('Royalty share must be between 0 and 100%.');
@@ -36,14 +41,14 @@ export function validateMintInput({metadata,assets,identity,royalties}){
 }
 export function makeRegistrationPacket({metadata,assets,identity,royalties,training,composition,storage,licensing={}},now='2026-01-01T00:00:00.000Z'){
  const category=getIpCategory(metadata.ipCategory||'sound-recording');
- const files=assetSlots.map(slot=>assetRecord(slot,assets[slot.id])).filter(Boolean);
+ const files=availableAssetSlots(category.id).map(slot=>assetRecord(slot,assets[slot.id])).filter(Boolean);
  const namespace='https://0x0z.org/road/metadata/v1';
  const denomination=['USD','USDC'].includes(licensing.currency)?licensing.currency:'USD';
  const useUnit=['per-1000-outputs','per-output','per-model-deployment'].includes(licensing.useUnit)?licensing.useUnit:'per-1000-outputs';
  const moneyCents=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=100000000?Number(n):0;
  const licenseQuote=kind=>({status:'draft-only-not-an-authorization',denomination,ingestion:{amountCents:moneyCents(kind==='writing'?licensing.writingIngestionCents:licensing.masterIngestionCents),unit:'per-dataset-inclusion'},use:{amountCents:moneyCents(kind==='writing'?licensing.writingUseCents:licensing.masterUseCents),unit:useUnit}});
  const common={standard:'0x0z-road-ip',schemaVersion:'1.0.0',schema:namespace,provenance:{recordedAt:now,sourceApplication:category.musical?(metadata.daw||'Unknown DAW'):'Creator-declared source',authStatus:identity.mode==='external'?'wallet-to-be-signed':'assisted-wallet-pending'},creators:[{name:metadata.artist.trim(),role:'primary-artist',wallet:isEvmAddress(identity.address)?identity.address:null,alias:aliasFor(metadata.artist)}],rights:{ownershipStatus:'self-declared-not-verified',territories:['worldwide'],aiTraining:{mode:training,requiresAttribution:training==='licensed-with-terms',generationRoyalties:'by-separate-agreement'}},extensions:{}};
- const master={...common,objectType:category.objectType,ipCategory:category.id,categoryLabel:category.label,title:metadata.title.trim(),description:metadata.description||'',identifiers:{isrc:metadata.isrc||null,iswc:null,upc:null},music:category.musical?{release:metadata.release||null,genre:metadata.genre||null,bpm:metadata.bpm?Number(metadata.bpm):null,key:metadata.key||null,daw:metadata.daw||'Unknown DAW'}:undefined,proposedAiLicense:licenseQuote('master'),media:files.filter(x=>x.role!=='artwork'),relationships:[],payout:{type:'proposed-split',shares:[{party:metadata.artist.trim(),bps:Number(royalties.creatorBps)},{party:'Additional rights holders (specify before signing)',bps:10000-Number(royalties.creatorBps)}].filter(x=>x.bps>0)}};
+ const master={...common,objectType:category.objectType,ipCategory:category.id,categoryLabel:category.label,title:metadata.title.trim(),description:metadata.description||'',identifiers:{isrc:category.musical?(metadata.isrc||null):null,iswc:null,upc:null},music:category.musical?{release:metadata.release||null,genre:metadata.genre||null,bpm:metadata.bpm?Number(metadata.bpm):null,key:metadata.key||null,daw:metadata.daw||'Unknown DAW'}:undefined,proposedAiLicense:licenseQuote('master'),media:files.filter(x=>x.role!=='artwork'),relationships:[],payout:{type:'proposed-split',shares:[{party:metadata.artist.trim(),bps:Number(royalties.creatorBps)},{party:'Additional rights holders (specify before signing)',bps:10000-Number(royalties.creatorBps)}].filter(x=>x.bps>0)}};
  if(category.spatial){
   master.evidence={...spatialEvidence(metadata.spatial||{},now),
     sourceMedia:files.filter(f=>f.role!=='artwork').map(f=>({role:f.role,digest:f.integrity.digest,algorithm:f.integrity.algorithm})),
