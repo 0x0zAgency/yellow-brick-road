@@ -50,11 +50,15 @@ export async function mintPacketOnChain({packet,provider,account,mode,factoryAdd
    const uri=`road-demo://sha256/${metadataDigest.slice(2)}`;
    const args=[contentHash,uri,metadataDigest,nonce];
    const predicted=await publicClient.readContract({address:factoryAddress,abi:FACTORY_ABI,functionName:'predictBrickAddress',args:[account,contentHash,nonce]});
-   onProgress({phase:'signing',index:i+1,total:packet.bricks.length,role:brick.role,confirmed:receipts});
-   const hash=await walletClient.writeContract({account,address:factoryAddress,abi:FACTORY_ABI,functionName:'deployBrickWithMetadataDigest',args,chain});
+   // Some unlocked JSON-RPC test wallets default to a 90k gas limit when one
+   // is omitted. Explicit estimation is also safer for injected wallets.
+   const estimatedGas=await publicClient.estimateContractGas({account,address:factoryAddress,abi:FACTORY_ABI,functionName:'deployBrickWithMetadataDigest',args});
+   const gas=estimatedGas+(estimatedGas/5n);
+   onProgress({phase:'signing',index:i+1,total:packet.bricks.length,role:brick.role,confirmed:receipts,gasEstimate:gas.toString()});
+   const hash=await walletClient.writeContract({account,address:factoryAddress,abi:FACTORY_ABI,functionName:'deployBrickWithMetadataDigest',args,gas,chain});
    onProgress({phase:'confirming',index:i+1,total:packet.bricks.length,role:brick.role,hash,confirmed:receipts});
    const mined=await publicClient.waitForTransactionReceipt({hash,confirmations:1});
-   if(mined.status!=='success')throw Error(`Transaction ${hash} reverted.`);
+   if(mined.status!=='success')throw Error(`Transaction ${hash} reverted (gas used: ${mined.gasUsed.toString()}).`);
    const events=parseEventLogs({abi:FACTORY_ABI,eventName:'BrickDeployed',logs:mined.logs,strict:true});
    const matching=events.find(e=>e.address?.toLowerCase()===factoryAddress.toLowerCase()&&e.args?.brick?.toLowerCase()===predicted.toLowerCase()&&e.args?.originator?.toLowerCase()===account.toLowerCase()&&e.args?.contentHash?.toLowerCase()===contentHash.toLowerCase());
    if(!matching)throw Error('Transaction mined, but expected BrickDeployed event was not found. Inspect the transaction before trying again.');

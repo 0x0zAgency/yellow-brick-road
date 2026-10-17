@@ -19,6 +19,7 @@ const packet={packetType:'LOCAL_PREVIEW_NOT_MINTED',bricks:[{localId:'master',ro
 const logs=[{address:factory,topics:encodeEventTopics({abi:FACTORY_ABI,eventName:'BrickDeployed',args:{ipId:'0x'+'5'.repeat(64),brick:brickAddress,originator:account}}),data:'0x'+'a'.repeat(64)}];
 const publicClient={
  getBytecode:async()=> '0x6000',
+ estimateContractGas:async()=>345000n,
  readContract:async({functionName})=>functionName==='implementation'?implementation:brickAddress,
  waitForTransactionReceipt:async()=>({status:'success',blockNumber:42n,gasUsed:42424n,logs}),
 };
@@ -40,9 +41,9 @@ test('rejects missing factory and non-factory contracts',async()=>{
 
 test('requests wallet-signed deployment and verifies real-looking on-chain event',async()=>{
  const progress=[];let calls=0;
- const walletClient={writeContract:async({address,functionName,chain,args})=>{
+ const walletClient={writeContract:async({address,functionName,chain,args,gas})=>{
   calls++;assert.equal(address,factory);assert.equal(functionName,'deployBrickWithMetadataDigest');
-  assert.equal(chain.id,1337);assert.equal(args[0],'0x'+'a'.repeat(64));
+  assert.equal(chain.id,1337);assert.equal(args[0],'0x'+'a'.repeat(64));assert.equal(gas,414000n);
   return '0x'+'6'.repeat(64);
  }};
  const result=await mintPacketOnChain({packet,provider,account,mode:'ganache',factoryAddress:factory,clients:{publicClient,walletClient},onProgress:v=>progress.push(v.phase)});
