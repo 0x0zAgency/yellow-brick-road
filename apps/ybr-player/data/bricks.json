@@ -1,0 +1,70 @@
+{
+  "format": "ybr-player-demo-manifest/0.1",
+  "bricks": [
+    {
+      "id": "BRK-AUD-001",
+      "type": "AudioBrick",
+      "title": "Golden Hour",
+      "creator": "The Amber Sessions",
+      "description": "An original synthetic demonstration recording for the YBR Player.",
+      "durationSeconds": 24,
+      "theme": "gold",
+      "media": {
+        "file": "golden-hour.wav",
+        "mimeType": "audio/wav",
+        "sha256": "ee8f1462c64040727cf3863a53a9c73743771045fd17e4c930481d45568e512f"
+      },
+      "permissions": {
+        "stream": {
+          "allowed": true,
+          "allowedAccounts": [
+            "listener",
+            "artist"
+          ]
+        }
+      },
+      "rights": {
+        "license": "Local demonstration only. Not a public performance or streaming license.",
+        "notes": "Open demo playback for approved local accounts"
+      },
+      "provenance": {
+        "entity": "urn:ybr:brick:BRK-AUD-001",
+        "agent": "YBR Demo Studio",
+        "activity": "original synthetic audio generation",
+        "vocabulary": "https://www.w3.org/TR/prov-o/"
+      }
+    },
+    {
+      "id": "BRK-AUD-002",
+      "type": "AudioBrick",
+      "title": "After the Rain",
+      "creator": "The Amber Sessions",
+      "description": "A restricted studio preview showing that YBR authorization can deny playback.",
+      "durationSeconds": 24,
+      "theme": "violet",
+      "media": {
+        "file": "after-the-rain.wav",
+        "mimeType": "audio/wav",
+        "sha256": "1e815d83e2fa832e8fd84be6c91b847341783fe434cf9750ad8cba6f6ab2c766"
+      },
+      "permissions": {
+        "stream": {
+          "allowed": true,
+          "allowedAccounts": [
+            "artist"
+          ]
+        }
+      },
+      "rights": {
+        "license": "Local demonstration only. Not a public performance or streaming license.",
+        "notes": "Restricted to the local artist account"
+      },
+      "provenance": {
+        "entity": "urn:ybr:brick:BRK-AUD-002",
+        "agent": "YBR Demo Studio",
+        "activity": "original synthetic audio generation",
+        "vocabulary": "https://www.w3.org/TR/prov-o/"
+      }
+    }
+  ]
+}
