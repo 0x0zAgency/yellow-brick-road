@@ -67,7 +67,7 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
   const get=functionName=>client.readContract({address,abi:BRICK_READ_ABI,functionName});
   const [originator,controller,ipId,contentHash,metadataDigest,metadataVersion,metadataURI,registered]=await Promise.all([
    get('originator'),get('controller'),get('ipId'),get('contentHash'),get('metadataDigest'),get('metadataVersion'),get('metadataURI'),
-   client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'isBrick',args:[address]}
+   client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'isBrick',args:[address]})
   ]);
   if(originator.toLowerCase()!==wallet.toLowerCase()||!registered||contentHash.toLowerCase()!==event.args.contentHash.toLowerCase()){
    throw Error('On-chain factory event and Brick contract do not match at '+address);
