@@ -58,7 +58,15 @@ function RoadNetwork(){return <><section className="network-hero"><div className
 export default function App(){
  const [page,setPage]=useState('manifesto'),[sidebar,setSidebar]=useState(false),[modal,setModal]=useState(null),[wallet,setWallet]=useState(null),[notice,setNotice]=useState('');
  const identity=useEnsIdentity(wallet);
- useEffect(()=>{const provider=window.ethereum;if(!provider?.on)return;const update=a=>setWallet(a?.[0]||null);provider.on('accountsChanged',update);return()=>provider.removeListener?.('accountsChanged',update)},[]);
+ useEffect(()=>{
+  const provider=window.ethereum;if(!provider?.request)return;
+  let active=true,revision=0;
+  const update=a=>{revision++;if(active)setWallet(a?.[0]||null)};
+  const disconnect=()=>update([]);
+  provider.on?.('accountsChanged',update);provider.on?.('disconnect',disconnect);
+  provider.request({method:'eth_accounts'}).then(a=>{if(active&&!revision)update(a)}).catch(()=>{});
+  return()=>{active=false;provider.removeListener?.('accountsChanged',update);provider.removeListener?.('disconnect',disconnect)};
+ },[]);
  const [drafts,setDrafts]=useState(()=>readDrafts('road:drafts:v1')),[createdBuildings,setCreatedBuildings]=useState(()=>readDrafts('road:structures:v1'));
  const bricks=useMemo(()=>[...drafts,...seedBricks],[drafts]), buildings=useMemo(()=>[...createdBuildings,...seedBuildings],[createdBuildings]);
  const total=seedBricks.reduce((x,b)=>x+b.amount,0);

@@ -12,6 +12,10 @@ jobs:
       - run: npm run compile
       - run: npm test
       - run: npm run demo
+      - name: Install wallet integration dependencies
+        run: npm --prefix web install --no-audit --no-fund
+      - name: Wallet-signed Ganache integration
+        run: npm run test:wallet
       - name: Ganache local mint smoke
         run: |
           npm run ganache > /tmp/road-ganache.log 2>&1 &

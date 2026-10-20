@@ -239,3 +239,83 @@ This is the future we intend to build.
 *The Yellow Brick Road is an experimental open-source protocol under active development. Current smart contracts demonstrate IP identity, contextual relationships, licensing declarations, royalty accounting, and governance in local test environments. Registration does not independently establish legal ownership, and production systems require further verification, security auditing, and legal review.*
 
 **0x🟨 Road. The missing layer of the internet.**
+
+### Wallet-signed Mint Studio on local Ganache
+
+Use Node 22.12 or newer. Install dependencies with `npm install` in the repository
+and in `web/`. Keep Ganache running in its own terminal:
+
+```sh
+npm run ganache
+```
+
+In a second terminal deploy the factory once for this chain instance:
+
+```sh
+npm run ganache:deploy
+```
+
+The command prints the factory address and saves the chain ID, deployment hash,
+and address in `.road-local/factory.json`. It only deploys to a loopback RPC on
+chain **1337**. Restarting Ganache without persistent chain storage invalidates
+old addresses; deploy again and paste the new address into the studio.
+
+Start the frontend with `cd web && npm run dev`. In your browser wallet, add the
+local RPC `http://127.0.0.1:8545`, chain ID **1337**, currency **ETH**. Import one
+of the disposable accounts printed by Ganache into a separate development wallet.
+These public deterministic accounts are only for local testing. The frontend
+never asks for a private key. Ganache's network ID can differ from its chain ID;
+use `eth_chainId`, not `net_version`, when configuring the wallet.
+
+In Mint Studio connect the wallet, select **Local Ganache**, and paste the factory
+address. Without a connected wallet, the original simulation runs automatically. Attach files, review metadata, then confirm each Brick in your wallet.
+Each Brick is a separate transaction; the factory charges no platform fee.
+The client checks both wallet/RPC chain IDs and their latest common block hash,
+simulates each call, waits for a mined receipt, checks the factory event and
+registry, and reads the deployed Brick's controller, content and metadata digests,
+and URI. Receipts show transaction hashes, addresses and block numbers.
+
+Download the JSON packet after completion, especially if a later signature is
+rejected or a transaction times out. A pending transaction may still be mined;
+inspect its hash before starting another work. Confirmed transactions cannot be
+undone by canceling later signatures. The studio does not automatically retry a
+partial batch. Receipt evidence and exact committed metadata bytes remain in
+memory until you export them; refreshing loses the session and encrypted files.
+
+Uploads and download authorization remain simulated. `road-local://sha256/…` is
+a local metadata commitment, not a remotely retrievable storage URI. A composition
+without a separate source file uses its exact metadata digest as its content hash;
+it does not claim to hash a composition source recording. The contextual Building,
+license quotes and payout proposals remain off-chain. Registration does not prove
+ownership. **Simulated** mode never requests a mint signature and produces no
+transaction hashes or contract addresses.
+
+Run the frontend regression tests with `cd web && npm test`, the production build
+with `npm run build`, and `npm run test:wallet` from the repository root. The latter
+starts a disposable HTTP Ganache instance and exercises the same mint service
+through an EIP-1193 wallet adapter that signs transactions with a test-only key.
+It does not exercise a browser extension's confirmation UI.
+
+### Connected wallets and Sepolia
+
+Mint Studio automatically uses the original simulation while no wallet is connected.
+A connected wallet enables real minting; choose Ganache or Sepolia. The studio
+recognizes a wallet already on Sepolia and selects it automatically. Existing wallet
+connections are restored without opening a connection prompt. Wallet errors never
+silently fall back to simulation, and a disconnect during a real batch stops the
+batch while retaining its transaction evidence.
+
+For Sepolia, switch your wallet to chain **11155111** and enter an existing deployed
+`YellowBrickFactory` address for Sepolia. The studio reads the chain through the
+wallet provider, so no separate RPC key is required. Factory addresses are kept
+separately for each network configuration for the current session. The same receipt,
+event, registry and contract-state checks apply. Merely connecting does not send
+transactions: review the mint and explicitly approve each wallet request. Each
+approved transaction uses Sepolia test ETH for gas. There is no automatic public
+factory deployment, funding, or mainnet support.
+
+Changing the account or network invalidates an open confirmation review. With no
+wallet connected, continuing starts the simulation again. Encrypted files and
+metadata remain local in both modes. Integration tests exercise both network paths
+using disposable local chains, including one configured with Sepolia's chain ID;
+they do not spend funds on public Sepolia.

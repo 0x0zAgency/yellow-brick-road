@@ -1,6 +1,6 @@
 # Mint Studio: wallet-signed test-chain minting
 
-This walkthrough describes the **live test-chain** mode. Mint Studio also offers a fully separate **Simulation** mode. Neither mode uploads source files: browser encryption is real, upload receipts are simulated, and the `road-demo://` on-chain URI cannot retrieve files.
+This walkthrough describes the **live test-chain** mode. Without a connected wallet, Mint Studio automatically runs the original **Simulation**. Connecting a wallet enables Ganache or Sepolia minting. Neither mode uploads source files: browser encryption is real, upload receipts are simulated, and the `road-local://` on-chain URI cannot retrieve files.
 
 ## Ganache: local wallet + real EVM transactions
 
@@ -30,11 +30,11 @@ Use **one of Ganache's disposable accounts**, funded with pretend local ETH. Do 
 
 Start the web UI with `cd web && npm install && npm run dev`. In Mint Studio:
 
-1. Choose the IP category, add a primary work file, and continue through the browser-side encryption stage.
-2. Fill in IP and licensing claims.
-3. On **Review**, select **Ganache Local** and connect your browser wallet from the Mint Studio header.
-4. Paste the factory address from `.road-local/ganache-mint-receipts.json`.
-5. Choose **Review wallet transactions**, then **Request wallet signatures**.
+1. Connect your browser wallet. On **Identity**, select **Local Ganache** and paste the factory address from `.road-local/ganache-mint-receipts.json`.
+2. Choose the IP category, add a primary work file, and continue through browser-side encryption.
+3. Fill in IP and licensing claims.
+4. Review the wallet, chain and factory details.
+5. Choose **Review wallet mint**, then **Request wallet signatures**.
 6. Approve **one transaction per Brick** in your wallet. Wait for blockchain confirmations.
 7. Review actual deployed Brick addresses, transaction hashes, block numbers, and gas used.
 

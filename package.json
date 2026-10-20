@@ -11,7 +11,9 @@
     "ganache": "ganache --server.host 127.0.0.1 --server.port 8545 --chain.chainId 1337 --chain.hardfork shanghai --wallet.deterministic",
     "ganache:smoke": "hardhat run scripts/ganache-smoke.js --network ganache",
     "ganache:test": "hardhat test --network ganache",
-    "sepolia:check": "hardhat run scripts/sepolia-check.js --network sepolia"
+    "sepolia:check": "hardhat run scripts/sepolia-check.js --network sepolia",
+    "ganache:deploy": "hardhat run scripts/deploy-local.js --network ganache",
+    "test:wallet": "npm run compile && node --test web/integration/ganache-wallet.test.js"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
