@@ -12,7 +12,7 @@ export const assetSlots=[
 /** File roles vary by IP category. Only a primary work is universally required. */
 export function availableAssetSlots(categoryId='sound-recording'){
  const category=getIpCategory(categoryId);
- return category.group==='Music & audio' ? assetSlots : assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork');
+ return category.group==='Music & audio' ? assetSlots : assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork'&&slot.id!=='lyrics');
 }
 export const trainingModes=[
  {value:'not-authorized',label:'No AI training permission'},
@@ -49,7 +49,7 @@ export function validateMintInput({metadata,assets,identity,royalties,cover={},l
  }
  if(assets.lyrics?.hash&&linkedBricks.some(l=>l.relation==='embodies-composition'||l.relation==='lyrics'))errors.push('A separate writer Brick owns linked lyrics evidence. Remove the local lyrics attachment or use a new writing Brick.');
  if(identity.mode==='external'&&metadata.ipCategory==='sound-recording'&&metadata.songwriters?.trim()&&!linkedBricks.some(l=>l.relation==='embodies-composition')){
-  const writers=metadata.songwriters.split(/[,;\\n]+/).map(x=>x.trim()).filter(Boolean);
+  const writers=metadata.songwriters.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
   if(writers.some(name=>name.toLowerCase()!==String(metadata.artist||'').trim().toLowerCase()))
    errors.push('Another songwriter is credited. Link their composition Brick with signed approval rather than minting their work from this wallet.');
  }
