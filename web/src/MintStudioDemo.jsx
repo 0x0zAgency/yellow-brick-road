@@ -1,5 +1,6 @@
 import MusicGenreSelect from './MusicGenreSelect.jsx';
 import {mintOnChain,mintMode} from './chain-mint.js';
+import {factoryStorageKey} from './brick-viewer-model.js';
 import {useEffect,useRef,useState} from 'react';
 import {aliasFor,availableAssetSlots,makeRegistrationPacket,trainingModes,validateMintInput,parseMetadataText} from './mint-model.js';
 import {extractId3} from './mp3-tags.js';
@@ -98,6 +99,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
    let receipt;
    if(execution!=='simulated'){receipt=await mintOnChain({packet,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress,onUpdate:setStatus,result});}
    else {for(let i=0;i<4;i++){setStage(i);await wait(750)}receipt=simulateMintReceipts(packet);}
+   if(!receipt.simulated){try{localStorage.setItem(factoryStorageKey(Number(chainId)),factoryAddress)}catch{}}
    setMint(receipt);setPacket(p=>({...p,[receipt.simulated?'demoMint':'onChainMint']:receipt,...(!receipt.simulated?{notices:p.notices.filter(n=>!n.startsWith('No wallets created')).concat('Brick contracts registered on the selected blockchain. No hosted files, licenses or automated royalties. The Building remains an off-chain proposal.')}:{})}));setStep(4);setDialog('complete');
   }catch(e){setError('Mint failed: '+(e.shortMessage||e.message));if(result.receipts.length){result.status='incomplete';setMint(result);setPacket(p=>({...p,onChainMint:result}));setStep(4)}setDialog('')}finally{mintLock.current=false;setBusy(false)}
  };

@@ -74,3 +74,11 @@ We integrate existing provenance standards rather than inventing competing ones.
 The **Review** step offers **Ganache Local** (chain 1337), **Sepolia** (11155111) and a separate **Simulation** mode. The real modes use the injected browser wallet to call `YellowBrickFactory.deployBrickWithMetadataDigest`, require user approval per Brick, wait for actual EVM receipts and expose transaction hashes and deployed addresses. Ganache factory address comes from `.road-local/ganache-mint-receipts.json` after running `npm run ganache:smoke`. An independently deployed Sepolia factory is needed for Sepolia. Optional public configuration: `VITE_ROAD_GANACHE_FACTORY` and `VITE_ROAD_SEPOLIA_FACTORY`.
 
 See [Wallet-signed test-chain mint instructions](../docs/WALLET_MINT_TEST.md). **No real file upload, key escrow, IPFS hosting or royalty settlement occurs.** On-chain demo metadata URIs are intentionally non-resolving. The human MetaMask interaction must be verified by a tester, in addition to automated wallet-provider and Ganache checks.
+
+## Read-only wallet Brick viewer
+
+Select **My Bricks** in the sidebar after connecting a wallet. Enter the `YellowBrickFactory` address on the selected network and scan the factory's on-chain `BrickDeployed` events to find Bricks **minted by the connected wallet**. The viewer independently reads each Brick's originator, current controller, IP identity, content/metadata commitments, metadata version and URI, and its deployment transaction and block. No wallet signatures or uploads are needed.
+
+The factory address is stored locally in your browser after a successful on-chain Mint Studio registration, or can be entered manually. The viewer does **not** fetch original files or resolve private metadata. Simulated mints do not appear, and contracts originally minted by other wallets but subsequently transferred to the connected wallet are not discoverable from the creation-event index alone.
+
+See [Wallet Brick Viewer documentation](../docs/WALLET_BRICK_VIEWER.md) for network, scan-range and privacy limitations.
