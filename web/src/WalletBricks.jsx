@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import CopyField from './CopyField.jsx';
+import {BrickOwnerApprovals} from './BrickLinkApprovals.jsx';
 import {createPublicClient,custom,defineChain,isAddress} from 'viem';
 import {MINT_NETWORKS} from './road-chain.js';
 import {discoverWalletBricks,factoryStorageKey} from './brick-viewer-model.js';
@@ -89,6 +90,7 @@ export default function WalletBricks({wallet,onConnect}){
     </article>)}</div>
    </div>}
   </>}
+  <BrickOwnerApprovals wallet={wallet} onConnect={onConnect}/>
   <p className="wb-disclaimer">This viewer shows contracts created by the connected wallet through one selected factory, not all Bricks the wallet might currently control. Blockchain registration is not proof of copyright or original authorship. Private files and full metadata are never downloaded by this viewer.</p>
  </section>;
 }

@@ -32,3 +32,21 @@
 .ms-copy-all{display:inline-flex;align-items:center;gap:7px;white-space:nowrap;padding:8px 12px;border:1px solid #9c864d;border-radius:8px;background:#36402d;color:#f3d783;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
 .ms-copy-all:hover,.ms-copy-all:focus-visible{background:#475035;border-color:#e5c46d}
 .ms-copy-all-status{font-size:11px;color:#c4eac8}
+
+/* Linked Brick consent exchange. Kept local; no background network uploads. */
+.ms-link-panel{display:grid;gap:14px;margin:22px 0;padding:17px;background:#222f2c;border:1px solid #5a694f;border-radius:11px}
+.ms-link-panel h3{font-size:16px;color:#f0d18c;margin:0}
+.ms-link-panel p,.ms-link-note{font-size:11px;color:#b8c4bf;line-height:1.75;overflow-wrap:anywhere}
+.ms-link{padding:16px;border:1px solid #697358;border-radius:9px;background:#25342e;display:grid;gap:15px;min-width:0}
+.ms-link-header{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.ms-link-header strong{color:#e4d8a9;font-size:13px}
+.ms-link-header button,.ms-link-json button{padding:8px 12px;border-radius:7px;border:1px solid #7c704b;background:#37412f;color:#efd18c;cursor:pointer}
+.ms-link-json{display:grid;gap:8px;min-width:0}
+.ms-link-json strong{font-size:12px;color:#f0d18c}
+.ms-link-json textarea,.ms-link-paste{width:100%;min-width:0;border:1px solid #66726a;border-radius:7px;padding:11px;background:#142028;color:#eef0e5;font:11px/1.6 ui-monospace,monospace;resize:vertical}
+.ms-link-json small{color:#b7c6c1;overflow-wrap:anywhere}
+.ms-link-review{border:1px solid #a08951;padding:15px;border-radius:9px;background:#35362b;min-width:0}
+.ms-link-review strong{color:#e7d397}
+.ms-link-review code{overflow-wrap:anywhere}
+.ms-link-review label{display:flex;gap:11px;align-items:flex-start;font-size:12px;color:#f6e1a8}
+.ms-link-review input{accent-color:#e6c371}

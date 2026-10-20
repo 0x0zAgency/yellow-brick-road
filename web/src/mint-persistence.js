@@ -20,7 +20,7 @@ const text=(value,max=1024)=>typeof value==='string'?value.slice(0,max):'';
 const bounded=(value,min,max,fallback)=>Number.isInteger(Number(value))&&Number(value)>=min&&Number(value)<=max?Number(value):fallback;
 const defaults={
  meta:{title:'',artist:'',songwriters:'',daw:'FL Studio',release:'',genre:'',bpm:'',key:'',isrc:'',iswc:'',description:''},
- ipCategoryId:'sound-recording',spatial:{},composition:true,training:'separate-license',
+ ipCategoryId:'sound-recording',spatial:{},cover:{artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'},composition:true,training:'separate-license',
  share:10000,currency:'USDC',unit:'per-1000-outputs',
  fees:{masterIngestionCents:10000,masterUseCents:500,writingIngestionCents:5000,writingUseCents:250}
 };
@@ -36,6 +36,10 @@ export function sanitizeMintForm(value={}){
  for(const key of META_FIELDS)clean.meta[key]=text(value.meta?.[key],key==='description'?8000:1024)||(key==='daw'?'FL Studio':'');
  if(VALID_TYPES.has(value.ipCategoryId))clean.ipCategoryId=value.ipCategoryId;
  for(const key of SPATIAL_KEYS){const field=text(value.spatial?.[key],512);if(field)clean.spatial[key]=field;}
+ if(value.cover&&typeof value.cover==='object'&&!Array.isArray(value.cover)){
+  for(const field of ['artist','title','description','wallet'])clean.cover[field]=text(value.cover[field],field==='description'?8000:1024);
+  if(['illustration','photograph','digital-art','painting'].includes(value.cover.ipCategory))clean.cover.ipCategory=value.cover.ipCategory;
+ }
  if(typeof value.composition==='boolean')clean.composition=value.composition;
  if(TRAINING.has(value.training))clean.training=value.training;
  clean.share=bounded(value.share,0,10000,10000);

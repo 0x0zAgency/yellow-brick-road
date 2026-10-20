@@ -86,3 +86,9 @@ See [Wallet Brick Viewer documentation](../docs/WALLET_BRICK_VIEWER.md) for netw
 ## Copy complete mint receipts
 
 Each Brick card in **Mint Studio → Mint results** now includes **Copy All** next to the category/role heading, in addition to the existing individual copy icons. Copy All places a labeled, multi-line receipt on the clipboard, including the ERC-721 collection address and decimal Token ID (when available), underlying Brick contract and IP identity, factory, chain, transaction hash, block and gas. Pending, simulated and legacy mints never invent an NFT address or token ID. The copy payload intentionally excludes private metadata JSON, source files, encrypted blobs and wallet secrets.
+
+## Cover artists, lyrics and existing-Brick links
+
+Mint Studio now collects independent cover-artwork provenance (title, visual IP category, artist, wallet and description) and has a dedicated lyrics evidence file slot. When someone else owns the work, enter the existing Brick and its factory in the **linked Brick** section instead of minting on their behalf. The target Brick's current controller can review the request under **My Bricks**, sign an EIP-712 authorization using their wallet, and return the signed JSON to the creator. The requesting wallet independently verifies the signature, chain, exact source hash and relationship before a real mint.
+
+This cross-wallet consent is not yet an on-chain Building link, automated Safe transaction, executed license, or royalty split. Source files remain browser-local. See [Cross-wallet Brick linking protocol](../docs/CROSS_WALLET_BRICK_LINKS.md).
