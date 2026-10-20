@@ -46,6 +46,17 @@ jobs:
           exit 1
       - name: Upload real encrypted bytes and verify pinned CID
         run: npm run ipfs:smoke
+      - name: Restart Kubo without deleting its persistent volume
+        run: docker compose -f infra/ipfs/compose.yaml restart kubo
+      - name: Verify CID and pin survive restart
+        run: |
+          ready=0
+          for attempt in {1..60}; do
+            if curl -fsS -X POST http://127.0.0.1:5001/api/v0/id > /dev/null; then ready=1; break; fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then exit 1; fi
+          node web/scripts/ipfs-verify-persistence.mjs
       - name: Show logs and stop containers
         if: always()
         run: |

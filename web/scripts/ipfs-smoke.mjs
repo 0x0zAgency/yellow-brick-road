@@ -1,3 +1,4 @@
+import {writeFile,mkdir} from 'node:fs/promises';
 /** Real integration smoke against a running YBR upload bridge + local Kubo.
  * Never sends plaintext to IPFS, and never prints the decryption secret.
  */
@@ -19,4 +20,6 @@ const result=await fetch(base+'/api/road-ipfs/upload',{method:'POST',headers:{
 if(!result.ok)throw Error('IPFS smoke upload failed: '+result.status+' '+await result.text());
 const uploaded=validateUploadReceipt(await result.json(),enc.sha256,enc.bytes.length);
 assert.equal(uploaded.pinned,true);assert.equal(uploaded.verified,true);
+await mkdir('.road-local',{recursive:true});
+await writeFile('.road-local/ipfs-smoke-receipt.json',JSON.stringify({cid:uploaded.cid,sha256:uploaded.sha256,size:uploaded.size},null,2)+'\n');
 process.stdout.write(JSON.stringify({status:'verified-and-pinned',cid:uploaded.cid,encryptedBytes:uploaded.size,kuboPeerId:node.peerId})+'\n');

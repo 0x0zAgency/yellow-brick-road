@@ -23,7 +23,7 @@ In terminal two, run the narrow upload bridge:
 npm run ipfs:bridge
 ```
 
-The bridge is bound to `127.0.0.1:8791`. It accepts only encrypted binary `POST /api/road-ipfs/upload` (maximum **32 MiB per encrypted container**) and a health read. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. The pin and returned CID are authoritative only for the local node at that moment.
+The bridge is bound to `127.0.0.1:8791`. It accepts only encrypted binary `POST /api/road-ipfs/upload` (maximum **32 MiB per encrypted container**) and a health read. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. The pin and returned CID are authoritative only for the local node at that moment. Automated CI also restarts Kubo and rechecks that the pin and bytes survive when the named Docker volume remains attached.
 
 In terminal three:
 
@@ -53,7 +53,7 @@ The Kubo HTTP gateway is loopback-only at `http://127.0.0.1:8080/ipfs/<CID>` for
 
 - Plaintext source bytes, private decryption key/passphrase and decrypted metadata **do not** go to Kubo, the bridge, or the chain. The bridge accepts only `0ZROAD01` encrypted containers with generic header name and MIME, and refuses an unencrypted source file.
 - CID references, ciphertext, approximate sizes, publisher/node network metadata and upload timing **can become public**. Even ciphertext cannot be guaranteed to disappear after release on IPFS; peers may retain copies.
-- The encryption key remains in volatile browser memory. **Download the private recovery-key file** before refreshing or closing the page. It includes the session secret and CIDs, so possession grants access to the encrypted contents. Do not publish, pin, or email that recovery file to an untrusted recipient.
+- The encryption key remains in volatile browser memory. **Download the private recovery-key file** before refreshing or closing the page. You can take an early backup before minting (contains the key but may not yet contain CIDs); download it again after ingestion to include the final IPFS references. It includes the session secret and CIDs, so possession grants access to the encrypted contents. Do not publish, pin, or email that recovery file to an untrusted recipient.
 - `ipfs://` metadata CIDs reference encrypted containers, **not** directly renderable OpenSea/MetaMask metadata. The registration ERC-721 receipt token maintains its own independent embedded yellow-square icon and generic public metadata.
 - The on-chain `contentHash` and other public commitments may still disclose equality/membership of recognizable originals. Blinded commitments and creator-authorized disclosure need another protocol version. Do not use unpublished high-sensitivity IP on a public testnet without assessing that privacy limitation.
 - The private package is currently assembled locally and includes references to pinned encrypted assets. There is no Road service that accepts, decrypts, or independently adjudicates the contents.

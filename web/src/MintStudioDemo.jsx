@@ -107,6 +107,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
   if(!assets.master?.hash){setError('Attach a primary work file before continuing.');return}
   if(Object.values(assets).some(a=>a.status==='hashing'||a.error)){setError('Wait for files to finish hashing, or replace failed files.');return}
   const slots=visibleSlots.filter(x=>assets[x.id]?.hash);
+  // The encrypted container adds a small overhead; catch oversize WAV/project
+  // files before the creator invests time validating the full registration.
+  if(ipfsEnabled&&slots.some(slot=>assets[slot.id].size>32*1048576-4096)){
+   setError('YBR IPFS pilot limit is 32 MiB per encrypted asset. Choose smaller test media or use local-only encryption.');
+   return;
+  }
   const fresh=slots.filter(x=>!vault.current.encrypted.has(x.id));
   setBusy(true);setError('');
   try{
@@ -205,7 +211,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  <p>All originals are encrypted locally with AES-256-GCM. Choose whether to pin the encrypted files to your own YBR IPFS node, or use the offline demonstration.</p>
  <label className="ms-ipfs-option"><input type="checkbox" checked={ipfsEnabled} onChange={e=>{setIpfsEnabled(e.target.checked);setIpfsHealth('')}}/>
   Upload encrypted files to my local YBR IPFS node (experimental)</label>
- {ipfsEnabled&&<><p className="ms-ipfs-warning">IPFS is a publicly retrievable, content-addressed network. Only encrypted containers are sent, but ciphertext, approximate file sizes and CIDs can be copied indefinitely. Keep the recovery key private. This local pilot does not guarantee global availability or backup.</p>
+ {ipfsEnabled&&<><p className="ms-ipfs-warning">Pilot limit: 32 MiB per encrypted file. IPFS is a publicly retrievable, content-addressed network. Only encrypted containers are sent, but ciphertext, approximate file sizes and CIDs can be copied indefinitely. Keep the recovery key private. This local pilot does not guarantee global availability or backup.</p>
   <button type="button" className="ms-outline" disabled={busy} onClick={()=>void checkLocalIpfs().then(x=>setIpfsHealth('Connected YBR IPFS node: '+x.peerId)).catch(e=>setIpfsHealth(e.message))}>Test IPFS connection</button>
   {ipfsHealth&&<p role="status">{ipfsHealth}</p>}
  </>}
@@ -213,7 +219,8 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  {status&&<p role="status">{status}</p>}
  </section></>}
  {step===2&&<><h2>03. IP and licensing.</h2>{ipfsEnabled&&<div className="ms-ipfs-confirm"><strong>Files encrypted locally, pending creator approval</strong>
- <p>Nothing has been sent to IPFS yet. Final validation and explicit mint confirmation will precede encrypted upload. Save the private recovery file from the results page after ingestion.</p>
+ <p>Nothing has been sent to IPFS yet. You can download an early private key backup now, then download it again after confirmed upload to include final CIDs. Keep the backup private; losing it makes pinned ciphertext inaccessible.</p>
+ <button type="button" className="ms-outline" onClick={exportRecovery}>Download private key backup ↓</button>
  </div>}<p>{isMusic?'Recording and songwriting become separate Bricks by default. Writers are credited separately from the recording artist.':'Register a work and supporting evidence. Creator claims are not independently verified by this demo.'}</p><p className="ms-ip-hint">IP category: <strong>{category.label}</strong></p><div className="ms-fields">{fields.filter(([id])=>isMusic||(id==='genre'&&category.group==='Music & audio')||(id==='songwriters'&&category.writers)||!['songwriters','daw','release','genre','bpm','key','isrc','iswc'].includes(id)).map(([id,label])=><label key={id}><span>{id==='title'&&!isMusic?'Work title':id==='artist'&&!isMusic?'Creator / claimant':label}</span>{id==='genre'?<MusicGenreSelect value={meta.genre} onChange={genre=>setMeta(p=>({...p,genre}))}/>:id==='description'?<textarea value={meta[id]} onChange={e=>setMeta(p=>({...p,[id]:e.target.value}))}/>:<input value={meta[id]} onChange={e=>setMeta(p=>({...p,[id]:e.target.value}))}/>}</label>)}</div>{category.spatial&&<section className="ms-spatial-fields"><h3>Spatial capture &amp; provenance</h3><p>Dates and credits below are creator-declared; attaching spatial video or motion capture does not establish first performance or exclusive rights. SHA-256 of the original file is recorded.</p><div className="ms-fields">{SPATIAL_FIELDS.map(field=><label key={field.id}><span>{field.label}</span><input placeholder={field.placeholder} value={spatial[field.id]||''} onChange={e=>setSpatial(p=>({...p,[field.id]:e.target.value}))}/></label>)}</div><small>Optional C2PA and PROV-O references link to external evidence, not automatically verified attestations.</small></section>}{category.group==='Music & audio'&&<section className="ms-link-panel">
  <h3>Cover artwork · independent visual IP Brick</h3>
  <p>The recording artist is also credited as cover artist by default. You can explicitly select another cover creator, or reference an existing visual Brick with controller approval.</p>
