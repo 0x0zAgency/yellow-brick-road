@@ -1,0 +1,53 @@
+name: YBR IPFS Encrypted Upload
+on:
+  push:
+    paths:
+      - 'web/**'
+      - 'infra/ipfs/**'
+      - '.github/workflows/ipfs.yml'
+      - 'package.json'
+  pull_request:
+    paths:
+      - 'web/**'
+      - 'infra/ipfs/**'
+      - '.github/workflows/ipfs.yml'
+      - 'package.json'
+jobs:
+  ipfs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Run encrypted IPFS client and bridge unit tests
+        run: |
+          npm --prefix web install --no-audit --no-fund
+          npm --prefix web test
+      - name: Boot persistent pilot node
+        run: docker compose -f infra/ipfs/compose.yaml up -d
+      - name: Wait for Kubo health
+        run: |
+          ready=0
+          for attempt in {1..90}; do
+            if curl -fsS -X POST http://127.0.0.1:5001/api/v0/id > /tmp/ybr-kubo-id.json; then ready=1; break; fi
+            sleep 2
+          done
+          if [ "$ready" -ne 1 ]; then docker compose -f infra/ipfs/compose.yaml logs; exit 1; fi
+      - name: Start encrypted-only YBR bridge
+        run: |
+          node web/scripts/ipfs-bridge.mjs >/tmp/ybr-ipfs-bridge.log 2>&1 &
+          for attempt in {1..20}; do
+            if curl -fsS http://127.0.0.1:8791/api/road-ipfs/health > /tmp/ybr-ipfs-health.json; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/ybr-ipfs-bridge.log
+          exit 1
+      - name: Upload real encrypted bytes and verify pinned CID
+        run: npm run ipfs:smoke
+      - name: Show logs and stop containers
+        if: always()
+        run: |
+          docker compose -f infra/ipfs/compose.yaml logs --tail=60 || true
+          docker compose -f infra/ipfs/compose.yaml down || true

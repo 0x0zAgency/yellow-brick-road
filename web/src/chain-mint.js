@@ -63,7 +63,9 @@ export async function mintOnChain({packet,provider,rpcUrl,chainId,factoryAddress
   // Works without a separate source file (e.g. composition) commit their metadata as content.
   const contentHash=b.metadata.media?.find(m=>m.role==='master'||m.role==='artwork')?.integrity.digest||metadataDigest;
   const nonce='0x'+Array.from(crypto.getRandomValues(new Uint8Array(32)),v=>v.toString(16).padStart(2,'0')).join('');
-  const uri='road-local://sha256/'+metadataDigest.slice(2);
+  // For YBR IPFS pilots this URI resolves to encrypted .roadenc metadata.
+  // It is deliberately not public-readable JSON and never contains a key.
+  const uri=b.metadataCipherCid?'ipfs://'+b.metadataCipherCid:'road-local://sha256/'+metadataDigest.slice(2);
   const args=[contentHash,uri,metadataDigest,nonce];
   const predicted=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'predictBrickAddress',args:[account,contentHash,nonce]});
   const {request}=await client.simulateContract({account,address:factoryAddress,abi:factoryAbi,functionName:'deployBrickWithMetadataDigest',args});

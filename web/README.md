@@ -92,3 +92,18 @@ Each Brick card in **Mint Studio → Mint results** now includes **Copy All** ne
 Mint Studio now collects independent cover-artwork provenance (title, visual IP category, artist, wallet and description) and has a dedicated lyrics evidence file slot. When someone else owns the work, enter the existing Brick and its factory in the **linked Brick** section instead of minting on their behalf. The target Brick's current controller can review the request under **My Bricks**, sign an EIP-712 authorization using their wallet, and return the signed JSON to the creator. The requesting wallet independently verifies the signature, chain, exact source hash and relationship before a real mint.
 
 This cross-wallet consent is not yet an on-chain Building link, automated Safe transaction, executed license, or royalty split. Source files remain browser-local. See [Cross-wallet Brick linking protocol](../docs/CROSS_WALLET_BRICK_LINKS.md).
+
+## Self-hosted encrypted IPFS pilot
+
+Mint Studio now has an **opt-in**, real encrypted-IPFS workflow. File encryption happens locally in Step 02; **nothing is transmitted until the creator finishes validating the rights declarations and explicitly confirms** in Step 04. The local YBR bridge verifies ciphertext integrity and a persistent Kubo pin, then the encrypted metadata CID is used as the `metadataURI` when minting. The original file, source filename, content, wallet keys and decryption passphrase remain local.
+
+To start the persistent YBR Kubo test service from repository root:
+
+```sh
+npm run ipfs:up
+npm run ipfs:bridge
+```
+
+Run `npm run ipfs:bridge` in its own terminal. Then in a third terminal start `cd web && npm install && npm run dev`, open `http://127.0.0.1:5173`, and opt in under Step 02. An independent actual pin/upload smoke test is `npm run ipfs:smoke`. **Do not expose Kubo's RPC port 5001 or the upload bridge to the public internet.** The Docker volume retains local pins across service restarts, but there is no offsite replication or production recovery guarantee.
+
+The browser offers a **private recovery key** download after ingestion. You must save it securely to decrypt your encrypted source assets later; never upload that key to IPFS. See [YBR IPFS storage pilot](../docs/IPFS_YBR_STORAGE_PILOT.md).

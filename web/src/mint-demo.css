@@ -50,3 +50,12 @@
 .ms-link-review code{overflow-wrap:anywhere}
 .ms-link-review label{display:flex;gap:11px;align-items:flex-start;font-size:12px;color:#f6e1a8}
 .ms-link-review input{accent-color:#e6c371}
+
+/* Real encrypted IPFS pilot is explicit and never silently enabled. */
+.ms-ipfs-option{display:flex!important;flex-direction:row!important;align-items:flex-start;gap:10px!important;font-size:12px!important;color:#f1d58e!important;margin:15px 0!important}
+.ms-ipfs-option input{width:auto!important;accent-color:#edc86b;flex:0 0 auto;margin:3px 0 0}
+.ms-ipfs-warning{padding:11px 13px;border-radius:8px;border:1px solid #a87e40;background:#403425;color:#f4dcb1!important}
+.ms-ipfs-confirm{border:1px solid #677a55;background:#29392d;border-radius:10px;padding:15px;margin:17px 0;display:grid;gap:10px}
+.ms-ipfs-confirm strong{color:#e9d594;font-size:13px}
+.ms-ipfs-confirm p{margin:0;color:#c7d2c9;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
+.ms-ipfs-confirm .road-copy-value{font-size:11px;overflow-wrap:anywhere}

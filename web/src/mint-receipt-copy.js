@@ -25,6 +25,7 @@ export function formatMintReceiptForCopy(receipt={},mint={}){
  add('Transaction hash',receipt.transactionHash);
  add('Block number',receipt.blockNumber);
  add('Gas used',receipt.gasUsed);
+ if(typeof receipt.uri==='string'&&receipt.uri.startsWith('ipfs://'))add('Encrypted metadata IPFS URI',receipt.uri);
  if(Number(receipt.chainId??mint.chainId)===11155111&&/^0x[0-9a-fA-F]{64}$/.test(receipt.transactionHash||'')){
   add('Sepolia transaction', 'https://sepolia.etherscan.io/tx/'+receipt.transactionHash);
  }
