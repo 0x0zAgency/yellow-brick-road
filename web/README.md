@@ -82,3 +82,7 @@ Select **My Bricks** in the sidebar after connecting a wallet. Enter the `Yellow
 The factory address is stored locally in your browser after a successful on-chain Mint Studio registration, or can be entered manually. The viewer does **not** fetch original files or resolve private metadata. Simulated mints do not appear, and contracts originally minted by other wallets but subsequently transferred to the connected wallet are not discoverable from the creation-event index alone.
 
 See [Wallet Brick Viewer documentation](../docs/WALLET_BRICK_VIEWER.md) for network, scan-range and privacy limitations.
+
+## Copy complete mint receipts
+
+Each Brick card in **Mint Studio → Mint results** now includes **Copy All** next to the category/role heading, in addition to the existing individual copy icons. Copy All places a labeled, multi-line receipt on the clipboard, including the ERC-721 collection address and decimal Token ID (when available), underlying Brick contract and IP identity, factory, chain, transaction hash, block and gas. Pending, simulated and legacy mints never invent an NFT address or token ID. The copy payload intentionally excludes private metadata JSON, source files, encrypted blobs and wallet secrets.
