@@ -58,7 +58,15 @@ describe("Yellow Brick Road", function () {
     const metadata = JSON.parse(Buffer.from(uri.split(",")[1], "base64").toString("utf8"));
     assert.equal(metadata.name, "Yellow Brick Registration");
     assert.ok(metadata.description.includes("not evidence"));
-    assert.equal(metadata.attributes[0].value.toLowerCase(), work.address.toLowerCase());
+    assert.equal(metadata.attributes.find(a => a.trait_type === "Default Artwork").value, "yellow-square-v1");
+    assert.equal(metadata.attributes.find(a => a.trait_type === "Brick Contract").value.toLowerCase(), work.address.toLowerCase());
+    assert.ok(metadata.image.startsWith("data:image/svg+xml;base64,"));
+    assert.equal(metadata.image, await token.defaultImage());
+    const svg = Buffer.from(metadata.image.split(",")[1], "base64").toString("utf8");
+    assert.ok(svg.includes("🟨"), "Metadata image must explicitly identify the yellow-square emoji");
+    assert.ok(svg.includes('fill="#FFD93D"'), "Emoji-colored yellow square is the image fallback");
+    assert.ok(svg.includes('viewBox="0 0 512 512"'), "Wallet artwork should scale to a square icon");
+    assert.ok(!svg.includes("ipfs://") && !svg.includes("http://"), "Artwork must be self-contained with no external asset fetch");
     await rejects(token.connect(creator).transferFrom(creator.address, artist.address, tokenId));
     await rejects(token.connect(stranger).mint(stranger.address, ethers.BigNumber.from("5"), work.address));
     assert.equal(await work.controller(), creator.address);
