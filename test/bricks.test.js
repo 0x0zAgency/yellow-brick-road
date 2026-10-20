@@ -66,7 +66,7 @@ describe("Yellow Brick Road", function () {
     assert.ok(svg.includes("🟨"), "Metadata image must explicitly identify the yellow-square emoji");
     assert.ok(svg.includes('fill="#FFD93D"'), "Emoji-colored yellow square is the image fallback");
     assert.ok(svg.includes('viewBox="0 0 512 512"'), "Wallet artwork should scale to a square icon");
-    assert.ok(!svg.includes("ipfs://") && !svg.includes("http://"), "Artwork must be self-contained with no external asset fetch");
+    assert.ok(!/<(?:script|image|use|link)\b/i.test(svg) && !/\b(?:href|src)\s*=\s*["\x27]https?:\/\//i.test(svg), "Artwork must use only inline SVG shapes, not linked assets");
     await rejects(token.connect(creator).transferFrom(creator.address, artist.address, tokenId));
     await rejects(token.connect(stranger).mint(stranger.address, ethers.BigNumber.from("5"), work.address));
     assert.equal(await work.controller(), creator.address);
