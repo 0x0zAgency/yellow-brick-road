@@ -11,19 +11,19 @@ const base={
 };
 
 test('Music recordings have optional preview and cover art; only master is required',()=>{
- for(const category of ['sound-recording','sound-design','musical-performance'])assert.deepEqual(ids(category),['master','preview','artwork','project','metadata']);
- for(const category of ['musical-work','song-lyrics'])assert.deepEqual(ids(category),['master','preview','artwork','lyrics','project','metadata']);
- assert.ok(!ids('sound-recording').includes('lyrics'),'The recording flow must not show a second lyrics input beneath cover artwork.');
+ for(const category of ['sound-recording','sound-design','musical-performance','musical-work','song-lyrics'])
+  assert.deepEqual(ids(category),['master','preview','artwork','lyrics','project','metadata']);
+ assert.ok(ids('sound-recording').includes('lyrics'),'Optional lyrics evidence stays available beneath cover artwork.');
  assert.ok(availableAssetSlots('sound-recording').filter(s=>s.required).every(s=>s.id==='master'));
  assert.deepEqual(validateMintInput({...base,metadata:{...base.metadata,ipCategory:'sound-recording'}}),[]);
 });
 
-test('Hidden old lyrics uploads cannot leak into a sound-recording packet',()=>{
+test('Optional audio-master lyrics are assigned only to the separate composition Brick',()=>{
  const recording={...base,metadata:{...base.metadata,ipCategory:'sound-recording'},assets:{
-  ...base.assets,lyrics:{name:'unrelated-lyrics.txt',hash:'f'.repeat(64),size:22,type:'text/plain'}}};
+  ...base.assets,lyrics:{name:'my-lyrics.txt',hash:'f'.repeat(64),size:22,type:'text/plain'}}};
  const packet=makeRegistrationPacket(recording);
  assert.equal(packet.bricks[0].metadata.media.some(file=>file.role==='lyrics'),false);
- assert.equal(packet.bricks.find(b=>b.localId==='composition')?.metadata.media.length,0);
+ assert.deepEqual(packet.bricks.find(b=>b.localId==='composition')?.metadata.media.map(m=>m.role),['lyrics']);
 });
 
 test('Non-music categories do not expose audio preview or cover artwork',()=>{

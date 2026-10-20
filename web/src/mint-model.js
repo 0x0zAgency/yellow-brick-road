@@ -12,10 +12,9 @@ export const assetSlots=[
 /** File roles vary by IP category. Only a primary work is universally required. */
 export function availableAssetSlots(categoryId='sound-recording'){
  const category=getIpCategory(categoryId);
- // Lyrics evidence belongs to a separately registered songwriting / lyrics work,
- // not in the master recording's source-file upload screen.
- if(category.group==='Music & audio')
-  return assetSlots.filter(slot=>category.writers||slot.id!=='lyrics');
+ // Optional lyrics can be attached with a recording; the model places them
+ // in the separately attributed songwriting Brick when a composition is created.
+ if(category.group==='Music & audio')return assetSlots;
  return assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork'&&slot.id!=='lyrics');
 }
 export const trainingModes=[

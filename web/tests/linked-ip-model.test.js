@@ -63,13 +63,12 @@ test('lyrics evidence is attached through a separate songwriting/lyrics Brick, n
  assert.equal(packet.bricks[0].metadata.media.find(m=>m.role==='lyrics').name,'lyrics.txt');
  assert.equal(packet.bricks.find(b=>b.localId==='composition'),undefined);
  assert.ok(availableAssetSlots('musical-work').some(slot=>slot.id==='lyrics'));
- assert.ok(!availableAssetSlots('sound-recording').some(slot=>slot.id==='lyrics'));
+ assert.ok(availableAssetSlots('sound-recording').some(slot=>slot.id==='lyrics'));
 });
-test('a hidden stale lyrics attachment does not prevent linking an existing composition Brick',()=>{
+test('attached lyrics require removing the file before linking another creator’s composition',()=>{
  const link={id:'writer',relation:'embodies-composition',targetBrick:artistWallet,factory,scope:'Recording use'};
  const input={...core,assets:{...core.assets,lyrics:{name:'lyrics.txt',hash:'c'.repeat(64),size:300}},linkedBricks:[link]};
- assert.deepEqual(validateMintInput(input),[]);
- assert.equal(makeRegistrationPacket(input).bricks[0].metadata.media.some(m=>m.role==='lyrics'),false);
+ assert.match(validateMintInput(input).join(' '),/Remove the local lyrics attachment/);
 });
 test('different credited writers must link their composition rather than having their work minted by recording wallet',()=>{
  const errors=validateMintInput({...core,metadata:{...core.metadata,songwriters:'Another Writer'}});
