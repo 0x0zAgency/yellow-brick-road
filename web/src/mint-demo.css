@@ -22,3 +22,6 @@
 .ms-receipts strong{color:#f2eedb;font-size:13px}
 .ms-receipts small{color:#aebec0;font-size:11px}
 .ms-receipts a{color:#f1cf85;font-size:11px}
+
+.ms-local-pref{display:grid;gap:9px;padding:14px 17px;margin:17px 0;background:#26302b;border:1px solid #59614e;border-radius:10px}.ms-local-pref label{display:flex;align-items:center;gap:10px;font-size:12px;color:#e4e7d8}.ms-local-pref input{accent-color:#d9bc73}.ms-local-pref small{font-size:11px;line-height:1.6;color:#a9b7b3}.ms-local-pref button{justify-self:start;border:1px solid #72664f;background:#33332c;border-radius:7px;color:#efcf96;padding:8px 12px;cursor:pointer}
+.ms-receipts{display:grid;gap:14px;margin:18px 0}.ms-receipt{padding:17px;background:#222e2a;border:1px solid #56634e;border-radius:10px;display:grid;gap:12px}.ms-receipt>strong{font-size:15px;color:#e9d796}.ms-receipt>div{min-width:0;display:grid;gap:5px}.ms-receipt>div>span:first-child:not(.road-copy-field){color:#afbec0;font-size:11px}.ms-receipt-primary{background:#334337;padding:12px;border-radius:8px}.ms-receipt small{color:#c2c5bb;font-size:11px;line-height:1.6}.ms-verified{color:#c5e6c5;font-size:11px;letter-spacing:.05em}.ms-receipt .road-copy-field{max-width:100%}

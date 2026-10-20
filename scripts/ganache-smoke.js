@@ -17,7 +17,9 @@ async function main(){
  const Factory=await ethers.getContractFactory('YellowBrickFactory',creator);
  const factory=await Factory.deploy();
  await factory.deployed();
- const result={network:'ganache-local',simulated:false,publicNetwork:false,chainId,factoryAddress:factory.address,originator:creator.address,bricks:[]};
+ const receiptTokenAddress=await factory.receiptToken();
+ const nft=await ethers.getContractAt('YellowBrickReceipt',receiptTokenAddress);
+ const result={network:'ganache-local',simulated:false,publicNetwork:false,chainId,factoryAddress:factory.address,nftContractAddress:receiptTokenAddress,originator:creator.address,bricks:[]};
  for(const item of examples){
   const contentHash=ethers.utils.sha256(ethers.utils.toUtf8Bytes(item.payload));
   const metadata={title:item.title,category:item.category,claimStatus:'DEMO unverified'};
@@ -36,7 +38,10 @@ async function main(){
   assert.equal(await brick.contentHash(),contentHash);
   assert.equal(await brick.metadataDigest(),digest);
   assert.equal(await brick.metadataURI(),uri);
-  result.bricks.push({category:item.category,title:item.title,contractAddress:address,transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber,gasUsed:receipt.gasUsed.toString(),contentHash,metadataDigest:digest});
+  const tokenId=(await brick.ipId()).toString();
+  assert.equal(await nft.ownerOf(tokenId),creator.address);
+  assert.equal(await nft.brickForToken(tokenId),address);
+  result.bricks.push({category:item.category,title:item.title,contractAddress:address,nftContractAddress:receiptTokenAddress,tokenId:ethers.BigNumber.from(tokenId).toString(),transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber,gasUsed:receipt.gasUsed.toString(),contentHash,metadataDigest:digest});
  }
  const directory=path.resolve(__dirname,'../.road-local');
  fs.mkdirSync(directory,{recursive:true});

@@ -19,6 +19,7 @@
     "@nomiclabs/hardhat-ethers": "^2.2.3",
     "ethers": "^5.7.2",
     "hardhat": "^2.22.0",
-    "ganache": "7.9.2"
+    "ganache": "7.9.2",
+    "@openzeppelin/contracts": "^5.4.0"
   }
 }

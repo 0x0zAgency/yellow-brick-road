@@ -4,6 +4,10 @@
 import {isAddress} from 'viem';
 import {factoryAbi} from './chain-mint.js';
 
+export const RECEIPT_READ_ABI=[
+ {type:'function',name:'ownerOf',stateMutability:'view',inputs:[{type:'uint256'}],outputs:[{type:'address'}]},
+ {type:'function',name:'brickForToken',stateMutability:'view',inputs:[{type:'uint256'}],outputs:[{type:'address'}]}
+];
 export const BRICK_READ_ABI=[
  {type:'function',name:'ipId',stateMutability:'view',inputs:[],outputs:[{type:'bytes32'}]},
  {type:'function',name:'originator',stateMutability:'view',inputs:[],outputs:[{type:'address'}]},
@@ -43,6 +47,11 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
  const implementationCode=await client.getBytecode({address:implementation});
  if(!implementationCode||implementationCode==='0x')throw Error('Factory implementation is not deployed.');
 
+ let receiptTokenAddress=null;
+ try{
+  const candidate=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'receiptToken'});
+  if(isAddress(candidate)&&await client.getBytecode({address:candidate}))receiptTokenAddress=candidate;
+ }catch{/* Older factories have no ERC721 receipt collection. */}
  const latest=await client.getBlockNumber();
  const {start,limited}=resolveScanStart(latest,startBlock);
  const events=[];
@@ -72,8 +81,18 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
   if(originator.toLowerCase()!==wallet.toLowerCase()||!registered||contentHash.toLowerCase()!==event.args.contentHash.toLowerCase()){
    throw Error('On-chain factory event and Brick contract do not match at '+address);
   }
-  bricks.push({address,originator,controller,ipId,contentHash,metadataDigest,metadataVersion:metadataVersion.toString(),metadataURI,
+  let nftContractAddress=null,tokenId=null;
+  if(receiptTokenAddress){
+   const expectedId=BigInt(ipId);
+   const [tokenOwner,linkedBrick]=await Promise.all([
+    client.readContract({address:receiptTokenAddress,abi:RECEIPT_READ_ABI,functionName:'ownerOf',args:[expectedId]}),
+    client.readContract({address:receiptTokenAddress,abi:RECEIPT_READ_ABI,functionName:'brickForToken',args:[expectedId]})
+   ]);
+   if(tokenOwner.toLowerCase()!==originator.toLowerCase()||linkedBrick.toLowerCase()!==address.toLowerCase())throw Error('NFT receipt does not match Brick '+address);
+   nftContractAddress=receiptTokenAddress;tokenId=expectedId.toString();
+  }
+  bricks.push({address,originator,controller,ipId,contentHash,metadataDigest,metadataVersion:metadataVersion.toString(),metadataURI,nftContractAddress,tokenId,
    transactionHash:event.transactionHash,blockNumber:event.blockNumber.toString(),creatorIsController:controller.toLowerCase()===wallet.toLowerCase()});
  }
- return {bricks,matchingEvents:found.length,limitReached:found.length>MAX_RESULTS,fromBlock:start.toString(),toBlock:latest.toString(),limited,verifiedFactory:factoryAddress};
+ return {bricks,matchingEvents:found.length,limitReached:found.length>MAX_RESULTS,fromBlock:start.toString(),toBlock:latest.toString(),limited,verifiedFactory:factoryAddress,receiptTokenAddress};
 }

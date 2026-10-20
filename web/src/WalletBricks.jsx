@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import CopyField from './CopyField.jsx';
 import {createPublicClient,custom,defineChain,isAddress} from 'viem';
 import {MINT_NETWORKS} from './road-chain.js';
 import {discoverWalletBricks,factoryStorageKey} from './brick-viewer-model.js';
@@ -74,14 +75,15 @@ export default function WalletBricks({wallet,onConnect}){
     <div className="wb-list">{result.bricks.map((brick,i)=><article className="wb-brick" key={brick.address}>
      <div className="wb-brick-top"><div><span className="wb-eyebrow">ON-CHAIN BRICK · {i+1}</span><h3>{short(brick.address)}</h3></div><span className={brick.creatorIsController?'wb-status':'wb-status transferred'}>{brick.creatorIsController?'Creator controls':'Controller changed'}</span></div>
      <dl>
-      <div><dt>Contract</dt><dd title={brick.address}>{brick.address}</dd></div>
-      <div><dt>IP identity</dt><dd>{brick.ipId}</dd></div>
+      {brick.nftContractAddress&&brick.tokenId?<><div><dt>NFT contract address (wallet import)</dt><dd><CopyField label="NFT contract address" value={brick.nftContractAddress}/></dd></div><div><dt>Token ID (decimal, wallet import)</dt><dd><CopyField label="NFT token ID" value={brick.tokenId}/></dd></div></>:<div><dt>Legacy factory</dt><dd>No ERC-721 token ID. This registration cannot be imported as an NFT.</dd></div>}
+      <div><dt>Brick contract</dt><dd><CopyField label="Brick contract address" value={brick.address}/></dd></div>
+      <div><dt>IP identity</dt><dd><CopyField label="IP identity" value={brick.ipId}/></dd></div>
       <div><dt>Content commitment (bytes32)</dt><dd>{brick.contentHash}</dd></div>
-      <div><dt>Metadata commitment</dt><dd>{brick.metadataDigest}</dd></div>
+      <div><dt>Metadata commitment</dt><dd><CopyField label="metadata commitment" value={brick.metadataDigest}/></dd></div>
       <div><dt>Metadata version</dt><dd>{brick.metadataVersion}</dd></div>
       <div><dt>Metadata reference</dt><dd>{brick.metadataURI}</dd></div>
-      <div><dt>Current controller</dt><dd>{brick.controller}</dd></div>
-      <div><dt>Block</dt><dd>{brick.blockNumber}</dd></div>
+      <div><dt>Current controller</dt><dd><CopyField label="current controller" value={brick.controller}/></dd></div>
+      <div><dt>Block</dt><dd><CopyField label="block number" value={brick.blockNumber}/></dd></div>
      </dl>
      <div className="wb-brick-links">{chainId===11155111?<><a href={'https://sepolia.etherscan.io/address/'+brick.address} rel="noreferrer" target="_blank">View contract on Sepolia ↗</a><a href={'https://sepolia.etherscan.io/tx/'+brick.transactionHash} rel="noreferrer" target="_blank">View mint transaction ↗</a></>:<span>Ganache transaction: {short(brick.transactionHash)}</span>}</div>
     </article>)}</div>

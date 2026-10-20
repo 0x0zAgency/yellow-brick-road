@@ -2,16 +2,21 @@
 pragma solidity ^0.8.24;
 
 import {YellowBrick} from "./YellowBrick.sol";
+import {YellowBrickReceipt} from "./YellowBrickReceipt.sol";
 
 /// @notice No-platform-fee contract factory. Originator pays blockchain gas.
 contract YellowBrickFactory {
     address public immutable implementation;
+    address public immutable receiptToken;
     mapping(address => bool) public isBrick;
     mapping(bytes32 => address) public brickById;
 
     event BrickDeployed(bytes32 indexed ipId, address indexed brick, address indexed originator, bytes32 contentHash);
 
-    constructor() { implementation = address(new YellowBrick()); }
+    constructor() {
+        implementation = address(new YellowBrick());
+        receiptToken = address(new YellowBrickReceipt(address(this)));
+    }
 
     function ipIdentity(address originator, bytes32 contentHash, bytes32 nonce) public pure returns (bytes32) {
         return keccak256(abi.encode("yellow-brick-road:ip:v1", originator, contentHash, nonce));
@@ -31,6 +36,7 @@ contract YellowBrickFactory {
         YellowBrick(brick).initialize(id, contentHash, msg.sender, uri);
         isBrick[brick] = true;
         brickById[id] = brick;
+        YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
         emit BrickDeployed(id, brick, msg.sender, contentHash);
     }
 
@@ -49,6 +55,7 @@ contract YellowBrickFactory {
         YellowBrick(brick).initializeWithDigest(id, contentHash, msg.sender, uri, metadataDigest);
         isBrick[brick] = true;
         brickById[id] = brick;
+        YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
         emit BrickDeployed(id, brick, msg.sender, contentHash);
     }
 

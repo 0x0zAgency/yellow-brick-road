@@ -45,7 +45,13 @@ for(const network of ['ganache','sepolia'])test(`wallet-signed ${network} path a
  reject=true;await assert.rejects(mintOnChain(options),/rejected/i);assert.equal(sends,0);reject=false;
  const result=await mintOnChain(options);
  assert.equal(result.simulated,false);assert.equal(result.status,'confirmed');assert.equal(result.receipts.length,3);assert.equal(sends,3);
- for(const receipt of result.receipts){assert.equal(receipt.status,'verified');assert.match(receipt.transactionHash,/^0x[0-9a-f]{64}$/);assert.ok(await client.getBytecode({address:receipt.contractAddress}));}
+ for(const receipt of result.receipts){
+  assert.equal(receipt.status,'verified');assert.match(receipt.transactionHash,/^0x[0-9a-f]{64}$/);
+  assert.ok(await client.getBytecode({address:receipt.contractAddress}));
+  assert.match(receipt.nftContractAddress,/^0x[0-9a-f]{40}$/i);
+  assert.ok(BigInt(receipt.tokenId)>0n);
+  assert.equal(await client.readContract({address:receipt.nftContractAddress,abi:[{type:'function',name:'ownerOf',stateMutability:'view',inputs:[{type:'uint256'}],outputs:[{type:'address'}]}],functionName:'ownerOf',args:[BigInt(receipt.tokenId)]}),account.address);
+ }
  const partial={simulated:false,status:'pending',receipts:[]};let updates=0;
  await assert.rejects(mintOnChain({...options,result:partial,onUpdate:message=>{if(message.startsWith('Verified')&&++updates===1)reject=true}}),/rejected/i);
  assert.equal(partial.receipts.length,1);assert.equal(partial.receipts[0].status,'verified');

@@ -41,6 +41,29 @@ describe("Yellow Brick Road", function () {
     await rejects(factory.connect(creator).deployBrick(one.contentHash, "ipfs://new", one.nonce));
   });
 
+  it("mints wallet-importable ERC721 registration receipts distinct from Brick rights", async function () {
+    const receiptAddress = await factory.receiptToken();
+    const token = await ethers.getContractAt("YellowBrickReceipt", receiptAddress);
+    const work = (await brick(creator, "receipt-work")).deployed;
+    const ipId = await work.ipId();
+    const tokenId = ethers.BigNumber.from(ipId);
+    assert.equal(await token.name(), "Yellow Brick Registration");
+    assert.equal(await token.symbol(), "YBRR");
+    assert.equal(await token.supportsInterface("0x80ac58cd"), true);
+    assert.equal(await token.supportsInterface("0x5b5e139f"), true);
+    assert.equal(await token.ownerOf(tokenId), creator.address);
+    assert.equal(await token.brickForToken(tokenId), work.address);
+    const uri = await token.tokenURI(tokenId);
+    assert.ok(uri.startsWith("data:application/json;base64,"));
+    const metadata = JSON.parse(Buffer.from(uri.split(",")[1], "base64").toString("utf8"));
+    assert.equal(metadata.name, "Yellow Brick Registration");
+    assert.ok(metadata.description.includes("not evidence"));
+    assert.equal(metadata.attributes[0].value.toLowerCase(), work.address.toLowerCase());
+    await rejects(token.connect(creator).transferFrom(creator.address, artist.address, tokenId));
+    await rejects(token.connect(stranger).mint(stranger.address, ethers.BigNumber.from("5"), work.address));
+    assert.equal(await work.controller(), creator.address);
+  });
+
   it("restricts metadata and uses two-step contract administration", async function () {
     const one = (await brick(creator, "photo")).deployed;
     await rejects(one.connect(stranger).updateMetadata("ipfs://tamper"));

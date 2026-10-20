@@ -8,7 +8,7 @@ async function main(){
  const factory=await (await ethers.getContractFactory('YellowBrickFactory')).deploy();
  const receipt=await factory.deployTransaction.wait(1);
  if(receipt.status!==1)throw Error('Deployment failed');
- const result={chainId,rpcUrl:url.href,factoryAddress:factory.address,transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber};
+ const result={chainId,rpcUrl:url.href,factoryAddress:factory.address,nftContractAddress:await factory.receiptToken(),transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber};
  fs.mkdirSync('.road-local',{recursive:true});fs.writeFileSync('.road-local/factory.json',JSON.stringify(result,null,2)+'\n');
  console.log(JSON.stringify(result,null,2));
 }

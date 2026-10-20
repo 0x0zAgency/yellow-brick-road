@@ -2,12 +2,14 @@ import {sepolia} from 'viem/chains';
 import {createPublicClient, createWalletClient, custom, http, parseAbi, parseEventLogs, isAddress, sha256, stringToHex, getAddress, encodeFunctionData} from 'viem';
 export const factoryAbi=parseAbi([
  'function implementation() view returns (address)',
+ 'function receiptToken() view returns (address)',
  'function isBrick(address) view returns (bool)',
  'function brickById(bytes32) view returns (address)',
  'function predictBrickAddress(address,bytes32,bytes32) view returns (address)',
  'function deployBrickWithMetadataDigest(bytes32,string,bytes32,bytes32) returns (address)',
  'event BrickDeployed(bytes32 indexed ipId,address indexed brick,address indexed originator,bytes32 contentHash)'
 ]);
+const receiptAbi=parseAbi(['function ownerOf(uint256) view returns (address)','function brickForToken(uint256) view returns (address)','function tokenURI(uint256) view returns (string)']);
 const brickAbi=parseAbi(['function controller() view returns (address)','function contentHash() view returns (bytes32)','function metadataDigest() view returns (bytes32)','function metadataURI() view returns (string)']);
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
 export function localConfig(rpcUrl, chainId){
@@ -42,13 +44,18 @@ export async function verifyFactory(client,address){
  if(!isAddress(address)||!await client.getBytecode({address}))throw Error('Factory address has no contract on this chain. Deploy or enter a current factory.');
  const implementation=await client.readContract({address,abi:factoryAbi,functionName:'implementation'});
  if(!await client.getBytecode({address:implementation}))throw Error('Factory implementation is missing.');
+ let receiptAddress;
+ try{receiptAddress=await client.readContract({address,abi:factoryAbi,functionName:'receiptToken'});}
+ catch{throw Error('This is a legacy YellowBrickFactory without ERC721 registration receipts. Deploy the updated factory before minting wallet-importable NFTs.');}
+ if(!isAddress(receiptAddress)||!await client.getBytecode({address:receiptAddress}))throw Error('The factory registration NFT collection is missing.');
+ return receiptAddress;
 }
 export async function mintOnChain({packet,provider,rpcUrl,chainId,factoryAddress,network='ganache',receiptTimeoutMs=120000,onUpdate=()=>{},result={simulated:false,status:'pending',receipts:[]}}){
  const account=packet?.account?.address;
  if(result.receipts.length)throw Error('Use a fresh batch only after reviewing all prior transaction hashes.');
  if(packet?.packetType!=='LOCAL_PREVIEW_NOT_MINTED'||!packet.bricks?.length)throw Error('Invalid registration packet.');
  const {client,wallet,chain,check}=await connectChain({provider,rpcUrl,chainId,account,network});
- await verifyFactory(client,factoryAddress);
+ const receiptTokenAddress=await verifyFactory(client,factoryAddress);
  result.chainId=chain.id;result.factoryAddress=getAddress(factoryAddress);
  for(const b of packet.bricks){
   await check();
@@ -80,7 +87,13 @@ export async function mintOnChain({packet,provider,rpcUrl,chainId,factoryAddress
    if(!same(await client.readContract({address,abi:brickAbi,functionName}),expected))throw Error('Brick verification failed: '+functionName);
   }
   if(!await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'isBrick',args:[address]})||!same(await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'brickById',args:[event.args.ipId]}),address))throw Error('Factory registry verification failed.');
-  Object.assign(entry,{status:'verified',id:event.args.ipId,contractAddress:address,blockNumber:receipt.blockNumber.toString(),gasUsed:receipt.gasUsed.toString()});onUpdate('Verified '+b.role);
+  const tokenId=BigInt(event.args.ipId);
+  const [owner,registeredBrick] = await Promise.all([
+   client.readContract({address:receiptTokenAddress,abi:receiptAbi,functionName:'ownerOf',args:[tokenId]}),
+   client.readContract({address:receiptTokenAddress,abi:receiptAbi,functionName:'brickForToken',args:[tokenId]})
+  ]);
+  if(!same(owner,account)||!same(registeredBrick,address))throw Error('ERC721 receipt does not match creator and Brick contract.');
+  Object.assign(entry,{status:'verified',id:event.args.ipId,contractAddress:address,nftContractAddress:receiptTokenAddress,tokenId:tokenId.toString(),blockNumber:receipt.blockNumber.toString(),gasUsed:receipt.gasUsed.toString()});onUpdate('Verified '+b.role);
  }
  result.status='confirmed';return result;
 }
