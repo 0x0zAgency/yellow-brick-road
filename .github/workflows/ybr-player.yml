@@ -1,0 +1,25 @@
+name: YBR Player
+
+on:
+  push:
+    paths:
+      - 'apps/ybr-player/**'
+      - '.github/workflows/ybr-player.yml'
+  pull_request:
+    paths:
+      - 'apps/ybr-player/**'
+      - '.github/workflows/ybr-player.yml'
+
+jobs:
+  player-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/ybr-player
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run YBR Player tests
+        run: npm test

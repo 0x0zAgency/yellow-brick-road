@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#12120e">
+  <title>YBR Player • Follow the music</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-mark"><div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></div><div><strong>yellow brick road</strong><small>PLAYER / ALPHA 0.1</small></div></div>
+      <div class="section-label">YOUR SPACE</div>
+      <button class="nav-item selected" type="button" id="libraryNav"><span class="nav-icon">♫</span> Library <span class="mini-dot"></span></button>
+      <button class="nav-item" type="button" id="inspectorNav"><span class="nav-icon">▦</span> Brick inspector</button>
+      <div class="sidebar-spacer"></div>
+      <div class="side-proof"><span class="proof-light"></span><span>Proof of connection</span><p>Media flows through rights-aware YBR bricks. No external streaming SDK.</p></div>
+      <div class="side-footer"><span class="online-dot"></span><span id="signedInAs">Not connected</span></div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar"><div class="breadcrumb">YBR <span>/</span> PLAYER <span>/</span> LIBRARY</div><div class="top-actions"><span class="pill"><i class="online-dot"></i> LOCAL DEMO</span><button id="logout" type="button" class="text-button">Sign out ↗</button></div></header>
+      <div class="page-content">
+        <div class="eyebrow"><span class="tiny-road"></span> THE ROAD STARTS HERE</div>
+        <h1>Follow the <em>music.</em></h1>
+        <p class="lead">A player built on provenance. Every sound has a source. Every source has a brick.</p>
+        <section class="feature" aria-label="Featured brick">
+          <div class="feature-copy"><span class="overline">FEATURED BRICK · AUDIO / 001</span><h2>Every track<br>has a story.</h2><p>Play a track, follow its brick, and see how the road connects.</p><button id="featurePlay" class="gold-button" type="button"><span class="triangle">▶</span> <span>Play featured brick</span> <span aria-hidden="true">↗</span></button></div>
+          <div class="feature-art" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="art-inner"><span class="art-y">Y</span><span class="art-b">B</span><span class="art-r">R</span></div><div class="art-stamp">SOURCE / SOUND / SIGNAL</div></div>
+        </section>
+        <div class="heading-row"><div><div class="eyebrow small">THE COLLECTION</div><h3>Connected audio</h3></div><span id="trackCount" class="track-count">Loading…</span></div>
+        <div id="trackList" class="track-list" role="list" aria-label="Audio bricks"></div>
+        <div class="under-note"><span>◇</span> These are original synthesized demo tracks, not material from any commercial streaming service.</div>
+      </div>
+    </main>
+
+    <aside class="inspector" id="inspector" aria-label="Brick details">
+      <div class="inspector-header"><span>BRICK INSPECTOR</span><span class="inspection-mark">◇</span></div>
+      <div class="inspector-cover" id="inspectorCover"><div class="cover-grid"></div><div class="cover-emblem">YBR<span>◆</span></div></div>
+      <span class="eyebrow small">NOW INSPECTING</span>
+      <h3 id="brickTitle">Select a brick</h3><p id="brickArtist" class="muted">Its metadata will appear here.</p>
+      <div class="inspector-divider"></div>
+      <div class="id-row"><span>BRICK ID</span><button type="button" id="copyId" title="Copy brick ID" disabled>Copy ↗</button></div><div class="brick-id" id="brickId">—</div>
+      <div class="meta-row"><span>STREAMING RIGHTS</span><strong id="brickRights">—</strong></div>
+      <div class="meta-row"><span>FORMAT</span><strong id="brickFormat">—</strong></div>
+      <div class="meta-row"><span>FILE INTEGRITY</span><strong id="brickHash" title="SHA-256 hash">—</strong></div>
+      <div class="inspector-divider"></div>
+      <div class="eyebrow small">PROVENANCE</div>
+      <p id="brickProvenance" class="provenance-copy">Select an audio brick to inspect its source and origin.</p>
+      <div class="inspector-end"><div class="inspector-badge">◈ <span>PROV-O-READY METADATA</span></div><p>This is a local reference manifest, not a finalized YBR standard or a signed Content Credential.</p></div>
+    </aside>
+  </div>
+
+  <footer class="player-bar">
+    <div class="now-playing"><div id="miniCover" class="mini-cover"><span>◆</span></div><div class="song-label"><strong id="nowTitle">Nothing playing</strong><span id="nowArtist">Pick a brick to begin</span></div><span id="nowStatus" class="status-indicator" aria-label="Playback status"></span></div>
+    <div class="playback"><div class="play-controls"><button type="button" id="previous" aria-label="Previous track" title="Previous">⏮</button><button class="big-play" type="button" id="playPause" aria-label="Play" title="Play"><span id="playGlyph">▶</span></button><button type="button" id="next" aria-label="Next track" title="Next">⏭</button></div><div class="seek-line"><span id="elapsed">0:00</span><input id="seek" type="range" min="0" max="1000" value="0" aria-label="Seek audio position"><span id="duration">0:00</span></div></div>
+    <div class="volume-controls"><span aria-hidden="true">◖))</span><input id="volume" type="range" min="0" max="100" value="75" aria-label="Volume"><span class="small-word">VOLUME</span></div>
+  </footer>
+
+  <div id="loginOverlay" class="login-overlay" hidden>
+    <form id="loginForm" class="login-card"><div class="brand-mark"><div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></div><div><strong>yellow brick road</strong><small>PLAYER / ALPHA 0.1</small></div></div>
+      <span class="eyebrow">AUTHORIZATION GATE</span><h2>Your passport<br>to the <em>road.</em></h2><p>Sign in with an account displayed in the server terminal. Streaming access is enforced for each brick.</p>
+      <label for="username">ACCOUNT</label><input id="username" name="username" type="text" autocomplete="username" value="listener" required>
+      <label for="password">PASSWORD</label><input id="password" name="password" type="password" autocomplete="current-password" placeholder="From the server terminal" required>
+      <p id="loginError" class="login-error" role="alert"></p><button type="submit" class="gold-button">Authorize session <span aria-hidden="true">↗</span></button><small class="login-footnote">Proof-of-concept access only. No Spotify account or third-party SDK required.</small>
+    </form>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <audio id="audio" preload="none"></audio>
+</body>
+</html>

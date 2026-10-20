@@ -234,6 +234,7 @@ This is the future we intend to build.
 - [Protocol Architecture](https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/ARCHITECTURE.md)
 - [Public Utility Constitution](https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/CONSTITUTION.md)
 - [Road Explorer Interface](https://github.com/0x0zAgency/yellow-brick-road/tree/main/web)
+- [YBR Player: independent rights-aware media player demo](https://github.com/0x0zAgency/yellow-brick-road/tree/main/apps/ybr-player)
 - [Technical Roadmap](https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/ROADMAP.md)
 
 *The Yellow Brick Road is an experimental open-source protocol under active development. Current smart contracts demonstrate IP identity, contextual relationships, licensing declarations, royalty accounting, and governance in local test environments. Registration does not independently establish legal ownership, and production systems require further verification, security auditing, and legal review.*

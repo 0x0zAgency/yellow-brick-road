@@ -1,0 +1,3 @@
+media/*.wav
+data/player-events.ndjson
+node_modules/
