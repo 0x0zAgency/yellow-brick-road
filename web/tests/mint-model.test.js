@@ -7,3 +7,15 @@ test('sidecar metadata supports JSON and key-value text',()=>{assert.equal(parse
 test('master file is required before packet staging',()=>{assert.ok(validateMintInput({...mock,assets:{}}).length);assert.deepEqual(validateMintInput(mock),[])});
 test('creates independently tracked cover and composition bricks',()=>{const p=makeRegistrationPacket(mock);assert.equal(p.bricks.length,3);assert.equal(p.bricks[0].metadata.relationships.length,2);assert.equal(p.bricks[1].metadata.media[0].access.visibility,'public');assert.equal(p.bricks[0].metadata.media[0].access.encryption,'required-before-upload');assert.equal(p.account.address,null);assert.equal(p.packetType,'LOCAL_PREVIEW_NOT_MINTED');assert.equal(p.bricks[0].metadata.payout.shares.reduce((v,s)=>v+s.bps,0),10000)});
 test('private metadata is never the public cover and signed upload is not asserted',()=>{const p=makeRegistrationPacket({...mock,composition:false});assert.equal(p.bricks.length,2);assert.equal(p.storage.uploaded,false);assert.equal(p.storage.encrypted,false)});
+test('music genres normalize imports and reject unapproved labels before registration',()=>{
+ const withGenre=genre=>({...mock,metadata:{...mock.metadata,genre}});
+ assert.equal(makeRegistrationPacket(withGenre(' hip-hop ')).bricks[0].metadata.music.genre,'Hip-Hop / Rap');
+ assert.equal(makeRegistrationPacket(withGenre('')).bricks[0].metadata.music.genre,null);
+ for(const ipCategory of ['musical-work','song-lyrics','musical-performance'])assert.equal(makeRegistrationPacket({...withGenre('Jazz'),metadata:{...mock.metadata,genre:'Jazz',ipCategory}}).bricks[0].metadata.music.genre,'Jazz');
+ assert.equal(makeRegistrationPacket(withGenre('Other')).bricks[0].metadata.music.genre,'Other');
+ assert.ok(validateMintInput(withGenre('My custom genre')).some(e=>e.includes('approved music genre')));
+ assert.throws(()=>makeRegistrationPacket(withGenre('My custom genre')),/approved music genre/);
+ const nonMusic={...withGenre('My custom genre'),metadata:{...mock.metadata,genre:'My custom genre',ipCategory:'literary-work'}};
+ assert.deepEqual(validateMintInput(nonMusic),[]);
+ assert.equal(makeRegistrationPacket(nonMusic).bricks[0].metadata.music,undefined);
+});

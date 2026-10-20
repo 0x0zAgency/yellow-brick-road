@@ -267,8 +267,9 @@ These public deterministic accounts are only for local testing. The frontend
 never asks for a private key. Ganache's network ID can differ from its chain ID;
 use `eth_chainId`, not `net_version`, when configuring the wallet.
 
-In Mint Studio connect the wallet, select **Local Ganache**, and paste the factory
-address. Without a connected wallet, the original simulation runs automatically. Attach files, review metadata, then confirm each Brick in your wallet.
+In Mint Studio connect the wallet and complete the files and rights steps. In
+**Step 4 — Review**, select **Local Ganache**, check the RPC URL and chain ID, and
+paste the factory address. Without a connected wallet, the original simulation runs automatically. Attach files, review metadata, then confirm each Brick in your wallet.
 Each Brick is a separate transaction; the factory charges no platform fee.
 The client checks both wallet/RPC chain IDs and their latest common block hash,
 simulates each call, waits for a mined receipt, checks the factory event and

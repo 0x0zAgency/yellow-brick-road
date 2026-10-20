@@ -30,10 +30,10 @@ Use **one of Ganache's disposable accounts**, funded with pretend local ETH. Do 
 
 Start the web UI with `cd web && npm install && npm run dev`. In Mint Studio:
 
-1. Connect your browser wallet. On **Identity**, select **Local Ganache** and paste the factory address from `.road-local/ganache-mint-receipts.json`.
+1. Connect your browser wallet. Network configuration is entered in Step 4.
 2. Choose the IP category, add a primary work file, and continue through browser-side encryption.
 3. Fill in IP and licensing claims.
-4. Review the wallet, chain and factory details.
+4. On **Review**, select **Local Ganache** and paste the factory address from `.road-local/ganache-mint-receipts.json`. Check the RPC URL, chain ID and wallet.
 5. Choose **Review wallet mint**, then **Request wallet signatures**.
 6. Approve **one transaction per Brick** in your wallet. Wait for blockchain confirmations.
 7. Review actual deployed Brick addresses, transaction hashes, block numbers, and gas used.
