@@ -45,3 +45,15 @@ test('invalid or corrupted local state falls back to safe defaults',()=>{
  clearMintNetwork(store);clearMintForm(store);
  assert.equal(store.map.size,0);
 });
+
+test('cover self-authorship is default; saved explicit collaborators retain attribution choice',()=>{
+ const store=storage();
+ const defaults=defaultMintForm();
+ assert.equal(defaults.cover.useMainArtist,true);
+ assert.equal(saveMintForm(store,{...defaults,cover:{artist:'',wallet:'',ipCategory:'illustration',useMainArtist:true}}),true);
+ assert.equal(loadMintForm(store).cover.useMainArtist,true);
+ saveMintForm(store,{...defaults,cover:{artist:'Legacy Cover Creator',wallet:'',ipCategory:'illustration'}});
+ const loaded=loadMintForm(store);
+ assert.equal(loaded.cover.useMainArtist,false,'Prior explicit credit is not overwritten');
+ assert.equal(loaded.cover.artist,'Legacy Cover Creator');
+});

@@ -21,6 +21,25 @@ test('cover artwork is its own separately attributed visual Brick',()=>{
  assert.equal(visual.metadata.payout.type,'rights-holder-split-pending');
  assert.equal(packet.bricks[0].metadata.media.some(m=>m.role==='artwork'),false);
 });
+test('recording artist is also the cover artist by default without extra fields',()=>{
+ const input={...core,assets:{...core.assets,artwork:{name:'my-own-cover.png',hash:'b'.repeat(64),size:321,type:'image/png'}},
+  cover:{useMainArtist:true,artist:'',wallet:'',title:'',description:'',ipCategory:'illustration'}};
+ assert.deepEqual(validateMintInput(input),[]);
+ const artwork=makeRegistrationPacket(input).bricks.find(b=>b.localId==='artwork');
+ assert.equal(artwork.metadata.creators[0].name,'Recording Artist');
+ assert.equal(artwork.metadata.creators[0].wallet,wallet);
+ assert.equal(artwork.metadata.title,'My Track — cover art');
+});
+test('cover-artist collaborator fields are checked only when explicitly selected',()=>{
+ const selected={...core,assets:{...core.assets,artwork:{name:'cover.png',hash:'b'.repeat(64),size:42}},
+  cover:{useMainArtist:false,artist:'Outside Artist',wallet:artistWallet,ipCategory:'illustration'}};
+ assert.match(validateMintInput(selected).join(' '),/its artist wallet/);
+ const own={...selected,cover:{...selected.cover,useMainArtist:true}};
+ assert.deepEqual(validateMintInput(own),[]);
+ const artwork=makeRegistrationPacket(own).bricks.find(b=>b.localId==='artwork');
+ assert.equal(artwork.metadata.creators[0].name,'Recording Artist');
+ assert.equal(artwork.metadata.creators[0].wallet,wallet);
+});
 test('cannot mint someone else’s uploaded cover from the recording artist wallet',()=>{
  const inData={...core,assets:{...core.assets,artwork:{name:'cover.jpg',hash:'b'.repeat(64),size:123}},
  cover:{artist:'Other creator',wallet:artistWallet,title:'External art'}};
@@ -37,18 +56,20 @@ test('existing owner-controlled cover and composition are references, not duplic
  assert.equal(packet.bricks[0].metadata.relationships[0].authorization,'pending-current-controller-signature');
  assert.equal(packet.linkAuthorizations[0].response,null);
 });
-test('optional lyrics file travels with songwriter Brick rather than master',()=>{
- const input={...core,assets:{...core.assets,lyrics:{name:'lyrics.txt',hash:'c'.repeat(64),size:300,type:'text/plain'}}};
+test('lyrics evidence is attached through a separate songwriting/lyrics Brick, not the recording upload flow',()=>{
+ const input={...core,metadata:{...core.metadata,ipCategory:'musical-work'},assets:{...core.assets,lyrics:{name:'lyrics.txt',hash:'c'.repeat(64),size:300,type:'text/plain'}}};
  const packet=makeRegistrationPacket(input);
- assert.equal(packet.bricks[0].metadata.media.some(m=>m.role==='lyrics'),false);
- const composition=packet.bricks.find(b=>b.localId==='composition');
- assert.equal(composition.metadata.media[0].role,'lyrics');
- assert.ok(availableAssetSlots('sound-recording').some(s=>s.id==='lyrics'));
+ assert.equal(packet.bricks[0].metadata.objectType,'musical-work');
+ assert.equal(packet.bricks[0].metadata.media.find(m=>m.role==='lyrics').name,'lyrics.txt');
+ assert.equal(packet.bricks.find(b=>b.localId==='composition'),undefined);
+ assert.ok(availableAssetSlots('musical-work').some(slot=>slot.id==='lyrics'));
+ assert.ok(!availableAssetSlots('sound-recording').some(slot=>slot.id==='lyrics'));
 });
-test('lyric attachment cannot be mixed with another creator’s signed composition reference',()=>{
+test('a hidden stale lyrics attachment does not prevent linking an existing composition Brick',()=>{
  const link={id:'writer',relation:'embodies-composition',targetBrick:artistWallet,factory,scope:'Recording use'};
  const input={...core,assets:{...core.assets,lyrics:{name:'lyrics.txt',hash:'c'.repeat(64),size:300}},linkedBricks:[link]};
- assert.match(validateMintInput(input).join(' '),/Remove the local lyrics attachment/);
+ assert.deepEqual(validateMintInput(input),[]);
+ assert.equal(makeRegistrationPacket(input).bricks[0].metadata.media.some(m=>m.role==='lyrics'),false);
 });
 test('different credited writers must link their composition rather than having their work minted by recording wallet',()=>{
  const errors=validateMintInput({...core,metadata:{...core.metadata,songwriters:'Another Writer'}});

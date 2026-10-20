@@ -12,7 +12,11 @@ export const assetSlots=[
 /** File roles vary by IP category. Only a primary work is universally required. */
 export function availableAssetSlots(categoryId='sound-recording'){
  const category=getIpCategory(categoryId);
- return category.group==='Music & audio' ? assetSlots : assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork'&&slot.id!=='lyrics');
+ // Lyrics evidence belongs to a separately registered songwriting / lyrics work,
+ // not in the master recording's source-file upload screen.
+ if(category.group==='Music & audio')
+  return assetSlots.filter(slot=>category.writers||slot.id!=='lyrics');
+ return assetSlots.filter(slot=>slot.id!=='preview'&&slot.id!=='artwork'&&slot.id!=='lyrics');
 }
 export const trainingModes=[
  {value:'not-authorized',label:'No AI training permission'},
@@ -37,17 +41,22 @@ export function validateMintInput({metadata,assets,identity,royalties,cover={},l
  if(!(metadata.artist||'').trim())errors.push('Artist / claimant is required.');
  if(!assets.master?.hash)errors.push('A hashed primary work file is required.');
  if(assets.artwork?.hash){
-  if(!String(cover.artist||'').trim())errors.push('Cover artwork creator / artist is required.');
-  if(identity.mode==='external'&&(!isEvmAddress(cover.wallet)||cover.wallet.toLowerCase()!==identity.address?.toLowerCase()))
-   errors.push('Mint new cover art only from its artist wallet; otherwise link the existing art Brick and obtain consent.');
-  if(cover.wallet&&!isEvmAddress(cover.wallet))errors.push('Cover artist wallet address must be valid or blank.');
+  // The recording artist creates their own cover by default. An explicit separate
+  // artist is only required after opting out of that default.
+  const selfCover=cover.useMainArtist===true||(cover.useMainArtist!==false&&!String(cover.artist||'').trim());
+  if(!selfCover){
+   if(!String(cover.artist||'').trim())errors.push('Enter the cover artist name or choose "Recording artist created the cover".');
+   if(identity.mode==='external'&&(!isEvmAddress(cover.wallet)||cover.wallet.toLowerCase()!==identity.address?.toLowerCase()))
+    errors.push('Mint new cover art only from its artist wallet; otherwise link the existing art Brick and obtain consent.');
+   if(cover.wallet&&!isEvmAddress(cover.wallet))errors.push('Enter a valid cover artist wallet address.');
+  }
   if(linkedBricks.some(l=>l.relation==='cover-art'))errors.push('Use either uploaded cover art or a linked cover Brick, not both.');
  }
  for(const link of linkedBricks){
   if(!isEvmAddress(link.targetBrick)||!isEvmAddress(link.factory))errors.push('Every external Brick reference must have a valid Brick and factory address.');
   if(!String(link.scope||'').trim())errors.push('Specify the requested usage scope for every linked Brick.');
  }
- if(assets.lyrics?.hash&&linkedBricks.some(l=>l.relation==='embodies-composition'||l.relation==='lyrics'))errors.push('A separate writer Brick owns linked lyrics evidence. Remove the local lyrics attachment or use a new writing Brick.');
+ if(availableAssetSlots(metadata.ipCategory).some(slot=>slot.id==='lyrics')&&assets.lyrics?.hash&&linkedBricks.some(l=>l.relation==='embodies-composition'||l.relation==='lyrics'))errors.push('A separate writer Brick owns linked lyrics evidence. Remove the local lyrics attachment or use a new writing Brick.');
  if(identity.mode==='external'&&metadata.ipCategory==='sound-recording'&&metadata.songwriters?.trim()&&!linkedBricks.some(l=>l.relation==='embodies-composition')){
   const writers=metadata.songwriters.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
   if(writers.some(name=>name.toLowerCase()!==String(metadata.artist||'').trim().toLowerCase()))
@@ -88,11 +97,13 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
  const bricks=[{localId:'master',role:category.label,metadata:master}];
  if(files.some(x=>x.role==='artwork')){
 
-  const coverArtist=String(cover.artist||metadata.artist).trim();
+  const selfCover=cover.useMainArtist===true||(cover.useMainArtist!==false&&!String(cover.artist||'').trim());
+  const coverArtist=selfCover?metadata.artist.trim():String(cover.artist||'').trim();
+  const coverWallet=selfCover?identity.address:cover.wallet;
   const coverTitle=String(cover.title||metadata.title.trim()+' — cover art').trim();
   bricks.push({localId:'artwork',role:'Cover artwork',metadata:{...common,objectType:'visual-artwork',ipCategory:cover.ipCategory||'illustration',
    categoryLabel:'Cover artwork',title:coverTitle,description:String(cover.description||'').slice(0,8000),
-   creators:[{name:coverArtist,role:'visual-artist',wallet:isEvmAddress(cover.wallet)?cover.wallet:null,alias:aliasFor(coverArtist),claimStatus:'creator-declared-not-verified'}],
+   creators:[{name:coverArtist,role:'visual-artist',wallet:isEvmAddress(coverWallet)?coverWallet:null,alias:aliasFor(coverArtist),claimStatus:'creator-declared-not-verified'}],
    rights:{...common.rights,ownershipStatus:'cover-artist-declared-not-verified'},identifiers:{},media:files.filter(x=>x.role==='artwork'),relationships:[],
    payout:{type:'rights-holder-split-pending',shares:[]}}});
   master.relationships.push({type:'cover-art',target:'artwork',context:'release-artwork',authorization:'license-needed'});
