@@ -77,10 +77,11 @@ async function availablePort(){
   server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(error=>error?reject(error):resolve(port));});
  });
 }
-function startCli(args,cwd){
+function startCli(port,cwd){
  return new Promise((resolve,reject)=>{
-  const cli=path.join(path.dirname(require.resolve('ganache')),'cli.js');
-  const child=spawn(process.execPath,[cli,...args],{cwd,stdio:['ignore','pipe','pipe']});
+  const runner=path.join(root,'scripts/dev-ganache.cjs');
+  const code=`require(${JSON.stringify(runner)}).startGanache({root:process.cwd(),port:${port},quiet:true}).then(({server,port})=>{process.once('SIGTERM',()=>void server.close());console.log('RPC Listening on 127.0.0.1:'+port);}).catch(()=>{console.error('Disposable runner failed');process.exitCode=1;});`;
+  const child=spawn(process.execPath,['-e',code],{cwd,stdio:['ignore','pipe','pipe']});
   let settled=false,tail='';
   const timer=setTimeout(()=>{child.kill('SIGTERM');if(!settled){settled=true;reject(Error('Disposable Ganache CLI startup timeout'));}},30000);
   const consume=chunk=>{
@@ -109,15 +110,11 @@ test('the actual npm Ganache command retains block hashes, nonce, balance and de
  const scripts=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).scripts;
  assert.equal(scripts.preganache,'node scripts/dev-ganache-storage.cjs');
  prepareGanacheStorage(tmp); // Exercise the exact preganache hook on a fresh checkout.
- const script=scripts.ganache;
- const [executable,...args]=script.split(/\s+/);
- assert.equal(executable,'ganache');
- assert.equal(args[args.indexOf('--database.dbPath')+1],'.road-local/ganache');
- assert.equal(args[args.indexOf('--chain.networkId')+1],'1337');
- args[args.indexOf('--server.port')+1]=String(await availablePort()); // CLI requires a positive port, unlike the programmatic API.
+ assert.equal(scripts.ganache,'node scripts/dev-ganache.cjs');
+ const port=await availablePort();
  let running;
  try{
-  running=await startCli(args,tmp);
+  running=await startCli(port,tmp);
   const [from,to]=await rpc(running.url,'eth_accounts');
   await rpc(running.url,'eth_sendTransaction',[{from,to,value:'0x1',gas:'0x5208'}]);
   const tx=await rpc(running.url,'eth_sendTransaction',[{from,data:'0x6001600c60003960016000f300',gas:'0x186a0'}]);
@@ -129,7 +126,7 @@ test('the actual npm Ganache command retains block hashes, nonce, balance and de
    code:await rpc(running.url,'eth_getCode',[receipt.contractAddress,'latest'])};
   assert.equal(before.code,'0x00');
   await stopCli(running.child);running=null;
-  running=await startCli(args,tmp);
+  running=await startCli(port,tmp);
   assert.equal(await rpc(running.url,'eth_chainId'),'0x539');
   assert.equal(await rpc(running.url,'net_version'),'1337');
   assert.equal((await rpc(running.url,'eth_getBlockByNumber',['0x0',false])).hash,before.genesis.hash);

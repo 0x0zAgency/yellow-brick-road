@@ -11,10 +11,12 @@ const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
 const {DevDashboard}=require('./dev-dashboard.cjs');
 const {ensurePlayerSession,ensureDemoPublished,verifyDemoPlayback,DEMO_TITLE,DEMO_ARTIST}=require('./dev-player-ready.cjs');
 const {selectPlayerAccess,verifyPlayerAccess,restartCheckoutPlayer}=require('./dev-player-access.cjs');
+const {readSelection,profilePaths,prepareProfile,describeMnemonic,generateSelection,changeAllowed,switchSelection}=require('./dev-ganache-profile.cjs');
 const ROOT=path.resolve(__dirname,'..');
+const SELECTED_WALLET=readSelection(ROOT);
 const PLAYER=path.join(ROOT,'apps','ybr-player');
 const WEB=path.join(ROOT,'web');
-const FACTORY_FILE=path.join(ROOT,'.road-local','factory.json');
+const FACTORY_FILE=profilePaths(ROOT,SELECTED_WALLET).factory;
 const RPC='http://127.0.0.1:8545';
 const PLAYER_URL='http://127.0.0.1:4173';
 const WEB_URL='http://127.0.0.1:5173';
@@ -86,9 +88,13 @@ async function validateFactory(provider,address){
 function fixtureDigest(){return crypto.createHash('sha256').update(fs.readFileSync(path.join(PLAYER,'media','golden-hour.wav'))).digest('hex');}
 async function ensureGanache(){
  const current=await probeGanache();
- if(current.online){log('Reusing running Ganache 1337 on '+RPC);return 'reused';}
+ if(current.online){
+  const response=await fetchJson(RPC,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:2,method:'eth_accounts',params:[]})});
+  if(response?.result?.[0]?.toLowerCase()!==SELECTED_WALLET.account.toLowerCase())throw Error('Running Ganache does not match the selected wallet profile. Stop that external node before relaunching.');
+  log('Reusing running Ganache 1337 on '+RPC);return 'reused';
+ }
  log('Starting local Ganache on '+RPC);
- const proc=spawnOwned('ganache',command(),['run','ganache'],{cwd:ROOT});
+ const proc=spawnOwned('ganache',command(),['run','ganache'],{cwd:ROOT,env:{...process.env,YBR_GANACHE_DASHBOARD:'1'}});
  proc.on('error',e=>shutdown('Ganache startup error: '+e.message,1));
  await waitUntil('Ganache 1337',async()=>(await probeGanache()).online,{timeoutMs:45000});return 'owned';
 }
@@ -135,6 +141,50 @@ async function restartPlayerHere(){
  try{await ensurePlayer(dashboard.state.factory,playerEnv,{restart:true});dashboard.service('player','UP');}
  finally{playerBusy=false;}
 }
+function mnemonicContext(){
+ return {phase:stopping||playerBusy?'BUSY':dashboard.state.phase,ganacheSource:dashboard.state.ganache.source,
+  playerSource:dashboard.state.access.source,overrides:!!(process.env.YBR_GANACHE_FACTORY||process.env.VITE_ROAD_GANACHE_FACTORY)};
+}
+function rpcPortOpen(){
+ return new Promise(resolve=>{
+  const socket=require('node:net').createConnection({host:'127.0.0.1',port:8545});
+  const finish=value=>{socket.destroy();resolve(value);};
+  socket.once('connect',()=>finish(true));socket.once('error',error=>finish(error.code!=='ECONNREFUSED'));
+  socket.setTimeout(700,()=>finish(true));
+ });
+}
+async function changeMnemonicHere(candidate,expectedId){
+ try{
+  changeAllowed(mnemonicContext());
+  if(candidate.id===expectedId)return;
+  // Validate target paths before stopping anything; no old data is moved/deleted.
+  prepareProfile(ROOT,candidate);
+  await switchSelection({root:ROOT,candidate,expectedId,context:mnemonicContext()},{
+   stop:async()=>{
+    stopping=true;clearInterval(healthTimer);dashboard.update({phase:'SWITCHING WALLET'});
+    log('Stopping owned services for a confirmed Ganache wallet-profile change.');
+    const children=[...OWNED.values()].map(({proc})=>proc);
+    const exited=Promise.all(children.map(proc=>new Promise((resolve,reject)=>{
+     if(proc.exitCode!==null||proc.signalCode!==null)return resolve();
+     const timer=setTimeout(()=>reject(Error('A managed service did not stop. Wallet settings are unchanged.')),10000);
+     proc.once('exit',()=>{clearTimeout(timer);resolve();});
+    })));
+    stopOwned();await exited;
+   },
+   verifyStopped:async()=>{
+    const deadline=Date.now()+10000;
+    while(await rpcPortOpen()){if(Date.now()>=deadline)return false;await sleep(100);}
+    return true;
+   }
+  });
+  dashboard.close('Ganache wallet profile saved. Existing chains and IPFS pins are intact. Run npm run dev to start the selected profile.');
+  process.exitCode=0;
+ }catch(error){
+  log(error.message);
+  if(stopping){dashboard.close('Wallet switch failed; inspect the redacted log before restarting.');process.exitCode=1;}
+  throw error;
+ }
+}
 async function launchWeb(env){
  const existing=await fetch(WEB_URL,{signal:AbortSignal.timeout(900)}).then(r=>r.ok).catch(()=>false);
  if(existing)throw Error('Port 5173 already has a web server. Stop the old Vite process before starting the integrated stack.');
@@ -169,9 +219,12 @@ async function main(){
  if(Number(process.versions.node.split('.')[0])!==24)throw Error('Use npm run dev to select Node 24 before starting the stack.');
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
-  dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard'),onRestartPlayer:restartPlayerHere});
+  dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard'),onRestartPlayer:restartPlayerHere,
+   mnemonicControl:{check:()=>changeAllowed(mnemonicContext()),current:()=>readSelection(ROOT),
+    generate:generateSelection,validate:describeMnemonic,onApply:changeMnemonicHere}});
   process.once('exit',()=>dashboard.close('Launcher exited'));dashboard.start();
-  dashboard.addSecrets(process.env.YBR_LISTENER_PASSWORD,process.env.YBR_ARTIST_PASSWORD);
+  dashboard.addSecrets(process.env.YBR_LISTENER_PASSWORD,process.env.YBR_ARTIST_PASSWORD,SELECTED_WALLET.mnemonic);
+  dashboard.update({profileId:SELECTED_WALLET.id});
   const saved=selectPlayerAccess(ROOT,process.env,{generate:false});if(saved)dashboard.addSecrets(saved.listener,saved.artist);
   ensureDependencies();dashboard.update({phase:'STARTING IPFS',kuboRpc:process.env.YBR_KUBO_RPC});dashboard.service('ipfs','START');
   const ipfs=await ensureIpfs({run,spawnOwned,command,waitUntil,log,isStopping:()=>stopping});if(stopping)return;
