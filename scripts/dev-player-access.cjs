@@ -24,8 +24,11 @@ function readPlayerAccess(root){
   if(st.size>8192)throw Error('Player access file is too large.');
   const fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0));
   let payload;
-  try{payload=JSON.parse(fs.readFileSync(fd,'utf8'));}finally{fs.closeSync(fd);}
-  if(payload.version!==1||!valid(payload.accounts))throw Error('Invalid local Player access file.');
+  try{
+   const text=fs.readFileSync(fd,'utf8');
+   try{payload=JSON.parse(text);}catch{throw Error('Invalid local Player access file.');}
+  }finally{fs.closeSync(fd);}
+  if(payload?.version!==1||!valid(payload.accounts))throw Error('Invalid local Player access file.');
   return {listener:payload.accounts.listener,artist:payload.accounts.artist};
  }catch(error){if(error.code==='ENOENT')return null;throw error;}
 }
