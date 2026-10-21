@@ -63,6 +63,7 @@ function CoverEditor({packet,mint,vault,wallet}){
    <button type="button" className="ms-primary" disabled={!consent||busy||!!txHash} onClick={()=>void publish()}>{busy?'Applying cover…':'Publish cover to NFTs'}</button>
   </>}
   <p className="nft-cover-note">Only a resized PNG display copy is published. Masters, project files, source metadata and recovery keys stay private. Original signatures are not represented as signatures of this derived thumbnail. A local IPFS pin does not guarantee worldwide availability.</p>
+  <p className="nft-cover-note">Publishing artwork does not authorize publication or streaming of the underlying work. Player playback permissions remain separate.</p>
   {status&&<p role="status">{status}</p>}
   {pinned&&<p>Public image: <code>{pinned.imageURI}</code>{!saved?' · May already be public even if the wallet transaction is canceled.':''}</p>}
   {txHash&&<p>Artwork transaction: <code>{txHash}</code>{!saved?' · Review this transaction in your wallet before attempting another update.':''}</p>}

@@ -5,12 +5,12 @@ import {coverAbi,nftCoverTargets,nftCoverSession,decodeReceiptMetadata} from '..
 const account='0x'+'1'.repeat(40),collection='0x'+'2'.repeat(40),factory='0x'+'3'.repeat(40),brick='0x'+'4'.repeat(40),other='0x'+'5'.repeat(40),hash='0x'+'6'.repeat(64);
 const image='ipfs://bafy'+'a'.repeat(55);
 const mint=()=>({simulated:false,status:'confirmed',chainId:1337,factoryAddress:factory,receipts:[{status:'verified',chainId:1337,nftContractAddress:collection,contractAddress:brick,tokenId:'17'}]});
-const tokenURI=image=>'data:application/json;base64,'+Buffer.from(JSON.stringify({name:'Yellow Brick Registration',image})).toString('base64');
+const tokenURI=(image,metadataBrick=brick)=>'data:application/json;base64,'+Buffer.from(JSON.stringify({name:'Yellow Brick Registration',image,attributes:[{trait_type:'Brick Contract',value:metadataBrick},{trait_type:'Registration IP ID',value:'0x'+(17n).toString(16).padStart(64,'0')}]})).toString('base64');
 function harness(){
  const state={chainId:'0x539',accounts:[account],version:1n,owner:account,brick,collection,factory,image:'data:placeholder',sends:0,input:null,fail:false};
  const provider={request:async({method})=>method==='eth_chainId'?state.chainId:state.accounts};
  const client={
-  readContract:async({functionName})=>{if(state.fail)throw Error('legacy');return {artworkVersion:state.version,ownerOf:state.owner,brickForToken:state.brick,factory:state.factory,receiptToken:state.collection,tokenURI:tokenURI(state.image)}[functionName];},
+  readContract:async({functionName})=>{if(state.fail)throw Error('legacy');return {artworkVersion:state.version,ownerOf:state.owner,brickForToken:state.brick,factory:state.factory,receiptToken:state.collection,tokenURI:tokenURI(state.image,state.metadataBrick)}[functionName];},
   simulateContract:async parameters=>({request:parameters}),estimateContractGas:async()=>100000n,
   waitForTransactionReceipt:async()=>({status:'success',transactionHash:hash}),
   getTransaction:async()=>({from:account,to:collection,input:state.input})
@@ -45,6 +45,11 @@ test('changing wallet/network after preparing the cover prevents a transaction',
 test('invalid image URI cannot trigger wallet operations',async()=>{
  const h=harness(),session=await nftCoverSession({mint:mint(),...h});
  await assert.rejects(session.update('https://host/cover'));assert.equal(h.state.sends,0);
+});
+test('matching artwork cannot disguise metadata for another registered Brick',async()=>{
+ const h=harness(),session=await nftCoverSession({mint:mint(),...h});
+ h.state.metadataBrick=other;
+ await assert.rejects(session.update(image),/different Brick or registration/);
 });
 test('malformed or unexpected tokenURI responses are rejected',()=>{
  assert.equal(decodeReceiptMetadata(tokenURI(image)).image,image);

@@ -23,6 +23,22 @@ describe('Registration NFT cover artwork',function(){
   for(const id of [1,2]){const data=decode(await receipt.tokenURI(id));assert.equal(data.image,image);assert.equal(data.name,'Yellow Brick Registration');assert.equal(await receipt.ownerOf(id),holder.address);}
   assert.equal(await receipt.brickForToken(1),holder.address);
  });
+ it('keeps distinct covers bound to distinct registered Bricks without exposing private metadata',async function(){
+  await (await receipt.setCovers([1],image)).wait();
+  await (await receipt.setCovers([2],otherImage)).wait();
+  for(const [id,expectedImage,expectedBrick] of [[1,image,holder.address],[2,otherImage,other.address]]){
+   const data=decode(await receipt.tokenURI(id));
+   assert.equal(data.image,expectedImage);
+   assert.deepEqual(data.attributes.slice(1),[
+    {trait_type:'Brick Contract',value:expectedBrick.toLowerCase()},
+    {trait_type:'Registration IP ID',value:ethers.utils.hexZeroPad(ethers.utils.hexlify(id),32)}
+   ]);
+   assert.deepEqual(Object.keys(data).sort(),['attributes','description','image','name']);
+  }
+  assert.equal(decode(await receipt.tokenURI(3)).image,await receipt.defaultImage());
+  await (await receipt.setCovers([1],'')).wait();
+  assert.equal(decode(await receipt.tokenURI(2)).image,otherImage);
+ });
  it('supports replacement and clearing, and emits no false update for unchanged images',async function(){
   await (await receipt.setCovers([1],image)).wait();
   const unchanged=await (await receipt.setCovers([1],image)).wait();assert.equal(unchanged.events.filter(e=>e.event==='MetadataUpdate').length,0);

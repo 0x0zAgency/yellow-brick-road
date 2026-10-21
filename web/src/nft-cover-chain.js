@@ -77,6 +77,10 @@ export async function nftCoverSession({mint,provider,expectedAccount,clients}={}
   for(const tokenId of targets.tokenIds){
    const data=decodeReceiptMetadata(await client.readContract({address:targets.collection,abi:coverAbi,functionName:'tokenURI',args:[tokenId]}));
    if(data.image!==imageURI)throw Error('NFT tokenURI does not yet match the requested cover. Inspect the transaction before retrying.');
+   const entry=targets.entries.find(entry=>BigInt(entry.tokenId)===tokenId);
+   const attributes=data.attributes;
+   const matches=(name,value)=>Array.isArray(attributes)&&attributes.filter(a=>a?.trait_type===name).length===1&&attributes.some(a=>a?.trait_type===name&&same(a.value,value));
+   if(!matches('Brick Contract',entry.contractAddress)||!matches('Registration IP ID','0x'+tokenId.toString(16).padStart(64,'0')))throw Error('NFT metadata identifies a different Brick or registration. Inspect the transaction before retrying.');
    metadata.push(data);
   }
   return {transactionHash:receipt.transactionHash,imageURI,collection:targets.collection,tokenIds:targets.tokenIds.map(String),metadata};
