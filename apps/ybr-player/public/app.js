@@ -1,7 +1,10 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
-let bricks = [];
+const {playableNewest,selectionFor,isPlayable}=window.YBRLibrary;
+let bricks = [], catalogBricks = [];
+const unavailable = new Set();
+let selectionPinned = false, selectionRevision = 0, sessionRevision = 0, currentUser = null;
 let selected = null;
 let registryPartial = false;
 let toastTimeout;
@@ -20,7 +23,7 @@ async function request(url, options={}) {
   try { res = await fetch(url, { credentials:'same-origin', ...options }); }
   catch { throw new Error('Could not reach the local YBR Player server'); }
   const body = await res.json().catch(()=>({error:`HTTP ${res.status}`}));
-  if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+  if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`),{status:res.status});
   return body;
 }
 const post=(url,body={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
@@ -37,7 +40,7 @@ function updatePlayback() {
   const duration=Number.isFinite(audio.duration)?audio.duration:(selected?.durationSeconds || 0);
   $('duration').textContent=stamp(duration);
   $('elapsed').textContent=stamp(audio.currentTime);
-  if (duration>0) $('seek').value=String(Math.round(audio.currentTime/duration*1000));
+  $('seek').value=duration>0?String(Math.round(audio.currentTime/duration*1000)):'0';
 }
 function updateInspector(brick) {
   $('brickTitle').textContent=brick?.title || 'Select a brick';
@@ -81,13 +84,44 @@ function renderList() {
     row.append(ix,cover,info,tag,duration,play);
     list.append(row);
   });
+  $('libraryEmpty').hidden=bricks.length>0;
+  $('trackList').hidden=bricks.length===0;
+  for(const id of ['featurePlay','playPause','next','previous','seek'])$(id).disabled=bricks.length===0;
+  const newest=bricks[0];
+  document.querySelector('.feature h2').textContent=newest?.title||'Your next release starts here.';
+  document.querySelector('.feature-copy > p').textContent=newest?newest.creator+' · Newest playable release':'Share an Audio Preview from Mint Studio to start listening.';
+  $('featurePlay').title=newest?'Play '+newest.title:'No playable tracks available';
+  $('trackCount').textContent=`${bricks.length} playable track${bricks.length===1?'':'s'} · newest first${registryPartial?' · partial registry scan':''}`;
   window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks}}));
-  $('trackCount').textContent=`${bricks.length} library entries · ${bricks.filter(b=>b.registration||b.source==='road').length} on-chain · ${bricks.filter(b=>b.streamAllowed).length} playable${registryPartial?' · partial registry scan':''}`;
+}
+function stopMedia() {
+  selectionRevision++;
+  currentMediaBrick=null;
+  audio.pause();audio.removeAttribute('src');audio.load();
+}
+function renderSelection() {
+  updateInspector(selected);
+  $('nowTitle').textContent=selected?.title||'Nothing playing';
+  $('nowArtist').textContent=selected?.creator||'No playable tracks available';
+  $('miniCover').classList.toggle('violet',selected?.theme==='violet');
+  updatePlayback();
+}
+function applyLibrary() {
+  bricks=playableNewest(catalogBricks,{canPlayType:mime=>audio.canPlayType(mime),unavailable});
+  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick))stopMedia();
+  const previous=selected?.id;
+  selected=selectionFor(bricks,previous,selectionPinned||!!currentMediaBrick);
+  if(!selected||selected.id!==previous)selectionPinned=false;
+  renderSelection();renderList();
+}
+function hideUnavailable(id,message) {
+  unavailable.add(id);librarySignature='';applyLibrary();toast(message);
 }
 async function choose(brick, playNow=true) {
-  if (!brick) return;
+  if (!brick||!bricks.some(item=>item.id===brick.id)||!isPlayable(brick,mime=>audio.canPlayType(mime))) return;
+  selectionPinned=true;
   if (selected?.id===brick.id && currentMediaBrick===brick.id && playNow) return togglePlay();
-  audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;
+  stopMedia();const revision=selectionRevision;
   selected=brick;
   $('nowTitle').textContent=brick.title;
   $('nowArtist').textContent=brick.creator;
@@ -98,13 +132,18 @@ async function choose(brick, playNow=true) {
   if (!brick.streamAllowed) {toast(brick.source==='road-registry'?'This Brick is registered. Share a preview through Add release to Player in Mint Studio to enable local playback.':`Access denied: ${brick.title} is not licensed to this account.`);return;}
   try {
     const grant=await post(`/api/bricks/${encodeURIComponent(brick.id)}/authorize`);
-    if (selected?.id!==brick.id) return;
-    if (!grant.authorized) throw new Error('Authorization refused');
+    if (revision!==selectionRevision||selected?.id!==brick.id) return;
+    if (!grant.authorized) throw Object.assign(new Error('Authorization refused'),{status:403});
     audio.src=grant.mediaUrl;
     currentMediaBrick=brick.id;
     audio.load();
     await audio.play();
   } catch(err) {
+    if(revision!==selectionRevision||selected?.id!==brick.id)return;
+    if([403,404,409,410].includes(err.status)||err.name==='NotSupportedError'){
+      hideUnavailable(brick.id,'This track is no longer playable and has been hidden.');return;
+    }
+    if(err.name==='AbortError')return;
     toast(err.name==='NotAllowedError'?'Authorized. Click Play to begin playback.':err.message);
   }
 }
@@ -117,31 +156,31 @@ async function togglePlay() {
   audio.pause();
 }
 async function refreshSession() {
+  const revision=sessionRevision;
   const session=await request('/api/session');
+  if(revision!==sessionRevision)return;
   signedIn=!!session.authenticated;
-  if (!session.authenticated) { audio.pause();currentMediaBrick=null;$('loginOverlay').hidden=false;return; }
+  if (!signedIn) {
+    stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];
+    unavailable.clear();librarySignature='';applyLibrary();$('loginOverlay').hidden=false;return;
+  }
+  if(currentUser!==session.user){
+    stopMedia();selected=null;selectionPinned=false;unavailable.clear();librarySignature='';
+    currentUser=session.user;
+  }
   $('loginOverlay').hidden=true;
   $('signedInAs').textContent=`Signed in as ${session.user}`;
   const library=await request('/api/bricks');
+  if(revision!==sessionRevision)return;
   const signature=JSON.stringify([library.bricks,library.network,library.registry]);
   registryPartial=!!(library.registry?.limited||library.registry?.limitReached);
-  if(signature===librarySignature&&selected)return;
+  if(signature===librarySignature)return;
   librarySignature=signature;
-  bricks=library.bricks;
-  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick&&brick.streamAllowed)){audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;}
+  catalogBricks=library.bricks;
   const roadState=JSON.stringify(library.network);
   if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · local demo music remains available');
   lastRoadState=roadState;
-  const previous=selected?.id;
-  selected=bricks.find(b=>b.id===previous) || bricks[0] || null;
-  if (selected) {
-    updateInspector(selected);
-    $('nowTitle').textContent=selected.title;
-    $('nowArtist').textContent=selected.creator;
-    $('miniCover').classList.toggle('violet',selected.theme==='violet');
-    $('duration').textContent=stamp(selected.durationSeconds);
-  }
-  renderList();updatePlayback();
+  applyLibrary();
 }
 async function recordEvent(event) {
   if (!currentMediaBrick || !selected || currentMediaBrick!==selected.id) return;
@@ -150,7 +189,7 @@ async function recordEvent(event) {
   } catch { /* Playback remains possible if demo telemetry fails. */ }
 }
 $('loginForm').addEventListener('submit',async e=>{
-  e.preventDefault();
+  e.preventDefault();sessionRevision++;
   const button=e.target.querySelector('button[type=submit]');
   button.disabled=true;
   $('loginError').textContent='';
@@ -163,12 +202,13 @@ $('loginForm').addEventListener('submit',async e=>{
   finally {button.disabled=false;}
 });
 $('logout').addEventListener('click',async()=>{
-  signedIn=false;librarySignature='';audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;selected=null;bricks=[];
+  sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];
+  selectionPinned=false;currentUser=null;unavailable.clear();
   await post('/api/logout');
   $('loginOverlay').hidden=false;
   $('signedInAs').textContent='Not connected';
   $('nowTitle').textContent='Nothing playing';$('nowArtist').textContent='Pick a brick to begin';
-  updateInspector(null);$('trackList').replaceChildren();$('trackCount').textContent='Sign in to see bricks';updatePlayback();
+  renderSelection();renderList();$('trackCount').textContent='Sign in to see tracks';
 });
 $('featurePlay').addEventListener('click',()=>choose(bricks[0],true));
 $('playPause').addEventListener('click',togglePlay);
@@ -186,7 +226,14 @@ $('inspectorNav').addEventListener('click',()=>{$('inspector').scrollIntoView({b
 $('libraryNav').addEventListener('click',()=>{$('trackList').scrollIntoView({behavior:'smooth',block:'center'});});
 for(const event of ['timeupdate','durationchange','play','pause','ended','loadedmetadata']) audio.addEventListener(event,updatePlayback);
 for(const event of ['play','pause','ended']) audio.addEventListener(event,()=>recordEvent(event));
-audio.addEventListener('error',()=>{if(audio.getAttribute('src')){currentMediaBrick=null;toast('Audio could not be loaded. Your authorization may have expired. Click the track to retry.');}});
+audio.addEventListener('error',()=>{
+  if(!audio.getAttribute('src')||!currentMediaBrick)return;
+  const id=currentMediaBrick;
+  // Decode/unsupported-source failures are definitive for this browser session.
+  // Network interruptions are not: keep those tracks available for retry.
+  if([3,4].includes(audio.error?.code))hideUnavailable(id,'This audio cannot be played and has been hidden. Refresh the library to retry after fixing it.');
+  else {stopMedia();toast('Playback was interrupted. Click Play to retry.');}
+});
 refreshSession().catch(e=>toast(e.message));
 
 async function refreshLibrary(){
@@ -195,7 +242,7 @@ async function refreshLibrary(){
   try{await refreshSession();}catch{window.dispatchEvent(new Event('ybr:library-error'));}
   finally{refreshing=false;}
 }
-window.addEventListener('ybr:refresh-request',()=>void refreshLibrary());
+window.addEventListener('ybr:refresh-request',()=>{unavailable.clear();librarySignature='';void refreshLibrary();});
 window.addEventListener('ybr:select-release',event=>{const found=bricks.find(brick=>brick.id===event.detail?.id);if(found)void choose(found,false);});
 setInterval(()=>{if(!document.hidden)void refreshLibrary();},5000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLibrary();});

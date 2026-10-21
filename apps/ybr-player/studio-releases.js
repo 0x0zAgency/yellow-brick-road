@@ -81,7 +81,7 @@ function readRegular(file, max) {
     return fs.readFileSync(fd);
   } finally { if (fd !== undefined) fs.closeSync(fd); }
 }
-function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-local/player-releases'),maxReleases=100}={}) {
+function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-local/player-releases'),maxReleases=100,now=Date.now}={}) {
   const root = path.resolve(directory);
   function read(id) {
     if (!ID.test(id || '')) return null;
@@ -90,6 +90,12 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
       if (fs.lstatSync(dir).isSymbolicLink()) throw error('Invalid preview directory.',409);
       const data = JSON.parse(readRegular(path.join(dir,'release.json'),128*1024).toString('utf8'));
       if (data.id !== id || data.format !== 'ybr-studio-preview/1') throw error('Invalid local preview record.',409);
+      // Legacy records predate publication timestamps; preserve a stable local
+      // filesystem fallback rather than making every restart look like a new upload.
+      if (!Number.isFinite(Date.parse(data.publishedAt))) {
+        data.publishedAt = fs.statSync(path.join(dir,'release.json')).mtime.toISOString();
+        data.publishedAtSource = 'legacy-file-time';
+      }
       return data;
     } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
   }
@@ -101,6 +107,7 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
     const url = role => '/api/studio-releases/' + data.id + '/' + role;
     const artwork = data.assets.artwork ? {...data.assets.artwork,url:url('artwork')} : null;
     return { id:data.id,type:'AudioBrick',source:'studio-demo',title:data.title,creator:data.creator,album:data.album,description:data.description,
+      publishedAt:data.publishedAt,publishedAtSource:data.publishedAtSource||'local-publication',
       durationSeconds:0,theme:'gold',streamAllowed:true,media:{mimeType:data.assets.audio.mime,sha256:data.assets.audio.sha256},
       artwork,lyrics:data.assets.lyrics ? {...data.assets.lyrics,url:url('lyrics')} : null,
       files:data.files.map(item=>({...item,artworkUrl:artwork?.url || null})),references:data.references,credits:data.credits||[],
@@ -111,13 +118,26 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
   function list() {
     let names; try { names=fs.readdirSync(root); } catch(e) { if(e.code==='ENOENT')return [];throw e; }
     if(names.filter(name=>ID.test(name)).length>maxReleases)throw error('Local preview library exceeds its configured limit.',409);
-    return names.filter(name=>ID.test(name)).sort().map(read).filter(data=>data&&safePreview(data)).map(describe);
+    return names.filter(name=>ID.test(name)).sort().flatMap(id=>{
+      try {
+        const data=read(id);
+        if(!data||!safePreview(data)||!AUDIO.has(data.assets?.audio?.mime))return [];
+        const audioFile=fs.lstatSync(path.join(root,id,'audio.bin'));
+        if(!audioFile.isFile()||audioFile.size<1||audioFile.size!==data.assets.audio.byteLength)return [];
+        // Serving still hashes the bytes. A broken release must not hide good ones.
+        return [describe(data)];
+      } catch { return []; }
+    });
   }
   function publish(body) {
     const {id,metadata,decoded} = normalizePublication(body);
     fs.mkdirSync(root,{recursive:true,mode:0o700});
     if (read(id)) { for(const role of Object.keys(decoded))asset(id,role);return {created:false,brick:describe(read(id))}; }
     if (list().length >= maxReleases) throw error('Local preview library is full. Remove an old preview first.',413);
+    // Timestamp is assigned by the receiving service, outside the content ID.
+    // Retrying the identical release preserves both its ID and original date.
+    metadata.publishedAt = new Date(now()).toISOString();
+    metadata.publishedAtSource = 'local-publication';
     const temporary = fs.mkdtempSync(path.join(root,'.incoming-'));
     try {
       for(const [role,asset] of Object.entries(decoded)) fs.writeFileSync(path.join(temporary,role+'.bin'),asset.bytes,{mode:0o600,flag:'wx'});

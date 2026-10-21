@@ -1,0 +1,9 @@
+# Player collection: playable only, newest first
+
+The Player's listening view hides registered-only Bricks, tracks denied to the signed-in account, entries without audio, and MIME types the browser cannot play. The IP Registry and registry API remain complete; nothing is deleted or newly licensed by hiding a row. Uploaded releases still use **Audio Preview only**, never Master Recording. A missing or truncated local preview is omitted without breaking the rest of the library. Definitive authorization and decoding failures also hide the row for the current session; a manual library refresh retries after a repair. Temporary network interruption does not permanently hide a track.
+
+The default list is newest first. Studio previews receive a server-assigned `publishedAt` when first published, not a date from the file tags or browser. Identical retries retain their original timestamp. Existing undated records use their local `release.json` modification time, labeled `legacy-file-time`; the exact original upload date was not recorded. Public Road tracks use their registration block time. Undated built-in demos appear last, and ties sort deterministically. This is a display sort, not provenance or rights evidence.
+
+On opening the Player, the newest playable track is selected without autoplay. An explicit release link or manual selection takes precedence. Incoming uploads move to the top while a playing or paused selection keeps its source and position. Next/previous and the featured play action use only the filtered collection. If nothing is playable, the Player clears the old title, artwork and lyrics selection and disables playback controls.
+
+Tests cover ordering, permission/format filters, stable publication dates, old-file fallback, missing preview isolation, and a real Chromium flow for incoming releases, uninterrupted playback, empty states and failed decoding.
