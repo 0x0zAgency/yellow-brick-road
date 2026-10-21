@@ -260,6 +260,40 @@
             }
           },
           "additionalProperties": true
+        },
+        "playback": {
+          "type": "object",
+          "description": "Optional, explicit creator/controller opt-in for player access. Only a chain-committed publisher manifest with a matching unencrypted audio hash is eligible; registration or AI-training terms do not confer playback rights.",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "not-authorized",
+                "public-stream",
+                "separate-license"
+              ]
+            },
+            "audience": {
+              "type": "string",
+              "enum": [
+                "any-player",
+                "named-licensees"
+              ]
+            },
+            "authorization": {
+              "type": "string",
+              "description": "The current controller must commit this manifest through YellowBrick metadataDigest."
+            },
+            "terms": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Human-readable playback scope and compensation terms. Self-declared unless independently verified."
+            }
+          },
+          "required": [
+            "mode"
+          ],
+          "additionalProperties": true
         }
       },
       "additionalProperties": true
