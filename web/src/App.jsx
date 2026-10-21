@@ -4,6 +4,7 @@ import {seedBricks,seedBuildings,seedLicenses,seedProposals,seedNodes} from './d
 import {filterBricks,members,feeCap,split,money,makeDraft} from './model.js';
 import MintStudio from './MintStudioDemo.jsx';
 import WalletBricks from './WalletBricks.jsx';
+import LiveRegistry from './LiveRegistry.jsx';
 import IpfsRecovery from './IpfsRecovery.jsx';
 import Manifesto from './Manifesto.jsx';
 import {useEnsIdentity} from './useEnsIdentity.js';
@@ -14,7 +15,7 @@ function readDrafts(key){try{const v=JSON.parse(localStorage.getItem(key));retur
 function Artwork({brick,small=false}){const Icon=brick.category==='Music'?Music2:brick.category==='Visual'?ImageIcon:brick.category==='Writing'?FileText:Sparkles;return <div className={'art '+(brick.tone||'draft')+(small?' small-art':'')}><span className="art-code">{small?'':brick.category+' / IP'}</span><Icon size={small?19:37} strokeWidth={1.25}/><span className="art-index">{small?'':'0x / '+brick.id.toUpperCase()}</span></div>}
 function SectionTitle({title,note,extra}){return <div className="section-title"><div><h2>{title}</h2><p>{note}</p></div>{extra}</div>}
 function Panel({children,extra=''}){return <section className={'panel '+extra}>{children}</section>}
-function Header({page,wallet,identity,onConnect,openMenu}){return <header className="topbar"><div className="breadcrumbs"><button className="mobile-toggle" onClick={openMenu} aria-label="Open navigation"><Menu size={21}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{nav.find(x=>x[0]===page)?.[1]}</strong></div><div className="top-actions"><span className="demo-tag"><i/> DEMO ENVIRONMENT</span><button className="wallet" onClick={onConnect} title={wallet?"Connected identity (demo)":"Connect wallet (demo)"}><Wallet size={15}/>{wallet?identity.displayName:"Connect wallet"}</button></div></header>}
+function Header({page,wallet,identity,onConnect,openMenu}){return <header className="topbar"><div className="breadcrumbs"><button className="mobile-toggle" onClick={openMenu} aria-label="Open navigation"><Menu size={21}/></button><span>Workspace</span><ChevronRight size={14}/><strong>{nav.find(x=>x[0]===page)?.[1]}</strong></div><div className="top-actions"><span className="demo-tag"><i/> LOCAL PROTOTYPE</span><button className="wallet" onClick={onConnect} title={wallet?"Connected identity (demo)":"Connect wallet (demo)"}><Wallet size={15}/>{wallet?identity.displayName:"Connect wallet"}</button></div></header>}
 function Modal({item,close,saveBrick,saveBuilding,bricks,buildings}){
  const [form,setForm]=useState({title:'',creator:'',category:'Music',detail:'',type:'Album'});
  const [selected,setSelected]=useState([]);
@@ -85,7 +86,7 @@ export default function App(){
  {page==='mint'&&<MintStudio wallet={wallet} ensName={identity.ensName} displayName={identity.displayName} onConnect={connect}/>}
  {page==='wallet-bricks'&&<WalletBricks wallet={wallet} onConnect={connect}/>}
  {page==='recovery'&&<IpfsRecovery/>}
- {page==='bricks'&&<Registry bricks={bricks} open={open} newBrick={()=>navTo('mint')}/>}
+ {page==='bricks'&&<LiveRegistry wallet={wallet} onMint={()=>navTo('mint')} onWallet={()=>navTo('wallet-bricks')}><Registry bricks={bricks} open={open} newBrick={()=>open({kind:'newBrick'})}/></LiveRegistry>}
  {page==='buildings'&&<Buildings buildings={buildings} bricks={bricks} open={open}/>}
  {page==='royalties'&&<Royalties bricks={bricks} open={open}/>}
  {page==='governance'&&<Governance/>}{page==='network'&&<RoadNetwork/>}
