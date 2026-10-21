@@ -19,9 +19,9 @@
     "ipfs:status": "docker compose -f infra/ipfs/compose.yaml ps",
     "ipfs:bridge": "node web/scripts/ipfs-bridge.mjs",
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
-    "dev": "node scripts/dev-stack.cjs",
-    "setup:dev": "npm install && npm install --prefix web && npm install --prefix apps/ybr-player",
-    "test:dev-stack": "node --test scripts/dev-stack.test.cjs"
+    "dev": "node scripts/dev.cjs",
+    "setup:dev": "node scripts/dev.cjs --setup",
+    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",

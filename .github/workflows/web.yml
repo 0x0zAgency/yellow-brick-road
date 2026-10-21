@@ -3,25 +3,21 @@ on:
   push:
     paths:
       - 'web/**'
-      - 'scripts/dev-dashboard*'
-      - 'scripts/dev-ipfs.cjs'
-      - 'scripts/dev-ipfs.test.cjs'
+      - 'scripts/dev*'
+      - 'scripts/use-node24.sh'
+      - 'package.json'
+      - '.nvmrc'
       - 'infra/ipfs/**'
-      - 'scripts/dev-stack.cjs'
-      - 'scripts/dev-stack.test.cjs'
-      - 'scripts/dev-stack-smoke.cjs'
       - 'apps/ybr-player/**'
       - '.github/workflows/web.yml'
   pull_request:
     paths:
       - 'web/**'
-      - 'scripts/dev-dashboard*'
-      - 'scripts/dev-ipfs.cjs'
-      - 'scripts/dev-ipfs.test.cjs'
+      - 'scripts/dev*'
+      - 'scripts/use-node24.sh'
+      - 'package.json'
+      - '.nvmrc'
       - 'infra/ipfs/**'
-      - 'scripts/dev-stack.cjs'
-      - 'scripts/dev-stack.test.cjs'
-      - 'scripts/dev-stack-smoke.cjs'
       - 'apps/ybr-player/**'
       - '.github/workflows/web.yml'
 jobs:
@@ -52,8 +48,11 @@ jobs:
           npm install --no-package-lock --no-audit --no-fund
           npm install --no-package-lock --no-audit --no-fund --prefix web
           npm install --no-package-lock --no-audit --no-fund --prefix apps/ybr-player
-      - name: Test lifecycle, dashboard and synthetic fixture
-        run: npm run test:dev-stack
+      - name: Test lifecycle, cyberpunk dashboard, Node selection and Player access
+        run: |
+          npm run test:dev-stack
+          npm run dev -- --check-node
+          npm --prefix web run dev -- --check-node
       - name: Pull Kubo image before timing stack readiness
         run: docker compose -f infra/ipfs/compose.yaml pull kubo
       - name: Start complete Road application and test web, player and IPFS
@@ -63,7 +62,7 @@ jobs:
           YBR_ARTIST_PASSWORD: ci-artist-demo-only
         run: |
           set -euo pipefail
-          node scripts/dev-stack.cjs > /tmp/ybr-integrated.log 2>&1 &
+          node scripts/dev.cjs > /tmp/ybr-integrated.log 2>&1 &
           STACK_PID=$!
           trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log' EXIT
           node scripts/dev-stack-smoke.cjs

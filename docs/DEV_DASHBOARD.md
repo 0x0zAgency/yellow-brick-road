@@ -1,82 +1,111 @@
-# Local development dashboard
+# YBR cyberpunk development terminal
 
 Run `npm run dev` from the repository root or `web/` with Docker running.
-The launcher uses a gold-accented, fixed terminal dashboard instead of mixing
-Ganache, Player, Vite and IPFS output into one scrolling stream. No new package
-or service is required.
+The local control screen has an ASCII YBR masthead, gold/cyan/magenta frames,
+an animated brick chase, real service health, and stationary credential panels.
+The brick animation is decorative, not network activity or throughput telemetry.
 
-## At a glance
+## Node 24, automatically
 
-- **Services:** Explorer, Player and encrypted-content IPFS bridge URLs and status.
-- **Ganache:** RPC URL, chain ID 1337, account 0, its live ETH balance, block number,
-  factory address, and whether this launcher owns or reuses the node.
-- **YBR access:** actual `listener` and `artist` credentials and the verified local
-  Ganache mnemonic. Credentials stay on the dashboard while activity changes below.
-- **Activity:** a short log tail, with routine RPC requests kept out of this panel.
+Both development entrypoints and `npm run setup:dev` go through `scripts/dev.cjs`.
+It loads no project packages until Node 24 is selected. On macOS/Linux, an older
+Node process loads your installed nvm and runs `nvm use 24`; when 24 is missing,
+it runs `nvm install 24` first. It then restarts under that runtime and puts its
+binary directory first in PATH for Ganache, Vite, npm, and Player children.
+`.nvmrc` pins the development major to 24. Your parent terminal's Node selection
+and default nvm alias are not changed by the wrapper itself.
 
-The normal layout fits an 80-column, 24-row terminal. Wider terminals get
-side-by-side service and network panels. Smaller terminals show a compact status
-fallback. Long override passwords are abbreviated on the home view; use `d` for
-the complete value. Printable ASCII credentials are shown exactly; passwords
-containing control or non-ASCII characters are labeled as configuration values
-rather than displayed inaccurately.
+Supported nvm locations: NVM_DIR, ~/.nvm, XDG_CONFIG_HOME/nvm, and the normal
+Apple Silicon/Intel Homebrew nvm script locations. nvm must already be installed;
+the launcher never downloads and executes an nvm installer. Missing nvm,
+installation failures, or selection of another Node major stop startup before
+services launch. A system Node 24 works directly without nvm. Windows users must
+select Node 24 themselves with their installed version manager.
 
-## Keys
+Check the selection without starting any services:
+
+```sh
+npm run dev -- --check-node
+```
+
+## Logins in this terminal
+
+The `listener` and `artist` passwords are generated once and stored in
+`.road-local/player-access.json`, inside the existing git-ignored directory.
+The directory is owner-only (700) and the file owner-only (600) on POSIX systems.
+The file contains Player demonstration credentials, **not Ganache seeds or IPFS
+recovery keys**. It is local plaintext: do not commit or share it, and do not use
+production credentials here. Windows ACLs are not hardened by these POSIX modes.
+Environment overrides YBR_LISTENER_PASSWORD and YBR_ARTIST_PASSWORD still work.
+
+The new `npm start` entrypoint for the Player uses the same file. A launcher that
+reuses that Player checks both credentials through the existing login endpoint,
+logs the short-lived test sessions out, then displays the verified credentials.
+There is no password-discovery HTTP endpoint and no password guessing.
+
+### One-time migration from an older running Player
+
+A Player started by the old version has random credentials that cannot be
+recovered from its API. Replace it once from this terminal:
+
+```sh
+npm run dev -- --restart-player
+```
+
+Or press **r twice** inside the dashboard (Escape cancels). This resets Player
+sessions, not IPFS pins or Ganache. Before sending SIGTERM the launcher verifies
+with lsof/ps that port 4173 belongs to the current user, the exact checkout's
+Player working directory, and the expected Node script. It refuses foreign or
+ambiguous processes and never uses SIGKILL. macOS/Linux need lsof for this
+one-time operation. A Player already managed by this launcher is not restarted:
+its verified passwords are already available with s.
+
+## Screen and keys
+
+The main view fits 80x24, with side-by-side service and Ganache panels at wider
+widths. Long password overrides are abbreviated on the home screen; d shows the
+complete values. Control/non-ASCII passwords are labeled rather than rendered
+misleadingly. Smaller windows fall back to service status without credentials.
 
 | Key | Action |
 | --- | --- |
-| `d` | Full reference: account-0 private key, HD path, IPFS peer, endpoints and shutdown commands. |
-| `l` | Full in-memory log view (most recent 200 relevant lines). |
-| `s` | Hide/show local credentials, useful before sharing your screen. |
-| `p` | Freeze/unfreeze the display while selecting and copying text. Services keep running. |
+| d | Reference view: full credentials, account-0 key, HD path, IPFS peer and endpoints. |
+| l | Expanded recent activity, up to 200 relevant lines. |
+| s | Hide/show local credentials. |
+| p | Pause drawing for selecting/copying text; services keep running. |
+| a | Toggle animated bricks. |
+| r, r | Confirm a controlled restart of this checkout's reused Player. |
 | Up / Down | Scroll details or logs. |
-| Escape | Return to the main dashboard. |
-| `q` / Ctrl+C | Stop launcher-owned processes and restore the terminal. Kubo remains running. |
+| Escape | Main view; cancel pending restart confirmation. |
+| q / Ctrl+C | Stop launcher-owned processes and restore terminal input/cursor. |
 
-Services are polled every four seconds after startup. Failed health checks show
-`DOWN` and `DEGRADED`, not a permanent green startup snapshot. The launcher also
-verifies the actual Mint Studio IPFS proxy before reporting ready.
+Services are checked every four seconds. The dashboard reports DOWN/DEGRADED on
+failed health checks. Only changed rows are repainted; credentials do not move
+with animation. `YBR_DEV_REDUCED_MOTION=1` starts with animation off. `NO_COLOR=1`
+keeps the layout without color. `YBR_DEV_HIDE_SECRETS=1` hides credentials initially.
 
-## Credentials and privacy
+## Privacy, logging and shutdown
 
-These are **local development accounts and test-chain keys**, never production
-credentials. Never send real funds to the Ganache wallet. Anyone who can see the
-terminal can see its displayed credentials; press `s` to hide them or launch with
-`YBR_DEV_HIDE_SECRETS=1`.
+The Ganache mnemonic is shown only after its derived account matches account 0
+from the launcher-owned node. Reused unknown Ganache nodes do not disclose their
+seed via RPC; no seed is guessed. **Never send real funds to local test wallets.**
 
-The launcher generates fresh Player passwords and passes those same values to
-its Player child. Existing `YBR_LISTENER_PASSWORD` / `YBR_ARTIST_PASSWORD` overrides
-are respected. It does not persist passwords or expose a credential endpoint.
+Known Player credentials, Ganache seed lines and private-key lines are redacted
+from captured child output before saving `.road-local/dev-stack.log`. One rotated
+`.1` file is retained, approximately 1 MiB per file. This remains targeted
+redaction, not a general-purpose secret detector. Player credentials are visible
+on the interactive screen unless hidden; hide them before screen sharing.
 
-The Ganache mnemonic is captured from the node process started by this launcher
-and displayed only after its derived account matches RPC account 0. The private
-key is available on the details view. A reused Ganache or Player process does not
-expose its credentials through the existing APIs, so the dashboard explicitly
-says to consult that process's original terminal. It does not guess default
-passwords or a seed for an unknown running node.
+Pipes, CI, TERM=dumb, or `npm run dev -- --plain` use plain output without printing
+credentials. Kubo, its volumes, and pre-existing services remain running when
+the launcher exits. `npm run ipfs:down` stops Kubo without deleting the volume.
+Never use `down -v` to preserve pins. No encryption or licensing behavior changed.
 
-Child output is captured, terminal control sequences are removed, and known
-Player credentials, Ganache seed lines and Ganache private-key lines are redacted
-before logging. Logs are saved under the already git-ignored
-`.road-local/dev-stack.log`, with one rotated `.1` file, approximately 1 MiB each.
-On supported platforms the log files have owner-only permissions. Do not put
-unrelated secrets into arbitrary application logs: this is targeted redaction,
-not a general-purpose secret detector.
+## Tests
 
-## Plain output and troubleshooting
-
-`npm run dev -- --plain` or `YBR_DEV_PLAIN=1 npm run dev` disables the interactive
-screen. Pipes, CI and `TERM=dumb` automatically use plain output. Credentials are
-not printed in this mode; run in an interactive terminal or supply known local
-password overrides to reference them. `NO_COLOR=1` keeps the dashboard layout
-without color.
-
-Errors remain visible after the alternate screen closes. Full redacted output
-is available in `.road-local/dev-stack.log`. Ctrl+C stops owned child processes
-only; reused services and the persistent Kubo node are left alone. Stop Kubo
-separately with `npm run ipfs:down`, never `down -v` to preserve your pins.
-
-Run `node --test scripts/dev-dashboard.test.cjs` for dashboard unit tests or
-`npm run test:dev-stack` for the combined launcher suite. The integrated CI smoke
-boots real Kubo/Ganache/Player/Vite and checks the configured Player logins plus
-log redaction. Terminal behavior is tested separately from service startup.
+`npm run test:dev-stack` covers the launcher, IPFS, dashboard, nvm bootstrap,
+credential persistence/permissions, verified reuse and guarded Player restart.
+The nvm shell tests use controlled fixtures, not live downloads. The integrated
+GitHub job runs the real stack on Node 24, authenticates both Player accounts,
+checks stored credentials and reuse, and verifies log redaction. Terminal
+animation and restoration are tested independently from Docker startup.

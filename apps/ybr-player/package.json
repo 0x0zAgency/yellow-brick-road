@@ -6,7 +6,7 @@
   "scripts": {
     "generate-audio": "node scripts/generate-demo-audio.js",
     "prestart": "node scripts/generate-demo-audio.js",
-    "start": "node server.js",
+    "start": "node ../../scripts/dev-player.cjs",
     "pretest": "node scripts/generate-demo-audio.js",
     "test": "node --test",
     "road:publish": "node scripts/publish-road-track.js --publish",
