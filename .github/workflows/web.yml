@@ -43,11 +43,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Install integrated Road dependencies
-        run: |
-          npm install --no-package-lock --no-audit --no-fund
-          npm install --no-package-lock --no-audit --no-fund --prefix web
-          npm install --no-package-lock --no-audit --no-fund --prefix apps/ybr-player
+      - name: Install, approve and rebuild integrated Road dependencies
+        run: npm run setup:dev
       - name: Test lifecycle, cyberpunk dashboard, Node selection and Player access
         run: |
           npm run test:dev-stack

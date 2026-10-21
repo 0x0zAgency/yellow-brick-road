@@ -22,7 +22,7 @@
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
     "dev": "node scripts/dev.cjs",
     "setup:dev": "node scripts/dev.cjs --setup",
-    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs"
+    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs scripts/dev-install-scripts.test.cjs"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",
