@@ -1,6 +1,7 @@
 'use strict';
 /** Pure terminal renderer. Motion is decoration, never invented telemetry. */
 const {stripVTControlCharacters:strip}=require('node:util');
+const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
 const URLS={web:'http://127.0.0.1:5173',player:'http://127.0.0.1:4173',ipfs:'http://127.0.0.1:8791',ganache:'http://127.0.0.1:8545'};
 const clean=v=>strip(String(v??'')).replace(/[\t\r\n]+/g,' ').replace(/[^\x20-\x7e]/g,'?');
 const clip=(v,w)=>{const s=clean(v);return s.length<=w?s:s.slice(0,Math.max(0,w-3))+'...';};
@@ -15,6 +16,7 @@ function secret(v,visible,fallback='waiting for Player'){
  return /^[\x20-\x7e]+$/.test(v)?v:'[configured non-printable value]';
 }
 function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=false,view='home',offset=0,motion=true}={}){
+ if(state.mnemonicMenu)return renderMnemonicMenu(state,{columns,rows,color});
  const w=Math.max(5,Math.min(144,columns-1)),h=Math.max(3,rows-1);
  const p=(n,s)=>color?'\x1b['+n+'m'+s+'\x1b[0m':s;
  const gold=s=>p('38;5;220',s),cyan=s=>p('38;5;51',s),pink=s=>p('38;5;201',s),dim=s=>p('38;5;244',s);
@@ -43,7 +45,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
   }
   return line;
  }
- const buttons=gold(clip('[d] details [l] logs [s] secrets [p] pause [a] FX [r] player [q] stop',w));
+ const buttons=gold(clip('[m] mnemonic [d] info [l] logs [s] keys [p] pause [a] FX [r] player [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip('LOCAL TEST KEYS ONLY / Never send real funds / '+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
  if((w<70||h<22)&&w>=60&&h>=14){
@@ -74,6 +76,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    ...logins.flatMap(line=>wrap(line,w-4)),
    ...wrap('Mnemonic: '+mnemonic,w-4),...wrap('Account 0 key: '+secret(g.privateKey,showSecrets,unknown),w-4),
    "HD path: m/44'/60'/0'/0/0 | ETH | Chain 1337",
+   ...wrap('Ganache profile: '+(state.profileId||'default')+' | [m] change mnemonic',w-4),
    'Wallet: '+(g.source||'pending')+' | Player: '+(a.source||'pending'),
    ...wrap(a.notice||'Player passwords: private .road-local/player-access.json',w-4)],w,gold),
    ...box('CONNECTION REFERENCE',[

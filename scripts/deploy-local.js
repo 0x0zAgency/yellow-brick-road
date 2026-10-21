@@ -1,14 +1,17 @@
 const {ethers,network}=require('hardhat');
 const fs=require('node:fs');
 const path=require('node:path');
-const {prepareGanacheStorage}=require('./dev-ganache-storage.cjs');
+const {readSelection,prepareProfile}=require('./dev-ganache-profile.cjs');
 async function main(){
  const url=new URL(network.config.url||'http://invalid');
  if(!['localhost','127.0.0.1','[::1]'].includes(url.hostname))throw Error('Local RPC required');
  const chainId=(await ethers.provider.getNetwork()).chainId;
  if(chainId!==1337)throw Error('Expected Ganache chain 1337');
- prepareGanacheStorage(process.cwd());
- const current=path.join('.road-local','factory.json');
+ const selection=readSelection(process.cwd());
+ const accounts=await ethers.provider.listAccounts();
+ if(accounts[0]?.toLowerCase()!==selection.account.toLowerCase())throw Error('Running Ganache does not match the selected wallet profile. No factory deployed.');
+ const profile=prepareProfile(process.cwd(),selection);
+ const current=profile.factory;
  // Save the old deployment reference before explicitly selecting a new factory.
  // Its contracts, registrations and chain database are never deleted or reminted.
  if(fs.existsSync(current)){
@@ -17,7 +20,7 @@ async function main(){
   let previous;
   try{previous=JSON.parse(fs.readFileSync(current,'utf8'));}catch{throw Error('Invalid existing factory receipt. Back it up and inspect it before deployment.');}
   if(!/^0x[a-fA-F0-9]{40}$/.test(previous.factoryAddress||'')||!Number.isSafeInteger(previous.chainId))throw Error('Invalid existing factory receipt.');
-  const dir=path.join('.road-local','factory-history');fs.mkdirSync(dir,{recursive:true,mode:0o700});
+  const dir=profile.history;fs.mkdirSync(dir,{recursive:true,mode:0o700});
   const ds=fs.lstatSync(dir);if(!ds.isDirectory()||ds.isSymbolicLink()||process.getuid&&ds.uid!==process.getuid())throw Error('Unsafe factory history directory.');
   const backup=path.join(dir,previous.chainId+'-'+previous.factoryAddress.toLowerCase()+'.json');
   try{fs.writeFileSync(backup,JSON.stringify(previous,null,2)+'\n',{flag:'wx',mode:0o600});}
