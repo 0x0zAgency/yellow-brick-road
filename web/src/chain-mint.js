@@ -1,3 +1,4 @@
+import {verifyLocalChainHistory} from './chain-history.js';
 import {sepolia} from 'viem/chains';
 import {createPublicClient, createWalletClient, custom, http, parseAbi, parseEventLogs, isAddress, sha256, stringToHex, getAddress, encodeFunctionData} from 'viem';
 export const factoryAbi=parseAbi([
@@ -32,9 +33,15 @@ export async function connectChain({provider,rpcUrl,chainId,account,network='gan
  async function check(){
   if(Number(await provider.request({method:'eth_chainId'}))!==chain.id)throw Error('Switch your wallet to the selected mint network.');
   if(await client.getChainId()!==chain.id)throw Error('RPC chain changed.');
-  const block=await client.getBlock();
-  const walletBlock=await provider.request({method:'eth_getBlockByNumber',params:['0x'+block.number.toString(16),false]});
-  if(!walletBlock||!same(walletBlock.hash,block.hash))throw Error('Wallet and RPC point to different blockchain histories.');
+  if(network==='ganache'){
+   await verifyLocalChainHistory({client,provider,rpcUrl,chainId:chain.id});
+  }else{
+   const block=await client.getBlock();
+   const walletBlock=await provider.request({method:'eth_getBlockByNumber',params:['0x'+block.number.toString(16),false]});
+   if(!walletBlock||!same(walletBlock.hash,block.hash))throw Error('Wallet and RPC point to different blockchain histories.');
+  }
+  // The user may switch networks while the read-only history check is pending.
+  if(Number(await provider.request({method:'eth_chainId'}))!==chain.id)throw Error('Switch your wallet to the selected mint network.');
   const accounts=await provider.request({method:'eth_accounts'});
   if(!account||!accounts.some(a=>same(a,account)))throw Error('Wallet account changed or disconnected. Reconnect and review.');
  }
