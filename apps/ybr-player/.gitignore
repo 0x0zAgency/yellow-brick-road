@@ -1,3 +1,6 @@
 media/*.wav
 data/player-events.ndjson
 node_modules/
+
+media/road-public/
+data/road-public/
