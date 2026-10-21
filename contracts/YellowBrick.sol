@@ -108,6 +108,8 @@ contract YellowBrick is YellowBrickContentPolicy {
         require(msg.sender == pendingController, "Brick: not nominated");
         controller = msg.sender;
         pendingController = address(0);
+        // A round-trip controller transfer must not revive an earlier grant.
+        if (contentPolicyEnabled) _setPlayerPermissions(0);
         emit ControllerAccepted(msg.sender);
     }
 }

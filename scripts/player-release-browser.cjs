@@ -47,6 +47,15 @@ async function main(){
   await studio.getByLabel('Recording artist / claimant',{exact:true}).fill('Synthetic Artist');
   await studio.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Synthetic Writer');
   await studio.getByRole('button',{name:'Continue →',exact:true}).click();
+  const review=studio.getByRole('region',{name:'Pre-mint Player permissions and content lock'});
+  await review.waitFor();
+  assert.equal(await review.getByRole('checkbox',{name:'Play Audio Preview',exact:false}).isChecked(),true);
+  assert.equal(await review.getByRole('checkbox',{name:'Display cover artwork',exact:false}).isChecked(),true);
+  assert.equal(await review.getByRole('checkbox',{name:'Display lyrics',exact:false}).isChecked(),true);
+  const seal=review.getByRole('switch',{name:'Content locked',exact:false});
+  assert.equal(await seal.isChecked(),false);await seal.check();
+  assert.match(await review.textContent(),/Permanent file lock/);await seal.uncheck();
+  assert.match(await review.textContent(),/Simulation only/);
   await studio.getByRole('button',{name:'Simulate mint →',exact:true}).click();
   await studio.getByRole('button',{name:'Confirm simulation',exact:true}).click();
   await studio.getByRole('button',{name:'View receipts →',exact:true}).click({timeout:30000});

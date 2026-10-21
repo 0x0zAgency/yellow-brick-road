@@ -64,7 +64,9 @@ describe('Atomic Player permission and file-integrity policy',function(){
   const {brick}=await mint({locked:true});
   await(await brick.proposeController(other.address)).wait();await(await brick.connect(other).acceptController()).wait();
   assert.equal(await brick.effectivePlayerPermissions(),0);assert.equal(await brick.contentLocked(),true);
-  await(await brick.connect(other).setPlayerPermissions(1,1,1)).wait();assert.equal(await brick.effectivePlayerPermissions(),1);
+  await(await brick.connect(other).setPlayerPermissions(1,1,2)).wait();assert.equal(await brick.effectivePlayerPermissions(),1);
+  await(await brick.connect(other).proposeController(owner.address)).wait();await(await brick.acceptController()).wait();
+  assert.equal(await brick.effectivePlayerPermissions(),0,'Returning control must not revive historical permissions.');
  });
  it('legacy entry points do not silently grant policies; implementation cannot be initialized',async()=>{
   const tx=await(await factory.deployBrick(h('a'),'road-demo://old',h('1'))).wait();

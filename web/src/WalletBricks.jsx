@@ -1,3 +1,4 @@
+import BrickPolicyEditor from './BrickPolicyEditor.jsx';
 import {useEffect,useRef,useState} from 'react';
 import CopyField from './CopyField.jsx';
 import NftCoverPublisher from './NftCoverPublisher.jsx';
@@ -55,7 +56,7 @@ export default function WalletBricks({wallet,onConnect}){
    if(id!==requestId.current)return;
    setResult(data);
    try{localStorage.setItem(factoryStorageKey(chainId),factory)}catch{}
-  }catch(e){if(id===requestId.current)setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.')}
+  }catch(e){if(id===requestId.current)setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.');}
   finally{if(id===requestId.current)setBusy(false)}
  };
  return <section className="wb">
@@ -93,6 +94,7 @@ export default function WalletBricks({wallet,onConnect}){
      <div className="wb-brick-links">{chainId===11155111?<><a href={'https://sepolia.etherscan.io/address/'+brick.address} rel="noreferrer" target="_blank">View contract on Sepolia ↗</a><a href={'https://sepolia.etherscan.io/tx/'+brick.transactionHash} rel="noreferrer" target="_blank">View mint transaction ↗</a></>:<span>Ganache transaction: {short(brick.transactionHash)}</span>}</div>
      {brick.metadataURI?.startsWith('ipfs://')&&validCid(brick.metadataURI.slice(7))&&<button type="button" className="outline-btn wb-recover" onClick={()=>setRecoveryAddress(brick.address)}>Recover encrypted files</button>}
      {recoveryAddress===brick.address&&<IpfsRecovery key={chainId+':'+brick.address+':'+brick.metadataDigest} brick={brick} onClose={()=>setRecoveryAddress(null)}/>}
+     <details><summary>Player permissions and content lock</summary><BrickPolicyEditor key={chainId+':'+brick.address} wallet={wallet} chainId={chainId} factoryAddress={result.verifiedFactory} brickAddress={brick.address}/></details>
      {brick.nftContractAddress&&brick.tokenId&&<details className="wb-nft-cover"><summary>Set or update NFT cover</summary><NftCoverPublisher wallet={wallet} mint={{simulated:false,status:'confirmed',chainId,factoryAddress:result.verifiedFactory,receipts:[{status:'verified',chainId,nftContractAddress:brick.nftContractAddress,tokenId:brick.tokenId,contractAddress:brick.address}]}}/></details>}
     </article>)}</div>
    </div>}

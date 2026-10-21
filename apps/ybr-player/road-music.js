@@ -9,6 +9,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {ethers}=require('ethers');
 const {discoverRegistry}=require('./road-registry');
+const {createPlayerPolicyReader}=require('./player-policy');
 
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const IPID=/^0x[0-9a-fA-F]{64}$/;
@@ -156,6 +157,7 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
    }
   });
  }
- return {ready,list,track,registry,config:configuration};
+ const playerPolicy=createPlayerPolicyReader({provider:rpcProvider,factoryAddress:factoryAddr,ethers});
+ return {ready,list,track,registry,playerPolicy,config:configuration};
 }
 module.exports={makeGateway,readFactoryAddress,loopbackUrl};

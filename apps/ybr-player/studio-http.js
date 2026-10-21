@@ -21,10 +21,12 @@ async function readPublication(req){
  for await(const chunk of req){count+=chunk.length;if(count>MAX_REQUEST_BYTES)throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});chunks.push(chunk);}
  try{return JSON.parse(Buffer.concat(chunks,count).toString('utf8'));}catch{throw Object.assign(Error('Invalid preview JSON.'),{status:400});}
 }
-function createStudioHttp({library,sendJson,requireSession,parseRange}){
+function createStudioHttp({library,sendJson,requireSession,parseRange,checkPermission=async()=>({allowed:true})}){
  const token=crypto.randomBytes(32).toString('hex');
  const validToken=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)&&crypto.timingSafeEqual(Buffer.from(value,'hex'),Buffer.from(token,'hex'));
- function deliver(req,res,id,role){
+ async function deliver(req,res,id,role){
+  const record=library.get(id);
+  if(!record||!(await checkPermission(record,role)).allowed){sendJson(res,403,{error:'The current on-chain Player permission does not allow this asset.'});return;}
   const asset=library.asset(id,role);
   if(!asset){sendJson(res,404,{error:'Preview asset not found.'});return;}
   const range=role==='audio'?parseRange(req.headers.range,asset.bytes.length):{start:0,end:asset.bytes.length-1,partial:false};
@@ -47,7 +49,9 @@ function createStudioHttp({library,sendJson,requireSession,parseRange}){
    }
    if(!validToken(req.headers['x-ybr-publish-token'])){sendJson(res,403,{error:'Local publishing token required.'});return true;}
    if(route==='/api/player-publish/releases'&&req.method==='POST'){
-    const result=library.publish(await readPublication(req));sendJson(res,result.created?201:200,result);return true;
+    const body=await readPublication(req);
+    for(const role of Object.keys(body.assets||{}))if(!(await checkPermission(body,role)).allowed){sendJson(res,403,{error:'Current on-chain Player permission or file commitment does not match this release.'});return true;}
+    const result=library.publish(body);sendJson(res,result.created?201:200,result);return true;
    }
    const removal=/^\/api\/player-publish\/releases\/(STUDIO-[a-f0-9]{64})$/.exec(route);
    if(removal&&req.method==='DELETE'){
@@ -59,7 +63,7 @@ function createStudioHttp({library,sendJson,requireSession,parseRange}){
   if(media){
    if(!requireSession(req,res))return true;
    if(req.method!=='GET'&&req.method!=='HEAD'){sendJson(res,405,{error:'Read-only asset endpoint.'});return true;}
-   deliver(req,res,media[1],media[2]);return true;
+   await deliver(req,res,media[1],media[2]);return true;
   }
   return false;
  }
