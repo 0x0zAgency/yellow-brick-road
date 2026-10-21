@@ -14,6 +14,17 @@ function approvalArgs(help){
  if(has('approve-scripts'))return ['approve-scripts','--all'];
  throw Error('The selected npm does not support install-script approvals. Update npm for Node 24, then retry npm run setup:dev. No services were started.');
 }
+async function npmHelp(npm,options,capture=exec){
+ try{return String((await capture(npm,['--help'],options)).stdout);}
+ catch(error){
+  // npm's general usage screen intentionally exits 1 even for --help.
+  // Accept only that complete usage response, not config/spawn/timeout errors.
+  const text=String(error.stdout||'');
+  if(error.code===1&&!error.killed&&!error.signal&&/^\s*npm <command>/.test(text)&&
+     /\bAll commands:/.test(text)&&!/npm (?:ERR!|error)/i.test(String(error.stderr||'')))return text;
+  throw error;
+ }
+}
 function readPolicy(cwd){
  let pkg;
  try{pkg=JSON.parse(fs.readFileSync(path.join(cwd,'package.json'),'utf8'));}
@@ -34,8 +45,8 @@ async function prepareInstallScripts({root,run,setup=false,env=process.env,
   if(!setup&&!fs.existsSync(path.join(cwd,'node_modules')))
    throw Error('Dependencies are missing in '+cwd+'. Run npm run setup:dev first.');
  }
- const {stdout}=await capture(npm,['--help'],{cwd:root,env,timeout:10000,maxBuffer:1024*1024});
- const approve=approvalArgs(String(stdout));
+ const help=await npmHelp(npm,{cwd:root,env,timeout:10000,maxBuffer:1024*1024},capture);
+ const approve=approvalArgs(help);
  log('[YBR] Approving installed dependency scripts for root, web and Player. This permits dependency code to run; existing denials stay in place.');
  async function checked(args,cwd){
   const code=await run(npm,args,{cwd,env});
@@ -59,4 +70,4 @@ async function prepareInstallScripts({root,run,setup=false,env=process.env,
   }
  }
 }
-module.exports={approvalArgs,readPolicy,projectDirs,prepareInstallScripts};
+module.exports={approvalArgs,npmHelp,readPolicy,projectDirs,prepareInstallScripts};
