@@ -6,6 +6,7 @@ import path from 'node:path';
 import {createRequire} from 'node:module';
 import {fileURLToPath} from 'node:url';
 import {spawn} from 'node:child_process';
+import {createServer} from 'node:net';
 import ganache from 'ganache';
 import {createPublicClient,createWalletClient,http} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
@@ -13,6 +14,7 @@ import {connectChain,mintOnChain,localConfig} from '../src/chain-mint.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const require=createRequire(import.meta.url);
+const {redact}=require('../../scripts/dev-dashboard.cjs');
 const options=time=>({logging:{quiet:true},chain:{chainId:1337,networkId:1337,time:new Date(time)},wallet:{deterministic:true}});
 
 test('a recreated local chain can mint despite a previous generation numbered-block cache; a foreign chain is still refused', {timeout:60000},async t=>{
@@ -68,6 +70,12 @@ test('a recreated local chain can mint despite a previous generation numbered-bl
  assert.equal(sends,before,'A real chain mismatch must fail before a wallet signature');
 });
 
+async function availablePort(){
+ return new Promise((resolve,reject)=>{
+  const server=createServer();server.once('error',reject);
+  server.listen(0,'127.0.0.1',()=>{const port=server.address().port;server.close(error=>error?reject(error):resolve(port));});
+ });
+}
 function startCli(args,cwd){
  return new Promise((resolve,reject)=>{
   const cli=path.join(path.dirname(require.resolve('ganache')),'cli.js');
@@ -81,7 +89,7 @@ function startCli(args,cwd){
   };
   child.stdout.on('data',consume);child.stderr.on('data',consume);
   child.once('error',()=>{clearTimeout(timer);if(!settled){settled=true;reject(Error('Disposable Ganache CLI spawn failed'));}});
-  child.once('exit',code=>{clearTimeout(timer);if(!settled){settled=true;reject(Error('Disposable Ganache CLI exited '+code));}});
+  child.once('exit',code=>{clearTimeout(timer);if(!settled){settled=true;reject(Error('Disposable Ganache CLI exited '+code+': '+redact(tail)));}});
  });
 }
 async function stopCli(child){
@@ -103,7 +111,7 @@ test('the actual npm Ganache command retains block hashes, nonce, balance and de
  assert.equal(executable,'ganache');
  assert.equal(args[args.indexOf('--database.dbPath')+1],'.road-local/ganache');
  assert.equal(args[args.indexOf('--chain.networkId')+1],'1337');
- args[args.indexOf('--server.port')+1]='0'; // Everything except the test port is the real launch command.
+ args[args.indexOf('--server.port')+1]=String(await availablePort()); // CLI requires a positive port, unlike the programmatic API.
  let running;
  try{
   running=await startCli(args,tmp);
