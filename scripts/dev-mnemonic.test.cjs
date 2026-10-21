@@ -97,7 +97,11 @@ test('real terminal key parsing masks paste, preserves shortcuts outside the edi
  let quits=0,applies=0;
  const dashboard=new DevDashboard({root,input,output,env:{TERM:'xterm'},onQuit:()=>quits++,mnemonicControl:{check:()=>{},current:()=>DEFAULT,generate:()=>candidate,validate:()=>candidate,onApply:async()=>applies++}});
  t.after(()=>{dashboard.close();input.destroy();});dashboard.start();
- input.write('m');input.write('i');input.write('\x1b[200~quit source private\nwords\x1b[201~');
+ const oldRows=dashboard.lastFrame.length,start=screen.length;
+ input.write('m');
+ assert.ok(dashboard.lastFrame.length<oldRows);
+ assert.ok(screen.slice(start).includes('\x1b['+oldRows+';1H\x1b[2K'),'Clear trailing home rows when opening a shorter secret-input menu');
+ input.write('i');input.write('\x1b[200~quit source private\nwords\x1b[201~');
  assert.equal(dashboard.state.mnemonicMenu.stage,'input');assert.equal(quits,0);assert.equal(applies,0);
  assert.ok(!screen.includes('quit source private'));assert.ok(!fs.readFileSync(dashboard.logFile,'utf8').includes('quit source private'));
  dashboard.keyHandler('',{name:'escape'});assert.equal(dashboard.state.mnemonicMenu,null);
