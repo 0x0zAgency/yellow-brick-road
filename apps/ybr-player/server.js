@@ -4,6 +4,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { makeGateway } = require('./road-music');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
@@ -90,7 +91,24 @@ function constantTimeEquals(a, b) {
   return x.length===y.length && crypto.timingSafeEqual(x,y);
 }
 
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS } = {}) {
+function streamAudio(req,res,brick) {
+  const st=fs.statSync(brick.mediaPath);
+  const range=parseRange(req.headers.range,st.size);
+  if(!range){res.writeHead(416,{'Content-Range':`bytes */${st.size}`,'Cache-Control':'no-store'});return res.end();}
+  const {start,end,partial}=range;
+  res.writeHead(partial?206:200,{
+    'Content-Type':brick.media.mimeType,
+    'Content-Length':end-start+1,
+    'Accept-Ranges':'bytes',
+    'Cache-Control':'private, no-store',
+    'X-YBR-Content-SHA256':brick.media.sha256,
+    ...(partial?{'Content-Range':`bytes ${start}-${end}/${st.size}`}:{})
+  });
+  if(req.method==='HEAD')return res.end();
+  return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
+}
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway } = {}) {
+  const road = roadGateway || makeGateway();
   const bricks = loadBricks();
   const sessions = new Map();
   const attempts = new Map();
@@ -143,23 +161,56 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS }
         sessions.delete(getCookie(req,COOKIE));
         return sendJson(res,200,{ok:true},{'Set-Cookie':`${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`});
       }
+      // Public Road Music API for other players; no YBR Player login required.
+      // Authorization is the opt-in license committed by the current Brick controller.
+      if (route === '/road/api/status' && req.method === 'GET') {
+        return sendJson(res,200,await road.ready());
+      }
+      if (route === '/road/api/music' && req.method === 'GET') {
+        const catalog=await road.list();
+        return sendJson(res,200,{network:catalog.status,tracks:catalog.tracks.map(({mediaPath,...item})=>({
+          ...item,mediaUrl:'/road/media/'+item.id,metadataUrl:'/road/metadata/'+item.id
+        }))});
+      }
+      const publicRoadRoute=/^\/road\/(api\/music|media|metadata)\/(0x[\da-fA-F]{64})$/.exec(route);
+      if (publicRoadRoute && (req.method==='GET'||req.method==='HEAD')) {
+        const brick=await road.track(publicRoadRoute[2]);
+        if (!brick) return fail(res,404,'No currently authorized, public Road audio at this Brick');
+        if (publicRoadRoute[1]==='api/music') {
+          if (req.method==='HEAD')return res.writeHead(200,{'Cache-Control':'no-store'}).end();
+          const {mediaPath,...published}=brick;
+          return sendJson(res,200,{...published,mediaUrl:'/road/media/'+brick.id});
+        }
+        if (publicRoadRoute[1]==='metadata') {
+          const data=fs.readFileSync(path.join(ROOT,'data/road-public',brick.id+'.json'));
+          res.writeHead(200,{'Content-Type':'application/json; charset=utf-8','Content-Length':data.length,'Cache-Control':'no-store'});
+          return req.method==='HEAD'?res.end():res.end(data);
+        }
+        return streamAudio(req,res,brick);
+      }
       if (route === '/api/bricks' && req.method === 'GET') {
         const s=requireSession(req,res); if (!s) return;
-        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.1', bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user))});
+        const catalog=await road.list();
+        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.2',
+          network:catalog.status,bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.tracks.map(({mediaPath,...b})=>b))});
       }
-      const brickRoute = /^\/api\/bricks\/([A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
+      const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
         const s=requireSession(req,res); if (!s) return;
-        const brick=bricks.get(brickRoute[1]);
+        const brick=bricks.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
         if (!brick) return fail(res,404,'Brick not found');
         const action=brickRoute[2];
-        if (!action && req.method==='GET') return sendJson(res,200,exposeBrick(brick,s.user));
+        if (!action && req.method==='GET') {
+          if(brick.source==='road'){const {mediaPath,...publicBrick}=brick;return sendJson(res,200,publicBrick);}
+          return sendJson(res,200,exposeBrick(brick,s.user));
+        }
         if (action==='authorize' && req.method==='POST') {
-          if (!canStream(brick,s.user)) return fail(res,403, 'Streaming rights not granted for this Brick and account');
+          if (brick.source!=='road' && !canStream(brick,s.user)) return fail(res,403, 'Streaming rights not granted for this Brick and account');
           s.grants.set(brick.id, now()+GRANT_MS);
-          return sendJson(res,200,{ authorized:true,brickId:brick.id,mediaUrl:`/api/bricks/${brick.id}/media`,expiresInSeconds:GRANT_MS/1000 });
+          return sendJson(res,200,{ authorized:true,brickId:brick.id,mediaUrl:brick.source==='road'?'/road/media/'+brick.id:`/api/bricks/${brick.id}/media`,expiresInSeconds:GRANT_MS/1000 });
         }
         if (action==='media' && (req.method==='GET' || req.method==='HEAD')) {
+          if(brick.source==='road')return streamAudio(req,res,brick);
           if (!canStream(brick,s.user) || !(s.grants.get(brick.id)>now())) return fail(res,403,'Playback authorization required');
           const st=fs.statSync(brick.mediaPath);
           const range=parseRange(req.headers.range,st.size);
@@ -180,8 +231,9 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS }
       if (route === '/api/events' && req.method === 'POST') {
         const s=requireSession(req,res);if (!s)return;
         const body=await readJson(req);
-        if (!['play','pause','ended'].includes(body.event) || !bricks.has(body.brickId) || !Number.isFinite(body.positionSeconds) || body.positionSeconds < 0 || body.positionSeconds>86400) return fail(res,400,'Invalid playback event');
-        if (!canStream(bricks.get(body.brickId),s.user) || !(s.grants.get(body.brickId)>now())) return fail(res,403,'Playback authorization required');
+        if (!['play','pause','ended'].includes(body.event) || typeof body.brickId!=='string' || !Number.isFinite(body.positionSeconds) || body.positionSeconds < 0 || body.positionSeconds>86400) return fail(res,400,'Invalid playback event');
+        const eventBrick=bricks.get(body.brickId)||(body.brickId.startsWith('0x')?await road.track(body.brickId):null);
+        if (!eventBrick || (eventBrick.source!=='road'&&!canStream(eventBrick,s.user)) || !(s.grants.get(body.brickId)>now())) return fail(res,403,'Playback authorization required');
         const entry={at:new Date(now()).toISOString(),kind:'client-reported-demo-event',user:s.user,brickId:body.brickId,event:body.event,positionSeconds:Math.round(body.positionSeconds*10)/10};
         fs.appendFileSync(eventFile,JSON.stringify(entry)+'\n','utf8');
         return sendJson(res,202,{recorded:true,proofLevel:'unverified-client-report',event:entry});
