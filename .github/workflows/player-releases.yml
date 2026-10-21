@@ -1,31 +1,71 @@
 name: Player release integration
 on:
   push:
-    branches: ['feature/player-studio-releases']
+    paths:
+      - 'apps/ybr-player/**'
+      - 'web/src/**'
+      - 'web/tests/**'
+      - 'web/vite.config.js'
+      - 'scripts/player-release-browser.cjs'
+      - '.github/workflows/player-releases.yml'
   pull_request:
     paths:
       - 'apps/ybr-player/**'
       - 'web/src/**'
       - 'web/tests/**'
+      - 'web/vite.config.js'
+      - 'scripts/player-release-browser.cjs'
       - '.github/workflows/player-releases.yml'
 permissions:
   contents: read
+concurrency:
+  group: player-releases-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   release-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Capture exact test inputs
+      - name: Capture exact test inputs (tracked source only)
         run: git archive --format=tar HEAD > /tmp/player-release-source.tar
       - uses: actions/upload-artifact@v4
         with:
           name: player-release-test-inputs
           path: /tmp/player-release-source.tar
           retention-days: 1
-      - name: Install player test dependencies
-        run: npm install --prefix apps/ybr-player --no-package-lock --no-audit --no-fund
-      - name: Test player
-        run: npm test --prefix apps/ybr-player
+      - name: Install Player and web dependencies
+        run: |
+          npm install --prefix apps/ybr-player --no-package-lock --no-audit --no-fund
+          npm install --prefix web --no-package-lock --no-audit --no-fund
+      - name: Test Player and browser release adapter
+        run: |
+          npm test --prefix apps/ybr-player
+          node --test web/tests/player-release.test.js
+          npm run build --prefix web
+      - name: Install isolated Chromium test runner
+        run: |
+          npm install --prefix /tmp/ybr-browser playwright@1.56.1 --no-audit --no-fund
+          /tmp/ybr-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Exercise Mint Studio uploads and the Player in Chromium
+        env:
+          YBR_LISTENER_PASSWORD: browser-test-listener-only
+          YBR_ARTIST_PASSWORD: browser-test-artist-only
+        run: |
+          set -euo pipefail
+          node apps/ybr-player/server.js > /tmp/ybr-browser-player.log 2>&1 &
+          PLAYER_PID=$!
+          npm run dev:web --prefix web > /tmp/ybr-browser-web.log 2>&1 &
+          WEB_PID=$!
+          trap 'kill -TERM "$PLAYER_PID" "$WEB_PID" 2>/dev/null || true; cat /tmp/ybr-browser-web.log' EXIT
+          node scripts/player-release-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: player-release-browser-results
+          path: .road-local/player-browser-results/
+          retention-days: 3
+          if-no-files-found: ignore

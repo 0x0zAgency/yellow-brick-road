@@ -4,7 +4,8 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { makeGateway } = require('./road-music');
+const { createStudioLibrary } = require('./studio-releases');
+const { createStudioHttp } = require('./studio-http');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
@@ -48,6 +49,7 @@ function exposeBrick(brick, user) {
 }
 
 function canStream(brick, user) {
+  if(brick.source==='studio-demo')return Boolean(user);
   return Boolean(brick.permissions?.stream?.allowed && brick.permissions.stream.allowedAccounts?.includes(user));
 }
 
@@ -107,8 +109,9 @@ function streamAudio(req,res,brick) {
   if(req.method==='HEAD')return res.end();
   return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
 }
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway } = {}) {
-  const road = roadGateway || makeGateway();
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway, studioLibrary } = {}) {
+  const studio = studioLibrary || createStudioLibrary();
+  const road = roadGateway || require('./road-music').makeGateway();
   const bricks = loadBricks();
   const sessions = new Map();
   const attempts = new Map();
@@ -125,6 +128,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
     if (!s) fail(res,401,'Sign in to access your YBR bricks');
     return s;
   }
+  const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange});
   const server = http.createServer(async (req, res) => {
     try {
       const origin = req.headers.origin;
@@ -146,6 +150,8 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Referrer-Policy', 'no-referrer');
       res.setHeader('X-Frame-Options', 'DENY');
+
+      if (await studioHttp.handle(req,res,route)) return;
 
       if (route === '/api/session' && req.method === 'GET') {
         const s = sessionFrom(req);
@@ -203,15 +209,16 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         const s=requireSession(req,res); if (!s) return;
         const catalog=await road.list();
         return sendJson(res,200,{format:'ybr-player-demo-manifest/0.2',
-          network:catalog.status,bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.tracks.map(({mediaPath,...b})=>b))});
+          network:catalog.status,bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.tracks.map(({mediaPath,...b})=>b),studio.list())});
       }
       const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
         const s=requireSession(req,res); if (!s) return;
-        const brick=bricks.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
+        const brick=bricks.get(brickRoute[1]) || studio.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
         if (!brick) return fail(res,404,'Brick not found');
         const action=brickRoute[2];
         if (!action && req.method==='GET') {
+          if(brick.source==='studio-demo')return sendJson(res,200,brick);
           if(brick.source==='road'){const {mediaPath,...publicBrick}=brick;return sendJson(res,200,publicBrick);}
           return sendJson(res,200,exposeBrick(brick,s.user));
         }
@@ -223,6 +230,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         if (action==='media' && (req.method==='GET' || req.method==='HEAD')) {
           if(brick.source==='road')return streamAudio(req,res,brick);
           if (!canStream(brick,s.user) || !(s.grants.get(brick.id)>now())) return fail(res,403,'Playback authorization required');
+          if(brick.source==='studio-demo')return studioHttp.deliver(req,res,brick.id,'audio');
           const st=fs.statSync(brick.mediaPath);
           const range=parseRange(req.headers.range,st.size);
           if (!range) { res.writeHead(416,{'Content-Range':`bytes */${st.size}`,'Cache-Control':'no-store'});return res.end(); }
@@ -243,7 +251,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         const s=requireSession(req,res);if (!s)return;
         const body=await readJson(req);
         if (!['play','pause','ended'].includes(body.event) || typeof body.brickId!=='string' || !Number.isFinite(body.positionSeconds) || body.positionSeconds < 0 || body.positionSeconds>86400) return fail(res,400,'Invalid playback event');
-        const eventBrick=bricks.get(body.brickId)||(body.brickId.startsWith('0x')?await road.track(body.brickId):null);
+        const eventBrick=bricks.get(body.brickId)||studio.get(body.brickId)||(body.brickId.startsWith('0x')?await road.track(body.brickId):null);
         if (!eventBrick || (eventBrick.source!=='road'&&!canStream(eventBrick,s.user)) || !(s.grants.get(body.brickId)>now())) return fail(res,403,'Playback authorization required');
         const entry={at:new Date(now()).toISOString(),kind:'client-reported-demo-event',user:s.user,brickId:body.brickId,event:body.event,positionSeconds:Math.round(body.positionSeconds*10)/10};
         fs.appendFileSync(eventFile,JSON.stringify(entry)+'\n','utf8');
@@ -251,7 +259,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res,405,'Method not allowed');
       const staticPath = route==='/'?'/index.html':route;
-      if (!['/index.html','/styles.css','/app.js','/favicon.svg'].includes(staticPath)) return fail(res,404,'Not found');
+      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css'].includes(staticPath)) return fail(res,404,'Not found');
       const filePath=path.join(PUBLIC,staticPath.slice(1));
       const body=fs.readFileSync(filePath);
       res.writeHead(200,{
@@ -262,7 +270,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       if(req.method==='HEAD')return res.end();
       return res.end(body);
     } catch (e) {
-      const status=e.message==='Request too large'?413:400;
+      const status=e.status || (e.message==='Request too large'?413:400);
       if(!res.headersSent) return fail(res,status,e.message);
       res.destroy(e);
     }
