@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="/styles.css">
   <link rel="stylesheet" href="/releases.css">
   <script src="/release-ui.js" defer></script>
+  <script src="/library-model.js" defer></script>
   <script src="/app.js" defer></script>
 </head>
 <body>
@@ -30,10 +31,11 @@
         <h1>Follow the <em>music.</em></h1>
         <p class="lead">A player built on provenance. Every sound has a source. Every source has a brick.</p>
         <section class="feature" aria-label="Featured brick">
-          <div class="feature-copy"><span class="overline">FEATURED BRICK · AUDIO / 001</span><h2>Every track<br>has a story.</h2><p>Play a track, follow its brick, and see how the road connects.</p><button id="featurePlay" class="gold-button" type="button"><span class="triangle">▶</span> <span>Play featured brick</span> <span aria-hidden="true">↗</span></button></div>
+          <div class="feature-copy"><span class="overline">NEWEST PLAYABLE TRACK</span><h2>Every track<br>has a story.</h2><p>Play a track, follow its brick, and see how the road connects.</p><button id="featurePlay" class="gold-button" type="button"><span class="triangle">▶</span> <span>Play newest track</span> <span aria-hidden="true">↗</span></button></div>
           <div class="feature-art" aria-hidden="true"><div class="orbit orbit-a"></div><div class="orbit orbit-b"></div><div class="art-inner"><span class="art-y">Y</span><span class="art-b">B</span><span class="art-r">R</span></div><div class="art-stamp">SOURCE / SOUND / SIGNAL</div></div>
         </section>
-        <div class="heading-row"><div><div class="eyebrow small">THE COLLECTION</div><h3>Connected audio</h3></div><span id="trackCount" class="track-count">Loading…</span></div>
+        <div class="heading-row"><div><div class="eyebrow small">THE COLLECTION</div><h3>Playable tracks <small class="library-sort">Newest first</small></h3></div><span id="trackCount" class="track-count">Loading…</span></div>
+        <p id="libraryEmpty" class="library-empty" hidden>No playable tracks yet. Add an Audio Preview in Mint Studio and share it with the Player. All registered Bricks remain in the IP Registry.</p>
         <div id="trackList" class="track-list" role="list" aria-label="Audio bricks"></div>
         <div class="under-note"><span>◇</span> Road music comes from opt-in, publicly streamable Ganache Bricks. Synthetic demo tracks are separate. No third-party streaming SDK.</div>
       </div>

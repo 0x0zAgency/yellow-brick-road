@@ -102,14 +102,19 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
   let bytes;
   try{bytes=fs.readFileSync(audioPath);}catch(e){if(e.code==='ENOENT')return null;throw e;}
   if(bytes.length!==master.byteLength||'0x'+sha(bytes)!==lower(mediaHash))return null;
+  const publishedBlock=await rpcProvider.getBlock(event.blockHash||event.blockNumber);
+  const publishedAt=Number.isSafeInteger(publishedBlock?.timestamp)
+   ?new Date(publishedBlock.timestamp*1000).toISOString():null;
   const track={
    id:lower(ipId),type:'AudioBrick',title:manifest.title,creator:manifest.creators?.[0]?.name||'Unknown creator',
    description:manifest.description||'',durationSeconds:(manifest.music?.durationMs||0)/1000,theme:'gold',
+   publishedAt,publishedAtSource:'chain-registration',
    streamAllowed:true,source:'road',rights:{license:manifest.rights.playback.terms,notes:'On-chain controller publication (local Ganache demo). Not independent verification of legal rights.'},
    provenance:{agent:manifest.creators?.[0]?.name||'Publisher',activity:'Published to YBR Ganache',entity:lower(ipId),
     vocabulary:'https://www.w3.org/TR/prov-o/'},
    media:{mimeType:master.mediaType,sha256:sha(bytes)},
    road:{chainId:1337,brickAddress:address,ipId:lower(ipId),originator,controller,
+    blockNumber:event.blockNumber,logIndex:event.logIndex,
     factoryAddress:factoryAddr,metadataURI,metadataDigest:lower(metadataDigest),contentHash:lower(mediaHash),
     licenseMode:'public-stream',terms:manifest.rights.playback.terms},
    mediaPath:audioPath
