@@ -35,7 +35,8 @@ export function assetRecord(slot,item){
   storageStatus:item.ipfsUpload?.verified?'ipfs-pinned-ciphertext':item.demoUpload?'demo-simulated-not-uploaded':'not-uploaded',
   encryption:item.encryption?.sha256?(item.ipfsUpload?.verified?'AES-256-GCM / ybr-ipfs-pilot':item.demoUpload?'AES-256-GCM / demo-vault':'AES-256-GCM / local-exported'):(slot.visibility==='encrypted'?'required-before-upload':'none'),
   ciphertextDigest:item.encryption?.sha256?'0x'+item.encryption.sha256:null,demoReceipt:item.ipfsUpload?null:item.demoUpload?.receiptId||null},
-  cid:item.ipfsUpload?.verified?item.ipfsUpload.cid:null};
+  cid:item.ipfsUpload?.verified?item.ipfsUpload.cid:null,
+  ...(item.extracted?{extractedMetadata:{title:item.extracted.fields.title,technical:item.extracted.technical,source:item.extracted.parser,status:'unverified-file-metadata'}}:{})};
 }
 export function validateMintInput({metadata,assets,identity,royalties,cover={},linkedBricks=[]}){
  const errors=[];

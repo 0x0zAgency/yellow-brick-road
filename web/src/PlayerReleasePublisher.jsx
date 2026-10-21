@@ -9,7 +9,7 @@ export default function PlayerReleasePublisher({packet,mint,vault}){
  const work=useRef(null),revision=useRef(0),lock=useRef(false);
  const selected=playerReleaseFiles(packet);
  useEffect(()=>()=>{revision.current++;work.current?.abort();},[]);
- if(!selected.audio)return null;
+ if(!selected.audio)return <section className="pr-publish" aria-label="YBR Player preview required"><span className="eyebrow">YOUR RELEASE / YBR PLAYER</span><h3>Audio Preview required</h3><p>Attach a supported file in the Audio Preview slot to publish this release to the Player. The Master Recording stays private and is never used as a playback fallback.</p><button className="ms-primary" type="button" disabled>Add release to Player</button></section>;
  const share=async()=>{
   if(lock.current||!consent)return;
   lock.current=true;setBusy(true);setError('');
@@ -31,10 +31,10 @@ export default function PlayerReleasePublisher({packet,mint,vault}){
  return <section className="pr-publish" aria-label="Share this demo release with YBR Player">
   <span className="eyebrow">YOUR RELEASE / YBR PLAYER</span><h3>Hear it. See the cover. Follow the lyrics.</h3>
   <p>Use the files already attached to this release. The Player will show them alongside the Ganache library, with this release’s cover on every associated file card.</p>
-  <dl><dt>Audio</dt><dd>{selected.audio.name} {selected.audio.role==='preview'?'(preview)':'(master copy)'}</dd></dl>
+  <dl><dt>Audio</dt><dd>{selected.audio.name} (Audio Preview only)</dd></dl>
   <label><input type="checkbox" checked={artwork} disabled={busy||!!published||!selected.artwork} onChange={e=>setArtwork(e.target.checked)}/> Include cover artwork {selected.artwork?'· '+selected.artwork.name:'· not attached'}</label>
   <label><input type="checkbox" checked={lyrics} disabled={busy||!!published||!selected.lyrics} onChange={e=>setLyrics(e.target.checked)}/> Include lyrics {selected.lyrics?'· '+selected.lyrics.name:'· not attached'}</label>
-  <p className="pr-limits">Audio up to 32 MiB; PNG/JPEG/WebP cover up to 8 MiB; UTF-8 TXT or timed WebVTT lyrics up to 512 KiB. Project files and other originals are listed but not uploaded.</p>
+  <p className="pr-limits">Audio up to 32 MiB; PNG/JPEG/WebP cover up to 8 MiB; UTF-8 TXT or timed WebVTT lyrics up to 512 KiB. The Master Recording, project files and other originals are listed but never uploaded for playback.</p>
   {!published?<><label className="pr-consent"><input type="checkbox" checked={consent} disabled={busy} onChange={e=>setConsent(e.target.checked)}/> I have permission to share these selected copies and their release/file labels with everyone using this local demo Player.</label>
    <p className="pr-boundary">This saves unencrypted preview copies on your local YBR server. Recovery keys and private project files stay in the browser. This is not a public Road license or verified stream.</p>
    <button className="ms-primary" type="button" disabled={busy||!consent} onClick={()=>void share()}>{busy?'Adding release…':'Add release to Player'}</button></>:<div className="pr-success" role="status"><strong>Release is in your Player.</strong><p>The library refreshes automatically. Audio, cover and lyrics remain linked as one release.</p>
