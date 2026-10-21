@@ -34,17 +34,12 @@ async function main(args=process.argv.slice(2)){
   if(args.includes('--check-node')){
    console.log('[YBR] Runtime ready: '+process.version+' ('+process.execPath+')');return;
   }
-  if(args[0]==='--setup'){
-   const npm=process.platform==='win32'?'npm.cmd':'npm';
-   for(const cwd of [ROOT,path.join(ROOT,'web'),path.join(ROOT,'apps','ybr-player')]){
-    const code=await runChild(npm,['install'],{env:process.env,cwd});
-    if(code!==0){process.exitCode=code;return;}
-   }
-   return;
-  }
+  const setup=args[0]==='--setup';
+  await require('./dev-install-scripts.cjs').prepareInstallScripts({root:ROOT,run:runChild,setup});
+  if(setup)return;
   await require('./dev-stack.cjs').main();
  }catch(error){
-  console.error('[YBR] '+error.message);process.exitCode=1;
+  console.error('[YBR] '+error.message);process.exitCode=Number.isInteger(error.exitCode)&&error.exitCode>0?error.exitCode:1;
  }
 }
 if(require.main===module)void main();
