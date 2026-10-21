@@ -7,6 +7,7 @@ const {stripVTControlCharacters}=require('node:util');
 const {StringDecoder}=require('node:string_decoder');
 const crypto=require('node:crypto');
 const {renderDashboard,URLS}=require('./dev-screen.cjs');
+const {MnemonicEditor}=require('./dev-mnemonic-menu.cjs');
 const LOG_LIMIT=1024*1024;
 const clean=value=>stripVTControlCharacters(String(value??'')).replace(/[\t\r\n]+/g,' ').replace(/[\x00-\x1f\x7f]/g,'').replace(/[^\x20-\x7e]/g,'?');
 const clip=(text,width)=>{text=clean(text);return text.length<=width?text:text.slice(0,Math.max(0,width-3))+'...';};
@@ -20,8 +21,8 @@ function redact(text,secrets=[]){
  return clean(result);
 }
 class DevDashboard{
- constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{}}){
-  this.output=output;this.input=input;this.env=env;this.onQuit=onQuit;this.onRestartPlayer=onRestartPlayer;
+ constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null}){
+  this.output=output;this.input=input;this.env=env;this.onQuit=onQuit;this.onRestartPlayer=onRestartPlayer;this.mnemonicControl=mnemonicControl;
   this.interactive=!!(output.isTTY&&input.isTTY&&env.TERM!=='dumb'&&!env.CI&&env.YBR_DEV_PLAIN!=='1'&&!args.includes('--plain'));
   this.showSecrets=this.interactive&&env.YBR_DEV_HIDE_SECRETS!=='1';
   this.color=this.interactive&&env.NO_COLOR===undefined;this.motion=env.YBR_DEV_REDUCED_MOTION!=='1';
@@ -40,6 +41,19 @@ class DevDashboard{
   this.rotate();fs.closeSync(fs.openSync(this.logFile,fs.constants.O_CREAT|fs.constants.O_APPEND|fs.constants.O_WRONLY|(fs.constants.O_NOFOLLOW||0),0o600));fs.chmodSync(this.logFile,0o600);
   this.logBytes=fs.statSync(this.logFile).size;
   this.keyHandler=(_text,key={})=>{
+   if(this.mnemonicEditor){this.mnemonicEditor.handle(_text,key);return;}
+   if(key.name==='m'&&this.interactive){
+    try{
+     if(!this.mnemonicControl)throw Error('Mnemonic control is unavailable in this session.');
+     this.mnemonicControl.check();
+     this.state.restartConfirm=false;
+     this.mnemonicEditor=new MnemonicEditor({...this.mnemonicControl,current:this.mnemonicControl.current(),
+      onSecret:value=>this.addSecrets(value),
+      onChange:menu=>{this.state.mnemonicMenu=menu;if(!menu)this.mnemonicEditor=null;this.draw(true);}});
+     this.mnemonicEditor.publish();
+    }catch(error){this.state.error=redact(error.message,this.secrets);this.log('launcher',error.message);this.draw(true);}
+    return;
+   }
    if(key.name==='q'||key.ctrl&&key.name==='c'){this.onQuit();return;}
    if(key.name==='s')this.showSecrets=!this.showSecrets;
    if(key.name==='a')this.motion=!this.motion;
@@ -71,7 +85,7 @@ class DevDashboard{
    this.wasRaw=!!this.input.isRaw;this.wasFlowing=this.input.readableFlowing===true;
    readline.emitKeypressEvents(this.input);this.input.setRawMode(true);this.input.resume();
    this.input.on('keypress',this.keyHandler);this.output.on('resize',this.resizeHandler);
-   this.output.write('\x1b[?1049h\x1b[?25l\x1b[2J');
+   this.output.write('\x1b[?1049h\x1b[?25l\x1b[?2004h\x1b[2J');
    this.timer=setInterval(()=>this.draw(),180);this.timer.unref();this.draw();
   }else this.output.write('[YBR] Local dev dashboard: plain output; credentials are not printed to logs.\n');
  }
@@ -79,7 +93,7 @@ class DevDashboard{
   if(!this.interactive||this.closed||this.paused&&!force)return;
   this.state.now=Date.now();
   const lines=renderDashboard(this.state,{columns:this.output.columns||100,rows:this.output.rows||32,color:this.color,showSecrets:this.showSecrets,view:this.view,offset:this.offset,motion:this.motion});
-  if(this.paused)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
+  if(this.paused&&!this.state.mnemonicMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
   // Repaint only changed rows; passwords and wallet text do not flicker with FX.
   let output='';
   for(let i=0;i<Math.max(lines.length,this.lastFrame.length);i++){
@@ -135,10 +149,11 @@ class DevDashboard{
  }
  close(reason='Stopped'){
   if(this.closed)return;this.closed=true;clearInterval(this.timer);
+  if(this.mnemonicEditor){this.mnemonicEditor.value='';this.mnemonicEditor.candidate=null;this.mnemonicEditor=null;}this.state.mnemonicMenu=null;
   if(this.interactive){
    this.input.off('keypress',this.keyHandler);this.output.off('resize',this.resizeHandler);
    this.input.setRawMode(this.wasRaw);if(!this.wasFlowing)this.input.pause();
-   this.output.write('\x1b[?25h\x1b[?1049l');
+   this.output.write('\x1b[?2004l\x1b[?25h\x1b[?1049l');
   }
   this.output.write('[YBR] '+redact(reason,this.secrets)+'\n[YBR] Redacted logs: .road-local/dev-stack.log\n');
  }

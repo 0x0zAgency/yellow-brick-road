@@ -9,6 +9,7 @@ const path=require('node:path');
 const crypto=require('node:crypto');
 const {ethers}=require('ethers');
 const {discoverRegistry}=require('./road-registry');
+const {readSelection,profilePaths}=require('../../scripts/dev-ganache-profile.cjs');
 
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const IPID=/^0x[0-9a-fA-F]{64}$/;
@@ -38,9 +39,12 @@ function readFactoryAddress(repoRoot,env=process.env){
   if(!ADDRESS.test(env.YBR_GANACHE_FACTORY))throw Error('Invalid YBR_GANACHE_FACTORY');
   return env.YBR_GANACHE_FACTORY;
  }
- for(const file of ['.road-local/factory.json','.road-local/ganache-mint-receipts.json']){
+ const selection=readSelection(repoRoot,ethers);
+ const files=[profilePaths(repoRoot,selection).factory];
+ if(selection.kind==='default')files.push(path.join(repoRoot,'.road-local','ganache-mint-receipts.json'));
+ for(const file of files){
   try{
-   const data=JSON.parse(fs.readFileSync(path.join(repoRoot,file),'utf8'));
+   const data=JSON.parse(fs.readFileSync(file,'utf8'));
    if(data.chainId===1337&&ADDRESS.test(data.factoryAddress))return data.factoryAddress;
   }catch(e){if(e.code!=='ENOENT')throw e;}
  }
