@@ -24,3 +24,6 @@ test('factory receipt reader does not invent a deployment',()=>{
  const address=factoryFromFile();
  assert.ok(address===null||/^0x[a-f0-9]{40}$/i.test(address));
 });
+
+// Include IPFS lifecycle regressions in npm run test:dev-stack.
+require('./dev-ipfs.test.cjs');
