@@ -1,0 +1,31 @@
+name: Player release integration
+on:
+  push:
+    branches: ['feature/player-studio-releases']
+  pull_request:
+    paths:
+      - 'apps/ybr-player/**'
+      - 'web/src/**'
+      - 'web/tests/**'
+      - '.github/workflows/player-releases.yml'
+permissions:
+  contents: read
+jobs:
+  release-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Capture exact test inputs
+        run: git archive --format=tar HEAD > /tmp/player-release-source.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: player-release-test-inputs
+          path: /tmp/player-release-source.tar
+          retention-days: 1
+      - name: Install player test dependencies
+        run: npm install --prefix apps/ybr-player --no-package-lock --no-audit --no-fund
+      - name: Test player
+        run: npm test --prefix apps/ybr-player
