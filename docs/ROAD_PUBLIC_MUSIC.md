@@ -15,7 +15,11 @@ The YBR Player is a reference client for a common media access layer. Third-part
 
 We extend the existing `schemas/brick-metadata-v1.schema.json` with an **optional** `rights.playback` field. AI training terms remain independent. No new on-chain contract or competing provenance scheme is introduced.
 
-## Prerequisites and launch
+## Integrated local launch (recommended)
+
+From the repository root, run `npm run setup:dev` once and then `npm run dev` (or `cd web && npm run dev`). This boots Ganache, reuses or deploys the existing factory, starts YBR Player and the web app, and **automatically publishes only our original synthetic audio fixture** for end-to-end player tests. Open http://127.0.0.1:5173/road/api/music or http://127.0.0.1:4173. Use `YBR_STACK_NO_DEMO_MUSIC=1` to opt out of automatic fixture publication. Existing encrypted Mint Studio sources never become public. [Full instructions](INTEGRATED_DEV_STACK.md).
+
+## Manual launch (advanced)
 
 From the main repository root, using the **same Ganache instance** as `web/`:
 
