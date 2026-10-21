@@ -3,10 +3,18 @@ on:
   push:
     paths:
       - 'web/**'
+      - 'scripts/dev-stack.cjs'
+      - 'scripts/dev-stack.test.cjs'
+      - 'scripts/dev-stack-smoke.cjs'
+      - 'apps/ybr-player/**'
       - '.github/workflows/web.yml'
   pull_request:
     paths:
       - 'web/**'
+      - 'scripts/dev-stack.cjs'
+      - 'scripts/dev-stack.test.cjs'
+      - 'scripts/dev-stack-smoke.cjs'
+      - 'apps/ybr-player/**'
       - '.github/workflows/web.yml'
 jobs:
   web:
@@ -22,3 +30,27 @@ jobs:
         run: npm --prefix web test
       - name: Build Vite frontend
         run: npm --prefix web run build
+
+  integrated-road-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install integrated Road dependencies
+        run: |
+          npm install --no-package-lock --no-audit --no-fund
+          npm install --no-package-lock --no-audit --no-fund --prefix web
+          npm install --no-package-lock --no-audit --no-fund --prefix apps/ybr-player
+      - name: Test lifecycle and synthetic fixture
+        run: npm run test:dev-stack
+      - name: Start complete Road application and test both web and player
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/dev-stack.cjs > /tmp/ybr-integrated.log 2>&1 &
+          STACK_PID=$!
+          trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log' EXIT
+          node scripts/dev-stack-smoke.cjs
