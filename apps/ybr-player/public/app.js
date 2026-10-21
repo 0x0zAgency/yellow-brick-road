@@ -3,6 +3,7 @@ const $ = (id) => document.getElementById(id);
 const audio = $('audio');
 let bricks = [];
 let selected = null;
+let registryPartial = false;
 let toastTimeout;
 let currentMediaBrick = null;
 let signedIn = false, refreshing = false, librarySignature = '', lastRoadState = '';
@@ -43,12 +44,18 @@ function updateInspector(brick) {
   $('brickArtist').textContent=brick?.creator || 'Its metadata will appear here.';
   $('brickId').textContent=brick?.id || '—';
   $('copyId').disabled=!brick;
-  $('brickRights').textContent=brick?(brick.streamAllowed?'AUTHORIZED':'ACCESS RESTRICTED'):'—';
+  $('brickRights').textContent=brick?(brick.streamAllowed?'AUTHORIZED':brick.source==='road-registry'?'REGISTERED / NOT PUBLISHED':'ACCESS RESTRICTED'):'—';
   $('brickRights').className=brick?(brick.streamAllowed?'authorized':'denied'):'';
   $('brickFormat').textContent=brick?.media?.mimeType || '—';
-  $('brickHash').textContent=brick?.media?.sha256 ? brick.media.sha256.slice(0,13)+'…' : '—';
-  $('brickHash').title=brick?.media?.sha256 || 'SHA-256 hash';
+  const digest=brick?.media?.sha256||brick?.registration?.contentHash;
+  $('brickHash').textContent=digest?digest.slice(0,13)+'…':'—';
+  $('brickHash').title=digest||'SHA-256 commitment';
   $('brickProvenance').textContent=brick ? `${brick.provenance.agent} · ${brick.provenance.activity}. ${brick.rights.notes} SHA-256 binds this manifest to the original audio bytes.` : 'Select an audio brick to inspect its source and origin.';
+  if(brick?.source==='road-registry'){
+    const r=brick.registration;
+    $('brickFormat').textContent='Not published';
+    $('brickProvenance').textContent=`Registered on Ganache ${r.chainId}. Contract: ${r.brickAddress}. Metadata reference: ${r.metadataURI}. Registration does not publish files or grant playback. Use Add release to Player in Mint Studio to share selected preview copies.`;
+  }
   $('inspectorCover').classList.toggle('violet',brick?.theme==='violet');
   window.dispatchEvent(new CustomEvent('ybr:selection',{detail:{brick}}));
 }
@@ -62,10 +69,10 @@ function renderList() {
     const cover=document.createElement('span');cover.className=`track-thumbnail ${brick.theme==='violet'?'violet':'gold'}`;cover.textContent='◆';
     const info=document.createElement('div');info.className='track-info';
     const name=document.createElement('strong');name.textContent=brick.title;
-    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+(brick.source==='road'?'GANACHE · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
+    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+((brick.source==='road'||brick.source==='road-registry')?'GANACHE · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
     info.append(name,creator);
-    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
-    const duration=document.createElement('span');duration.className='track-duration';duration.textContent=stamp(brick.durationSeconds);
+    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road-registry'?'⌁ ON CHAIN':brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
+    const duration=document.createElement('span');duration.className='track-duration';duration.textContent=brick.source==='road-registry'?'—':stamp(brick.durationSeconds);
     const play=document.createElement('button');play.className='track-action';play.type='button';play.setAttribute('aria-label',`${brick.streamAllowed?'Play':'Inspect restricted'} ${brick.title}`);play.textContent=brick.streamAllowed?'▶':'⌁';
     const action=()=>choose(brick,true);
     play.addEventListener('click',(e)=>{e.stopPropagation();action();});
@@ -75,7 +82,7 @@ function renderList() {
     list.append(row);
   });
   window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks}}));
-  $('trackCount').textContent=`${bricks.length} audio bricks · ${bricks.filter(b=>b.source==='road').length} from Ganache`;
+  $('trackCount').textContent=`${bricks.length} library entries · ${bricks.filter(b=>b.registration||b.source==='road').length} on-chain · ${bricks.filter(b=>b.streamAllowed).length} playable${registryPartial?' · partial registry scan':''}`;
 }
 async function choose(brick, playNow=true) {
   if (!brick) return;
@@ -88,7 +95,7 @@ async function choose(brick, playNow=true) {
   $('elapsed').textContent='0:00';$('duration').textContent=stamp(brick.durationSeconds);$('seek').value=0;
   updateInspector(brick);renderList();updatePlayback();
   if (!playNow) return;
-  if (!brick.streamAllowed) {toast(`Access denied: ${brick.title} is not licensed to this account.`);return;}
+  if (!brick.streamAllowed) {toast(brick.source==='road-registry'?'This Brick is registered. Share a preview through Add release to Player in Mint Studio to enable local playback.':`Access denied: ${brick.title} is not licensed to this account.`);return;}
   try {
     const grant=await post(`/api/bricks/${encodeURIComponent(brick.id)}/authorize`);
     if (selected?.id!==brick.id) return;
@@ -116,11 +123,12 @@ async function refreshSession() {
   $('loginOverlay').hidden=true;
   $('signedInAs').textContent=`Signed in as ${session.user}`;
   const library=await request('/api/bricks');
-  const signature=JSON.stringify(library.bricks);
+  const signature=JSON.stringify([library.bricks,library.network,library.registry]);
+  registryPartial=!!(library.registry?.limited||library.registry?.limitReached);
   if(signature===librarySignature&&selected)return;
   librarySignature=signature;
   bricks=library.bricks;
-  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick)){audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;}
+  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick&&brick.streamAllowed)){audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;}
   const roadState=JSON.stringify(library.network);
   if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · local demo music remains available');
   lastRoadState=roadState;

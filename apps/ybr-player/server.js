@@ -6,6 +6,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { createStudioLibrary } = require('./studio-releases');
 const { createStudioHttp } = require('./studio-http');
+const { readPlayerCatalog } = require('./road-registry');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
@@ -183,6 +184,15 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       if (route === '/road/api/status' && req.method === 'GET') {
         return sendJson(res,200,await road.ready());
       }
+      // Registration visibility is independent of public playback eligibility.
+      if (route === '/road/api/registry' && req.method === 'GET') {
+        if(typeof road.registry!=='function')return fail(res,503,'Registry discovery is unavailable. Restart the updated local Player.');
+        try {
+          const catalog=await readPlayerCatalog(road);
+          if(!catalog.status.ready)return sendJson(res,503,{...catalog.registry,error:catalog.status.reason||'Registry is offline.'});
+          return sendJson(res,200,catalog.registry);
+        } catch { return fail(res,503,'Unable to verify the local registry. Check Ganache and the configured factory, then refresh.'); }
+      }
       if (route === '/road/api/music' && req.method === 'GET') {
         const catalog=await road.list();
         return sendJson(res,200,{network:catalog.status,tracks:catalog.tracks.map(({mediaPath,...item})=>({
@@ -207,18 +217,25 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       }
       if (route === '/api/bricks' && req.method === 'GET') {
         const s=requireSession(req,res); if (!s) return;
-        const catalog=await road.list();
-        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.2',
-          network:catalog.status,bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.tracks.map(({mediaPath,...b})=>b),studio.list())});
+        let catalog;
+        try { catalog=await readPlayerCatalog(road); }
+        catch { catalog={status:{ready:false,reason:'Registry verification failed. Check Ganache and refresh.'},bricks:[]}; }
+        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.3',
+          network:catalog.status,registry:catalog.registry?{matchingEvents:catalog.registry.matchingEvents,limitReached:catalog.registry.limitReached,limited:catalog.registry.limited}:null,
+          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,studio.list())});
       }
       const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
         const s=requireSession(req,res); if (!s) return;
-        const brick=bricks.get(brickRoute[1]) || studio.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
+        let brick=bricks.get(brickRoute[1]) || studio.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
+        if(!brick&&brickRoute[1].startsWith('0x')&&typeof road.registry==='function'){
+          const index=await road.registry();
+          brick=index.bricks.find(item=>item.id.toLowerCase()===brickRoute[1].toLowerCase());
+        }
         if (!brick) return fail(res,404,'Brick not found');
         const action=brickRoute[2];
         if (!action && req.method==='GET') {
-          if(brick.source==='studio-demo')return sendJson(res,200,brick);
+          if(brick.source==='studio-demo'||brick.source==='road-registry')return sendJson(res,200,brick);
           if(brick.source==='road'){const {mediaPath,...publicBrick}=brick;return sendJson(res,200,publicBrick);}
           return sendJson(res,200,exposeBrick(brick,s.user));
         }

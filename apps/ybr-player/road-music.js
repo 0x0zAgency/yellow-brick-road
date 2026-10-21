@@ -8,6 +8,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const crypto=require('node:crypto');
 const {ethers}=require('ethers');
+const {discoverRegistry}=require('./road-registry');
 
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const IPID=/^0x[0-9a-fA-F]{64}$/;
@@ -20,7 +21,8 @@ const FACTORY_ABI=[
 const BRICK_ABI=[
  'function ipId() view returns (bytes32)','function originator() view returns (address)',
  'function controller() view returns (address)','function contentHash() view returns (bytes32)',
- 'function metadataDigest() view returns (bytes32)','function metadataURI() view returns (string)'
+ 'function metadataDigest() view returns (bytes32)','function metadataURI() view returns (string)',
+ 'function metadataVersion() view returns (uint64)'
 ];
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const lower=s=>String(s).toLowerCase();
@@ -134,6 +136,21 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
   const {tracks}=await list();
   return tracks.find(t=>t.id===lower(ipId))||null;
  }
- return {ready,list,track,config:configuration};
+ async function registry(){
+  return discoverRegistry({status:{...await ready(),rpcUrl:rpc},
+   readHead:tag=>rpcProvider.getBlock(tag),
+   readEvents:(from,to)=>factory.queryFilter(factory.filters.BrickDeployed(),from,to),
+   readBrick:async(address,blockTag)=>{
+    const contract=new ethers.Contract(address,BRICK_ABI,rpcProvider);
+    const keys=['ipId','originator','controller','contentHash','metadataDigest','metadataVersion','metadataURI'];
+    const [code,registered,...values]=await Promise.all([
+     rpcProvider.getCode(address,blockTag),factory.isBrick(address,{blockTag}),
+     ...keys.map(key=>contract[key]({blockTag}))
+    ]);
+    return {code,registered,...Object.fromEntries(keys.map((key,i)=>[key,values[i]]))};
+   }
+  });
+ }
+ return {ready,list,track,registry,config:configuration};
 }
 module.exports={makeGateway,readFactoryAddress,loopbackUrl};

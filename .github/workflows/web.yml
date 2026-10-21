@@ -77,3 +77,4 @@ jobs:
           STACK_PID=$!
           trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; kill -TERM "$LEGACY_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log; rm -f /tmp/ybr-legacy-player.log' EXIT
           node scripts/dev-stack-smoke.cjs
+          node scripts/dev-registry-smoke.cjs
