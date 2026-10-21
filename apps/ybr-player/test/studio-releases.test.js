@@ -14,7 +14,7 @@ const lyrics=Buffer.from('This is a lyric.\n<script>notExecutable()</script>\n')
 function publication(){return {format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',title:'My uploaded release',creator:'Creator',album:'Demo album',description:'Preview',
  assets:{audio:encode(audio,'demo.wav','audio/wav'),artwork:encode(image,'cover.png','image/png'),lyrics:encode(lyrics,'lyrics.txt','text/plain')},
  files:[{role:'preview',name:'demo.wav',sharedAs:'audio'},{role:'artwork',name:'cover.png',sharedAs:'artwork'},{role:'lyrics',name:'lyrics.txt',sharedAs:'lyrics'},{role:'project',name:'private.flp'}],
- bricks:[{role:'Sound recording',title:'My uploaded release',address:'0x'+'1'.repeat(40)}],key:'DO-NOT-STORE-THIS-SECRET'};}
+ bricks:[{role:'Sound recording',title:'My uploaded release',address:null}],key:'DO-NOT-STORE-THIS-SECRET'};}
 function fixture(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-studio-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return {dir,library:createStudioLibrary({directory:dir})};}
 
 test('release stores only consented copies, preserves shared cover identity and deduplicates retries',t=>{

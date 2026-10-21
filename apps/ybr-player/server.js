@@ -129,7 +129,18 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
     if (!s) fail(res,401,'Sign in to access your YBR bricks');
     return s;
   }
-  const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange});
+  const checkPermission=async(record,role='audio')=>road.playerPolicy?road.playerPolicy.check(record,role):{allowed:!record?.authorization};
+  async function permittedStudio(idOrBrick){
+    const brick=typeof idOrBrick==='string'?studio.get(idOrBrick):idOrBrick;
+    if(!brick)return null;
+    const grant=await checkPermission(brick);
+    if(!grant.allowed)return null;
+    const result={...brick,policy:grant.onChain?grant:null};
+    if(brick.artwork&&!(await checkPermission(brick,'artwork')).allowed){result.artwork=null;result.files=brick.files.map(file=>({...file,artworkUrl:null}));}
+    if(brick.lyrics&&!(await checkPermission(brick,'lyrics')).allowed)result.lyrics=null;
+    return result;
+  }
+  const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange,checkPermission});
   const server = http.createServer(async (req, res) => {
     try {
       const origin = req.headers.origin;
@@ -222,12 +233,12 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         catch { catalog={status:{ready:false,reason:'Registry verification failed. Check Ganache and refresh.'},bricks:[]}; }
         return sendJson(res,200,{format:'ybr-player-demo-manifest/0.3',
           network:catalog.status,registry:catalog.registry?{matchingEvents:catalog.registry.matchingEvents,limitReached:catalog.registry.limitReached,limited:catalog.registry.limited}:null,
-          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,studio.list())});
+          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,(await Promise.all(studio.list().map(item=>permittedStudio(item)))).filter(Boolean))});
       }
       const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
         const s=requireSession(req,res); if (!s) return;
-        let brick=bricks.get(brickRoute[1]) || studio.get(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
+        let brick=bricks.get(brickRoute[1]) || await permittedStudio(brickRoute[1]) || (brickRoute[1].startsWith('0x')?await road.track(brickRoute[1]):null);
         if(!brick&&brickRoute[1].startsWith('0x')&&typeof road.registry==='function'){
           const index=await road.registry();
           brick=index.bricks.find(item=>item.id.toLowerCase()===brickRoute[1].toLowerCase());
@@ -247,7 +258,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         if (action==='media' && (req.method==='GET' || req.method==='HEAD')) {
           if(brick.source==='road')return streamAudio(req,res,brick);
           if (!canStream(brick,s.user) || !(s.grants.get(brick.id)>now())) return fail(res,403,'Playback authorization required');
-          if(brick.source==='studio-demo')return studioHttp.deliver(req,res,brick.id,'audio');
+          if(brick.source==='studio-demo')return await studioHttp.deliver(req,res,brick.id,'audio');
           const st=fs.statSync(brick.mediaPath);
           const range=parseRange(req.headers.range,st.size);
           if (!range) { res.writeHead(416,{'Content-Range':`bytes */${st.size}`,'Cache-Control':'no-store'});return res.end(); }
@@ -268,7 +279,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         const s=requireSession(req,res);if (!s)return;
         const body=await readJson(req);
         if (!['play','pause','ended'].includes(body.event) || typeof body.brickId!=='string' || !Number.isFinite(body.positionSeconds) || body.positionSeconds < 0 || body.positionSeconds>86400) return fail(res,400,'Invalid playback event');
-        const eventBrick=bricks.get(body.brickId)||studio.get(body.brickId)||(body.brickId.startsWith('0x')?await road.track(body.brickId):null);
+        const eventBrick=bricks.get(body.brickId)||await permittedStudio(body.brickId)||(body.brickId.startsWith('0x')?await road.track(body.brickId):null);
         if (!eventBrick || (eventBrick.source!=='road'&&!canStream(eventBrick,s.user)) || !(s.grants.get(body.brickId)>now())) return fail(res,403,'Playback authorization required');
         const entry={at:new Date(now()).toISOString(),kind:'client-reported-demo-event',user:s.user,brickId:body.brickId,event:body.event,positionSeconds:Math.round(body.positionSeconds*10)/10};
         fs.appendFileSync(eventFile,JSON.stringify(entry)+'\n','utf8');

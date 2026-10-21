@@ -6,6 +6,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const {normalizeAuthorization}=require('./player-policy');
 const { TextDecoder } = require('node:util');
 const MiB = 1024 * 1024;
 const LIMITS = Object.freeze({ audio: 32 * MiB, artwork: 8 * MiB, lyrics: 512 * 1024 });
@@ -67,7 +68,9 @@ function normalizePublication(body) {
   const references = Array.isArray(body.bricks) ? body.bricks.slice(0,64).map(item => ({ role: text(item?.role,'Brick role',100), title: text(item?.title || title,'Brick title'), address: /^0x[0-9a-fA-F]{40}$/.test(item?.address || '') ? item.address : null })) : [];
   if(body.credits!==undefined&&(!Array.isArray(body.credits)||body.credits.length>64))throw error('Invalid credit list.');
   const credits=(body.credits||[]).map(person=>({name:text(person?.name,'credit name'),role:text(person?.role,'credit role',80)}));
-  const metadata = { format:'ybr-studio-preview/1', audioSourceRole:'preview', title, creator, album, description, files, references, credits,
+  const authorization=normalizeAuthorization(body.authorization);
+  if(references.some(ref=>ref.address)&&!authorization)throw error('On-chain release references require verified Player permissions.');
+  const metadata = { ...(authorization?{authorization}:{}), format:'ybr-studio-preview/1', audioSourceRole:'preview', title, creator, album, description, files, references, credits,
     provenanceStatus:'local-creator-preview-not-chain-verified', assets:Object.fromEntries(Object.entries(decoded).map(([role,asset])=>[role,asset.info])) };
   const id = 'STUDIO-' + sha256(JSON.stringify(metadata));
   return { id, metadata:{...metadata,id}, decoded };
@@ -106,7 +109,7 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
   function describe(data) {
     const url = role => '/api/studio-releases/' + data.id + '/' + role;
     const artwork = data.assets.artwork ? {...data.assets.artwork,url:url('artwork')} : null;
-    return { id:data.id,type:'AudioBrick',source:'studio-demo',title:data.title,creator:data.creator,album:data.album,description:data.description,
+    return { authorization:data.authorization||null,assets:data.assets,id:data.id,type:'AudioBrick',source:'studio-demo',title:data.title,creator:data.creator,album:data.album,description:data.description,
       publishedAt:data.publishedAt,publishedAtSource:data.publishedAtSource||'local-publication',
       durationSeconds:0,theme:'gold',streamAllowed:true,media:{mimeType:data.assets.audio.mime,sha256:data.assets.audio.sha256},
       artwork,lyrics:data.assets.lyrics ? {...data.assets.lyrics,url:url('lyrics')} : null,

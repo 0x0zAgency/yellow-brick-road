@@ -52,7 +52,7 @@ jobs:
       - name: Test Player and browser release adapter
         run: |
           npm test --prefix apps/ybr-player
-          node --test web/tests/player-release.test.js web/tests/upload-metadata.test.js
+          node --test web/tests/player-release.test.js web/tests/upload-metadata.test.js web/tests/content-policy.test.js
           npm run build --prefix web
       - name: Install isolated Chromium test runner
         run: |

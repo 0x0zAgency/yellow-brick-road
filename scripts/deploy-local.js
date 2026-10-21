@@ -31,7 +31,7 @@ async function main(){
  if(receipt.status!==1)throw Error('Deployment failed');
  const nftContractAddress=await factory.receiptToken();
  const nft=await ethers.getContractAt('YellowBrickReceipt',nftContractAddress);
- const result={chainId,rpcUrl:url.href,factoryAddress:factory.address,nftContractAddress,receiptArtworkVersion:(await nft.artworkVersion()).toNumber(),transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber};
+ const result={contentPolicyVersion:Number(await factory.contentPolicyVersion()),chainId,rpcUrl:url.href,factoryAddress:factory.address,nftContractAddress,receiptArtworkVersion:(await nft.artworkVersion()).toNumber(),transactionHash:receipt.transactionHash,blockNumber:receipt.blockNumber};
  fs.writeFileSync(current,JSON.stringify(result,null,2)+'\n',{mode:0o600});
  console.log(JSON.stringify(result,null,2));
 }

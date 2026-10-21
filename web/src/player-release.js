@@ -1,3 +1,4 @@
+import {permissionForFile} from './content-policy.js';
 /** Mint Studio -> local reference Player adapter, not a new rights standard.
  * Only selected preview copies leave the browser, after explicit consent.
  * Never serialize the vault, recovery key, private packet, or encrypted source.
@@ -32,16 +33,29 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
  if(consent!==true)throw Error('Confirm sharing selected preview copies with the local Player.');
  if(!packet?.bricks?.length||!mint||(mint.simulated!==true&&mint.status!=='confirmed'))throw Error('Finish the demo or test-chain mint before sharing a preview.');
  const selection=playerReleaseFiles(packet);
+ if(!permissionForFile(packet,'preview'))throw Error('Audio Preview playback was disabled in the pre-mint permissions. Update the Brick permissions before publishing.');
  if(!selection.audio)throw Error('Attach a supported Audio Preview (MP3, WAV, OGG, FLAC, M4A, WEBM or AAC). The Master Recording is never used for Player playback.');
  if(!vault?.secret||!vault.encrypted?.get)throw Error('This browser session no longer has the encrypted uploads. Reattach the originals in Mint Studio.');
  const picked={audio:selection.audio};
- if(includeArtwork&&selection.artwork)picked.artwork=selection.artwork;
- if(includeLyrics&&selection.lyrics)picked.lyrics=selection.lyrics;
+ if(includeArtwork&&selection.artwork&&permissionForFile(packet,'artwork'))picked.artwork=selection.artwork;
+ if(includeLyrics&&selection.lyrics&&permissionForFile(packet,'lyrics'))picked.lyrics=selection.lyrics;
  // Validate every selection before decrypting any file.
  for(const [role,file] of Object.entries(picked)){
   if(!mimeFor(file,role))throw Error(role==='artwork'?'Player covers support PNG, JPEG or WebP.':'Player lyrics support UTF-8 .txt or WebVTT .vtt.');
   if(!Number.isSafeInteger(file.byteLength)||file.byteLength<1||file.byteLength>LIMITS[role])throw Error(role+' exceeds the local preview limit. Audio: 32 MiB; cover: 8 MiB; lyrics: 512 KiB.');
   if(!/^0x[0-9a-f]{64}$/i.test(file.integrity?.digest||''))throw Error('The selected '+role+' has no original-file checksum.');
+ }
+ let authorization=null;
+ if(mint.simulated!==true){
+  if(mint.chainId!==1337||!/^0x[0-9a-f]{64}$/i.test(mint.genesisHash||''))throw Error('The local Player requires Ganache policy-enabled mint receipts. Legacy mints need a policy-enabled registration; Sepolia delivery is not configured.');
+  const sources={};
+  for(const [role,file] of Object.entries(picked)){
+   const owner=packet.bricks.find(brick=>brick.metadata.media?.some(item=>item.role===file.role));
+   const receipt=mint.receipts?.find(item=>item.sourceId===owner?.localId);
+   if(!receipt?.contentPolicy||receipt.status!=='verified')throw Error('This Brick has no verified Player permission. Do not substitute a local consent checkbox for an on-chain grant.');
+   sources[role]={brickAddress:receipt.contractAddress,controller:receipt.contentPolicy.controller,revision:receipt.contentPolicy.revision};
+  }
+  authorization={format:'ybr-player-onchain/v1',chainId:mint.chainId,factoryAddress:mint.factoryAddress,genesisHash:mint.genesisHash,sources};
  }
  const assets={};
  for(const [role,file] of Object.entries(picked)){
@@ -57,7 +71,7 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
  const primary=packet.bricks.find(brick=>brick.localId==='master')||packet.bricks[0];
  const metadata=primary.metadata;
  return {format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',
-  title:metadata.title,creator:metadata.creators?.[0]?.name||'Creator',album:metadata.music?.release||'',description:(metadata.description||'').slice(0,2000),assets,
+  authorization,title:metadata.title,creator:metadata.creators?.[0]?.name||'Creator',album:metadata.music?.release||'',description:(metadata.description||'').slice(0,2000),assets,
   files:selection.files.map(file=>({role:file.role,name:file.name,sharedAs:Object.entries(picked).find(([,selected])=>selected.role===file.role)?.[0]||null})),
   credits:[...new Map(packet.bricks.flatMap(brick=>(brick.metadata.creators||[]).map(person=>({name:person.name,role:person.role||'creator'}))).map(person=>[person.name+'|'+person.role,person])).values()],
   bricks:packet.bricks.map(brick=>({role:brick.role,title:brick.metadata.title,address:mint.receipts?.find(receipt=>receipt.sourceId===brick.localId)?.contractAddress||null}))};
