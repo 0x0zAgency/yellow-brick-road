@@ -55,14 +55,28 @@ jobs:
           npm --prefix web run dev -- --check-node
       - name: Pull Kubo image before timing stack readiness
         run: docker compose -f infra/ipfs/compose.yaml pull kubo
-      - name: Start complete Road application and test web, player and IPFS
+      - name: Repair legacy Player automatically and test the complete Road stack
         shell: bash
         env:
           YBR_LISTENER_PASSWORD: ci-listener-demo-only
           YBR_ARTIST_PASSWORD: ci-artist-demo-only
+          YBR_TEST_EXPECT_LEGACY_PLAYER: '1'
         run: |
           set -euo pipefail
+          command -v lsof
+          # Reproduce an older standalone Player with unknown passwords and no factory.
+          # Its output contains disposable credentials: never print that file.
+          (cd apps/ybr-player && exec env YBR_LISTENER_PASSWORD=legacy-listener-only YBR_ARTIST_PASSWORD=legacy-artist-only node server.js) > /tmp/ybr-legacy-player.log 2>&1 &
+          LEGACY_PID=$!
+          trap 'kill -TERM "$LEGACY_PID" 2>/dev/null || true; rm -f /tmp/ybr-legacy-player.log' EXIT
+          READY=0
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/api/session > /dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          test "$READY" = 1
+          # No --restart-player flag: the default launch must repair it.
           node scripts/dev.cjs > /tmp/ybr-integrated.log 2>&1 &
           STACK_PID=$!
-          trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log' EXIT
+          trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; kill -TERM "$LEGACY_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log; rm -f /tmp/ybr-legacy-player.log' EXIT
           node scripts/dev-stack-smoke.cjs

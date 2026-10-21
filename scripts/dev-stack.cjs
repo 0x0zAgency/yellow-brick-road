@@ -9,6 +9,7 @@ const {ethers}=require('ethers');
 const crypto=require('node:crypto');
 const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
 const {DevDashboard}=require('./dev-dashboard.cjs');
+const {ensurePlayerSession,ensureDemoPublished,verifyDemoPlayback,DEMO_TITLE,DEMO_ARTIST}=require('./dev-player-ready.cjs');
 const {selectPlayerAccess,verifyPlayerAccess,restartCheckoutPlayer}=require('./dev-player-access.cjs');
 const ROOT=path.resolve(__dirname,'..');
 const PLAYER=path.join(ROOT,'apps','ybr-player');
@@ -102,44 +103,30 @@ async function ensureFactory(){
  const deployed=factoryFromFile();if(!(await validateFactory(provider,deployed)))throw Error('Deployed factory could not be verified.');return deployed;
 }
 async function ensureDemoTrack(factoryAddress,env){
- if(process.env.YBR_STACK_NO_DEMO_MUSIC==='1'){log('Automatic synthetic fixture publication skipped (YBR_STACK_NO_DEMO_MUSIC=1).');return;}
- await run('Generate first-party synthetic demo audio',process.execPath,[path.join(PLAYER,'scripts','generate-demo-audio.js')],{cwd:PLAYER,env});
- const {makeGateway}=require('../apps/ybr-player/road-music');const gateway=makeGateway({factoryAddress});const catalog=await gateway.list(),hash=fixtureDigest();
- if(catalog.tracks.some(t=>t.creator==='The Amber Sessions'&&t.title==='Golden Hour — Road Release'&&t.media.sha256===hash)){log('Reusing already published synthetic Road audio Brick.');return;}
- log('Publishing our generated Golden Hour fixture to Ganache (not private user media)...');
- await run('Publish original demo music',process.execPath,[path.join(PLAYER,'scripts','publish-road-track.js'),'--publish','--file',path.join(PLAYER,'media','golden-hour.wav'),'--title','Golden Hour — Road Release','--artist','The Amber Sessions'],{cwd:PLAYER,env});
+ const {makeGateway}=require('../apps/ybr-player/road-music');
+ const gateway=makeGateway({factoryAddress});
+ return ensureDemoPublished({skip:env.YBR_STACK_NO_DEMO_MUSIC==='1'},{
+  generate:()=>run('Generate first-party synthetic demo audio',process.execPath,[path.join(PLAYER,'scripts','generate-demo-audio.js')],{cwd:PLAYER,env}),
+  list:()=>gateway.list(),digest:fixtureDigest,log,
+  publish:()=>run('Publish original demo music',process.execPath,[path.join(PLAYER,'scripts','publish-road-track.js'),'--publish','--file',path.join(PLAYER,'media','golden-hour.wav'),'--title',DEMO_TITLE,'--artist',DEMO_ARTIST],{cwd:PLAYER,env})
+ });
 }
 async function ensurePlayer(factoryAddress,env,{restart=false}={}){
- let previous=await fetchJson(PLAYER_URL+'/road/api/status');
- if(previous&&restart){
-  log('Restarting only the verified local Player in this checkout; active Player sessions will reset.');
-  dashboard?.update({access:{source:'starting',verified:false}});
-  await restartCheckoutPlayer(ROOT);previous=null;
- }
- if(previous){
-  if(previous.ready!==true||previous.chainId!==1337||String(previous.factoryAddress).toLowerCase()!==factoryAddress.toLowerCase())throw Error('Port 4173 has another Player using a different or unhealthy factory. Run npm run dev -- --restart-player to restart only this checkout\'s Player.');
-  const known=selectPlayerAccess(ROOT,env,{generate:false});
-  if(known)dashboard?.addSecrets(known.listener,known.artist);
-  const verified=!!known&&await verifyPlayerAccess(known);
-  if(verified){
-   dashboard?.update({access:{...known,source:'reused',verified:true}});
-   log('Reusing YBR Player with both logins verified in this terminal.');
-  }else{
-   dashboard?.update({access:{source:'reused',verified:false,notice:'Legacy Player has no matching saved logins. Press r twice here to restart it, or launch with --restart-player.'}});
-   log('Legacy Player credentials are not available. Press r twice to restart this checkout\'s Player here.');
+ return ensurePlayerSession({factoryAddress,restart},{
+  status:()=>fetchJson(PLAYER_URL+'/road/api/status'),
+  access:options=>selectPlayerAccess(ROOT,env,options),
+  verify:verifyPlayerAccess,
+  restartLocal:()=>restartCheckoutPlayer(ROOT),
+  onAccess:access=>dashboard?.update({access}),
+  onSecrets:credentials=>dashboard?.addSecrets(credentials.listener,credentials.artist),log,
+  start:async credentials=>{
+   const childEnv={...env,HOST:'127.0.0.1',PORT:'4173',YBR_LISTENER_PASSWORD:credentials.listener,YBR_ARTIST_PASSWORD:credentials.artist};
+   log('Starting YBR Player on '+PLAYER_URL);
+   const proc=spawnOwned('YBR Player',command(),['run','start'],{cwd:PLAYER,env:childEnv});
+   proc.on('error',e=>shutdown('Player startup error: '+e.message,1));
+   await waitUntil('YBR Player',async()=>{const status=await fetchJson(PLAYER_URL+'/road/api/status');return status?.ready===true&&status.chainId===1337&&status.factoryAddress?.toLowerCase()===factoryAddress.toLowerCase();},{timeoutMs:30000});
   }
-  return {source:'reused',verified};
- }
- const credentials=selectPlayerAccess(ROOT,env);
- dashboard?.addSecrets(credentials.listener,credentials.artist);
- env={...env,HOST:'127.0.0.1',PORT:'4173',YBR_LISTENER_PASSWORD:credentials.listener,YBR_ARTIST_PASSWORD:credentials.artist};
- log('Starting YBR Player on '+PLAYER_URL);
- const proc=spawnOwned('YBR Player',command(),['run','start'],{cwd:PLAYER,env});
- proc.on('error',e=>shutdown('Player startup error: '+e.message,1));
- await waitUntil('YBR Player',async()=>{const status=await fetchJson(PLAYER_URL+'/road/api/status');return status?.ready===true&&status?.factoryAddress?.toLowerCase()===factoryAddress.toLowerCase();},{timeoutMs:30000});
- if(!(await verifyPlayerAccess(credentials)))throw Error('Player started, but its configured logins could not be verified. Credentials were not displayed.');
- dashboard?.update({access:{...credentials,source:'owned',verified:true}});
- return {source:'owned',verified:true};
+ });
 }
 async function restartPlayerHere(){
  if(stopping||playerBusy||!playerEnv){log('Player startup is still in progress.');return;}
@@ -175,7 +162,7 @@ async function refreshHealth(){
   dashboard.service('player',player?.ready===true&&player?.factoryAddress?.toLowerCase()===dashboard.state.factory.toLowerCase()?'UP':'DOWN');
   dashboard.service('ipfs',ipfs.ready?'UP':'DOWN');dashboard.service('web',web?'UP':'DOWN');
   if(ganache.online)await refreshWallet(dashboard.state.ganache.source);if(stopping)return;
-  dashboard.update({phase:Object.values(dashboard.state.services).every(s=>s==='UP')?'READY':'DEGRADED'});
+  dashboard.update({phase:Object.values(dashboard.state.services).every(s=>s==='UP')&&dashboard.state.access.verified===true&&['VERIFIED','SKIPPED'].includes(dashboard.state.music?.state)?'READY':'DEGRADED'});
  }catch(error){if(!stopping)log('Health refresh: '+error.message);}finally{healthBusy=false;}
 }
 async function main(){
@@ -191,10 +178,14 @@ async function main(){
   dashboard.service('ipfs','UP');dashboard.update({peerId:ipfs.peerId,phase:'STARTING GANACHE'});dashboard.service('ganache','START');
   const source=await ensureGanache();dashboard.service('ganache','UP');await refreshWallet(source);
   dashboard.update({phase:'VERIFYING FACTORY'});const factory=await ensureFactory();dashboard.update({factory,phase:'PREPARING DEMO MUSIC'});
-  const env={...process.env,YBR_GANACHE_FACTORY:factory,VITE_ROAD_GANACHE_FACTORY:factory};await ensureDemoTrack(factory,env);
+  const env={...process.env,YBR_GANACHE_FACTORY:factory,VITE_ROAD_GANACHE_FACTORY:factory};
+  const demo=await ensureDemoTrack(factory,env);dashboard.update({music:demo});
   dashboard.update({phase:'STARTING PLAYER'});dashboard.service('player','START');playerBusy=true;
   await ensurePlayer(factory,env,{restart:process.argv.includes('--restart-player')});playerBusy=false;playerEnv=env;
-  dashboard.service('player','UP');dashboard.update({phase:'STARTING EXPLORER'});dashboard.service('web','START');await launchWeb(env);if(stopping)return;
+  dashboard.service('player','UP');dashboard.update({phase:'VERIFYING TEST PLAYBACK'});
+  const music=await verifyDemoPlayback(demo);dashboard.update({music});
+  if(music.state==='VERIFIED')log('TEST MUSIC VERIFIED: Golden Hour is registered on Ganache and playable in YBR Player.');
+  dashboard.update({phase:'STARTING EXPLORER'});dashboard.service('web','START');await launchWeb(env);if(stopping)return;
   dashboard.service('web','UP');
   const proxied=await fetchJson(WEB_URL+'/api/road-ipfs/health',{timeout:6500});
   if(proxied?.ok!==true||proxied.peerId!==ipfs.peerId)throw Error('Mint Studio IPFS proxy did not reach the expected healthy Kubo node.');
@@ -206,4 +197,4 @@ async function main(){
  }catch(e){log(e.message);shutdown('Integrated launch failed: '+e.message,1);}
 }
 if(require.main===module)void main();
-module.exports={main,ensurePlayer,probeGanache,waitUntil,factoryFromFile,validateFactory,fixtureDigest};
+module.exports={main,ensurePlayer,ensureDemoTrack,probeGanache,waitUntil,factoryFromFile,validateFactory,fixtureDigest};

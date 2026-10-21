@@ -3,7 +3,8 @@
 Run `npm run dev` from the repository root or `web/` with Docker running.
 The local control screen has an ASCII YBR masthead, gold/cyan/magenta frames,
 an animated brick chase, real service health, and stationary credential panels.
-The brick animation is decorative, not network activity or throughput telemetry.
+The tagline is **FOLLOW THE YELLOW BRICK ROAD**. The brick animation is decorative,
+not network activity or throughput telemetry.
 
 ## Node 24, automatically
 
@@ -30,42 +31,68 @@ npm run dev -- --check-node
 
 ## Logins in this terminal
 
-The `listener` and `artist` passwords are generated once and stored in
-`.road-local/player-access.json`, inside the existing git-ignored directory.
-The directory is owner-only (700) and the file owner-only (600) on POSIX systems.
-The file contains Player demonstration credentials, **not Ganache seeds or IPFS
-recovery keys**. It is local plaintext: do not commit or share it, and do not use
-production credentials here. Windows ACLs are not hardened by these POSIX modes.
-Environment overrides YBR_LISTENER_PASSWORD and YBR_ARTIST_PASSWORD still work.
+The **YBR PLAYER LOGIN** panel sits above the service panels, with separate
+`Username` and `Password` rows for `listener` and `artist`. Both accounts are
+verified against the running Player before their passwords are displayed.
 
-The new `npm start` entrypoint for the Player uses the same file. A launcher that
-reuses that Player checks both credentials through the existing login endpoint,
-logs the short-lived test sessions out, then displays the verified credentials.
-There is no password-discovery HTTP endpoint and no password guessing.
+Passwords are generated once and stored in `.road-local/player-access.json`,
+inside the existing git-ignored directory. The directory is owner-only (700) and
+the file owner-only (600) on POSIX systems. The file contains Player demonstration
+credentials, **not Ganache seeds or IPFS recovery keys**. It is local plaintext:
+do not commit or share it, and do not use production credentials here. Windows
+ACLs are not hardened by these POSIX modes. Environment overrides
+YBR_LISTENER_PASSWORD and YBR_ARTIST_PASSWORD still work.
 
-### One-time migration from an older running Player
+The Player's `npm start` entrypoint uses the same file. A launcher that reuses
+that Player checks both credentials through the existing login endpoint and
+logs the short-lived verification sessions out. There is no password-discovery
+HTTP endpoint and no password guessing.
 
-A Player started by the old version has random credentials that cannot be
-recovered from its API. Replace it once from this terminal:
+### Automatic repair of an older running Player
 
-```sh
-npm run dev -- --restart-player
-```
+No special flag is needed for the normal startup path. When an existing Player
+has unknown or mismatched passwords, an unhealthy factory, or a stale factory,
+`npm run dev` automatically attempts a guarded restart and launches it with
+known local credentials. It no longer reports READY with unavailable logins.
+A healthy Player with verified credentials is reused without a restart.
 
-Or press **r twice** inside the dashboard (Escape cancels). This resets Player
-sessions, not IPFS pins or Ganache. Before sending SIGTERM the launcher verifies
-with lsof/ps that port 4173 belongs to the current user, the exact checkout's
-Player working directory, and the expected Node script. It refuses foreign or
-ambiguous processes and never uses SIGKILL. macOS/Linux need lsof for this
-one-time operation. A Player already managed by this launcher is not restarted:
+Before sending SIGTERM, lsof/ps must establish the current user, this exact
+checkout's Player working directory, and an expected Node script. Foreign or
+ambiguous processes are not stopped, and SIGKILL is never used. A refused repair
+or failed login check stops startup with an error instead of displaying guessed
+passwords. macOS/Linux require lsof for this repair. On Windows an older Player
+must be stopped manually once.
+
+Repair resets Player sessions, not IPFS pins or Ganache. The explicit override
+`npm run dev -- --restart-player` and **r twice** (Escape cancels) remain available.
+A Player already managed by this launcher is not restarted through the r key:
 its verified passwords are already available with s.
+
+## Automatic Ganache test music
+
+Default startup generates only the existing first-party synthetic audio fixture,
+registers **Golden Hour — Road Release** by **The Amber Sessions** on local Ganache
+when missing, and reuses the matching registered Brick on subsequent launches.
+User media and encrypted IPFS originals are never automatically published.
+
+The launcher re-reads the registered catalog after publication. After starting
+or reusing the Player, it checks the Player's catalog and fetches the fixture's
+actual playback bytes through a fixed loopback route. The returned SHA-256 must
+match the generated fixture before startup continues. `Test music: Golden Hour /
+PLAYBACK VERIFIED` records this startup check. It is not a live throughput meter.
+The details view includes the test Brick ID and its playback URL.
+
+`YBR_STACK_NO_DEMO_MUSIC=1` remains an explicit opt-out and displays SKIPPED, never
+PLAYBACK VERIFIED. Registration, catalog, or audio-integrity failures otherwise
+stop startup. The test fixture does not require an extra publish command.
 
 ## Screen and keys
 
 The main view fits 80x24, with side-by-side service and Ganache panels at wider
 widths. Long password overrides are abbreviated on the home screen; d shows the
 complete values. Control/non-ASCII passwords are labeled rather than rendered
-misleadingly. Smaller windows fall back to service status without credentials.
+misleadingly. Short windows of at least 61 columns and 15 rows keep the login
+panel in a compact view. Smaller windows show status without credentials.
 
 | Key | Action |
 | --- | --- |
@@ -97,15 +124,18 @@ redaction, not a general-purpose secret detector. Player credentials are visible
 on the interactive screen unless hidden; hide them before screen sharing.
 
 Pipes, CI, TERM=dumb, or `npm run dev -- --plain` use plain output without printing
-credentials. Kubo, its volumes, and pre-existing services remain running when
-the launcher exits. `npm run ipfs:down` stops Kubo without deleting the volume.
-Never use `down -v` to preserve pins. No encryption or licensing behavior changed.
+credentials. Kubo and its volumes remain running when the launcher exits.
+Reused healthy services are left alone; Players replaced during repair are now
+launcher-owned and stop with it. `npm run ipfs:down` stops Kubo without deleting
+the volume. Never use `down -v` to preserve pins. No encryption or licensing
+behavior changed.
 
 ## Tests
 
-`npm run test:dev-stack` covers the launcher, IPFS, dashboard, nvm bootstrap,
-credential persistence/permissions, verified reuse and guarded Player restart.
-The nvm shell tests use controlled fixtures, not live downloads. The integrated
-GitHub job runs the real stack on Node 24, authenticates both Player accounts,
-checks stored credentials and reuse, and verifies log redaction. Terminal
-animation and restoration are tested independently from Docker startup.
+`npm run test:dev-stack` includes Player startup postconditions, registration
+idempotency, playback integrity, and exact-tagline/layout regressions. The
+existing nvm tests use controlled fixtures, not live downloads. The integrated
+GitHub job starts an older standalone Player first, then uses the default dev
+command without a restart flag. It verifies guarded automatic repair, both real
+logins, credential permissions, playback, repeated publication without duplicate
+Bricks, and log redaction on Node 24 with real Kubo/Ganache/Player/Vite.
