@@ -282,10 +282,17 @@ rejected or a transaction times out. A pending transaction may still be mined;
 inspect its hash before starting another work. Confirmed transactions cannot be
 undone by canceling later signatures. The studio does not automatically retry a
 partial batch. Receipt evidence and exact committed metadata bytes remain in
-memory until you export them; refreshing loses the session and encrypted files.
+memory until you export them; refreshing loses the session and in-memory encrypted
+copies. Ciphertext already pinned to IPFS survives independently.
 
-Uploads and download authorization remain simulated. `road-local://sha256/…` is
-a local metadata commitment, not a remotely retrievable storage URI. A composition
+Mint Studio can optionally pin browser-encrypted originals and metadata to a
+local Kubo node. The **Recover files** screen imports a private recovery backup,
+retrieves pinned ciphertext, and verifies/decrypts it in the browser. **My Bricks**
+can additionally compare recovered metadata with the digest read from the selected
+contract. See the [encrypted IPFS pilot and recovery guide](docs/IPFS_YBR_STORAGE_PILOT.md).
+Without the opt-in IPFS path, uploads remain simulated. Remote delivery entitlements
+and license-based decryption are not implemented. `road-local://sha256/…` is a local
+metadata commitment, not a remotely retrievable storage URI. A composition
 without a separate source file uses its exact metadata digest as its content hash;
 it does not claim to hash a composition source recording. The contextual Building,
 license quotes and payout proposals remain off-chain. Registration does not prove
@@ -317,7 +324,8 @@ approved transaction uses Sepolia test ETH for gas. There is no automatic public
 factory deployment, funding, or mainnet support.
 
 Changing the account or network invalidates an open confirmation review. With no
-wallet connected, continuing starts the simulation again. Encrypted files and
-metadata remain local in both modes. Integration tests exercise both network paths
+wallet connected, continuing starts the simulation again. Plaintext files, metadata
+and decryption keys stay in the browser in both modes; the optional IPFS path
+publishes only their encrypted containers. Integration tests exercise both network paths
 using disposable local chains, including one configured with Sepolia's chain ID;
 they do not spend funds on public Sepolia.

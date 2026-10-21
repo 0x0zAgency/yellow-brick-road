@@ -4,7 +4,7 @@ const CID_RE=/^(?:bafy|bafk|baga|Qm)[a-zA-Z0-9]{20,120}$/;
 const SHA_RE=/^[0-9a-f]{64}$/i;
 export const IPFS_UPLOAD_PATH='/api/road-ipfs/upload';
 export const IPFS_HEALTH_PATH='/api/road-ipfs/health';
-export function validCid(cid){return typeof cid==='string'&&CID_RE.test(cid)}
+export function validCid(cid){return typeof cid==='string'&&cid===cid.trim()&&CID_RE.test(cid)}
 export function validateUploadReceipt(receipt,expectedDigest,expectedLength){
  if(!receipt||!validCid(receipt.cid))throw Error('IPFS did not return a valid CID.');
  if(!SHA_RE.test(expectedDigest||''))throw Error('Encrypted file digest is missing.');
@@ -40,10 +40,15 @@ export async function pinEncryptedBrickMetadata({packet,secret,onProgress=()=>{}
  for(let i=0;i<packet.bricks.length;i++){
   const brick=packet.bricks[i];
   onProgress('Pinning encrypted Brick metadata '+(i+1)+' / '+packet.bricks.length+'…');
-  const encrypted=await encryptAsset(new TextEncoder().encode(JSON.stringify(brick.metadata)),secret,
+  // Preserve the exact bytes committed by chain-mint.js (JSON.stringify order).
+  const plaintext=new TextEncoder().encode(JSON.stringify(brick.metadata));
+  const metadataDigest=await globalThis.crypto.subtle.digest('SHA-256',plaintext);
+  const plaintextSha256=[...new Uint8Array(metadataDigest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+  const encrypted=await encryptAsset(plaintext,secret,
    {name:'brick-metadata',mime:'application/octet-stream'});
   const pinned=await uploadEncryptedAsset({entry:{bytes:encrypted.bytes,ciphertextSha256:encrypted.sha256},fetchImpl});
-  bricks.push({...brick,metadataCipherCid:pinned.cid});
+  bricks.push({...brick,metadataCipherCid:pinned.cid,metadataCipherSha256:pinned.sha256,
+   metadataCipherSize:pinned.size,metadataPlaintextSha256:plaintextSha256,metadataPlaintextSize:plaintext.byteLength});
  }
  return {...packet,bricks,
   storage:{...packet.storage,mode:'ipfs-encrypted-pinned',uploaded:true,encrypted:true,

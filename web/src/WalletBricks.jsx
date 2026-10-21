@@ -1,5 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import CopyField from './CopyField.jsx';
+import IpfsRecovery from './IpfsRecovery.jsx';
+import {validCid} from './ipfs-upload.js';
 import {BrickOwnerApprovals} from './BrickLinkApprovals.jsx';
 import {createPublicClient,custom,defineChain,isAddress} from 'viem';
 import {MINT_NETWORKS} from './road-chain.js';
@@ -13,6 +15,7 @@ const envFactory=id=>id===1337?import.meta.env.VITE_ROAD_GANACHE_FACTORY||'':id=
 export default function WalletBricks({wallet,onConnect}){
  const [chainId,setChainId]=useState(null),[factory,setFactory]=useState(''),[startBlock,setStartBlock]=useState('');
  const [result,setResult]=useState(null),[busy,setBusy]=useState(false),[progress,setProgress]=useState(null),[error,setError]=useState('');
+ const [recoveryAddress,setRecoveryAddress]=useState(null);
  const requestId=useRef(0);
  const network=networkFor(chainId);
  useEffect(()=>{
@@ -26,20 +29,20 @@ export default function WalletBricks({wallet,onConnect}){
  },[]);
  useEffect(()=>{
   requestId.current++;
-  setResult(null);setError('');setProgress(null);setBusy(false);
+  setResult(null);setError('');setProgress(null);setBusy(false);setRecoveryAddress(null);
   if(!chainId){setFactory('');return;}
   let saved='';
   try{saved=localStorage.getItem(factoryStorageKey(chainId))||''}catch{}
   setFactory(saved||envFactory(chainId));
  },[wallet,chainId]);
- const reset=()=>{requestId.current++;setResult(null);setProgress(null);setError('');setBusy(false)};
+ const reset=()=>{requestId.current++;setResult(null);setProgress(null);setError('');setBusy(false);setRecoveryAddress(null)};
  const run=async()=>{
   if(!wallet||!network){setError('Connect your wallet and select the chain where your factory was deployed.');return;}
   if(!isAddress(factory)){setError('Enter a valid deployed YellowBrickFactory contract address.');return;}
   const provider=window.ethereum;
   if(!provider?.request){setError('An EIP-1193 browser wallet is required.');return;}
   const id=++requestId.current;
-  setBusy(true);setResult(null);setError('');setProgress(null);
+  setBusy(true);setResult(null);setError('');setProgress(null);setRecoveryAddress(null);
   try{
    const actual=Number(BigInt(await provider.request({method:'eth_chainId'})));
    if(actual!==chainId)throw Error('Wallet network changed. Refresh the viewer.');
@@ -87,10 +90,12 @@ export default function WalletBricks({wallet,onConnect}){
       <div><dt>Block</dt><dd><CopyField label="block number" value={brick.blockNumber}/></dd></div>
      </dl>
      <div className="wb-brick-links">{chainId===11155111?<><a href={'https://sepolia.etherscan.io/address/'+brick.address} rel="noreferrer" target="_blank">View contract on Sepolia ↗</a><a href={'https://sepolia.etherscan.io/tx/'+brick.transactionHash} rel="noreferrer" target="_blank">View mint transaction ↗</a></>:<span>Ganache transaction: {short(brick.transactionHash)}</span>}</div>
+     {brick.metadataURI?.startsWith('ipfs://')&&validCid(brick.metadataURI.slice(7))&&<button type="button" className="outline-btn wb-recover" onClick={()=>setRecoveryAddress(brick.address)}>Recover encrypted files</button>}
+     {recoveryAddress===brick.address&&<IpfsRecovery key={chainId+':'+brick.address+':'+brick.metadataDigest} brick={brick} onClose={()=>setRecoveryAddress(null)}/>}
     </article>)}</div>
    </div>}
   </>}
   <BrickOwnerApprovals wallet={wallet} onConnect={onConnect}/>
-  <p className="wb-disclaimer">This viewer shows contracts created by the connected wallet through one selected factory, not all Bricks the wallet might currently control. Blockchain registration is not proof of copyright or original authorship. Private files and full metadata are never downloaded by this viewer.</p>
+  <p className="wb-disclaimer">This viewer shows contracts created by the connected wallet through one selected factory, not all Bricks the wallet might currently control. Blockchain registration is not proof of copyright or original authorship. File recovery is optional and requires your private recovery key; decryption stays in your browser.</p>
  </section>;
 }

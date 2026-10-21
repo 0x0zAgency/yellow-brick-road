@@ -14,6 +14,7 @@ import {extractId3} from './mp3-tags.js';
 import {encryptDemoBatch,openDemoDownload} from './demo-vault.js';
 import {simulateMintReceipts} from './demo-mint.js';
 import {uploadEncryptedAsset,checkLocalIpfs,pinEncryptedBrickMetadata} from './ipfs-upload.js';
+import {buildRecoveryFile} from './ipfs-recovery.js';
 import {IP_CATEGORIES,SPATIAL_FIELDS,getIpCategory,groupedIpCategories} from './ip-catalog.js';
 import './mint-studio.css';
 import './mint-demo.css';
@@ -144,7 +145,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
   if(mintLock.current)return;
   if(reviewContext.current!==context){setDialog('');setError('Wallet or network changed. Review the mint again.');return}
   mintLock.current=true;activeExecution.current=execution;
-  setDialog('waiting');setBusy(true);setError('');
+  setDialog('waiting');setBusy(true);setError('');setStatus('Validating rights declarations…');
   const result={simulated:false,status:'pending',receipts:[]};
   try{
    let receipt;
@@ -177,9 +178,9 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
     }
     receipt=await mintOnChain({packet:uploadedPacket,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress,onUpdate:setStatus,result});
    }
-   else {for(let i=0;i<4;i++){setStage(i);await wait(750)}receipt=simulateMintReceipts(uploadedPacket);}
+   else {for(let i=0;i<4;i++){setStage(i);setStatus(['Validating rights declarations','Preparing separate IP Bricks','Preparing contextual Building','Simulating confirmation'][i]);await wait(750)}receipt=simulateMintReceipts(uploadedPacket);}
    if(!receipt.simulated){try{localStorage.setItem(factoryStorageKey(Number(chainId)),factoryAddress)}catch{}}
-   setMint(receipt);setPacket(p=>({...uploadedPacket,[receipt.simulated?'demoMint':'onChainMint']:receipt,...(!receipt.simulated?{notices:p.notices.filter(n=>!n.startsWith('No wallets created')).concat('Brick contracts registered on the selected blockchain. No hosted files, licenses or automated royalties. The Building remains an off-chain proposal.')}:{})}));setStep(4);setDialog('complete');
+   setMint(receipt);setPacket(p=>({...uploadedPacket,[receipt.simulated?'demoMint':'onChainMint']:receipt,...(!receipt.simulated?{notices:uploadedPacket.notices.filter(n=>!n.startsWith('No wallets created')).concat('Brick contracts registered on the selected blockchain. '+(uploadedPacket.storage.uploaded?'Encrypted files and metadata are pinned to the local IPFS node. ':'No files are hosted. ')+'No licenses or automated royalties are installed. The Building remains an off-chain proposal.')}:{})}));setStep(4);setDialog('complete');
   }catch(e){setError('Mint failed: '+(e.shortMessage||e.message));if(result.receipts.length){result.status='incomplete';setMint(result);setPacket(p=>({...p,onChainMint:result}));setStep(4)}setDialog('')}finally{mintLock.current=false;setBusy(false)}
  };
  const download=async(id)=>{
@@ -192,14 +193,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  };
  const exportRecovery=()=>{
   if(!vault.current.secret){setError('Recovery key unavailable. Reattach the originals and encrypt again.');return}
-  const kit={format:'0x-road-ipfs-recovery-v1',warning:'PRIVATE DECRYPTION SECRET. Anyone with this file and the CIDs can access your protected work.',
-   key:vault.current.secret,assets:visibleSlots.filter(slot=>assets[slot.id]?.ipfsUpload?.cid)
-    .map(slot=>({role:slot.id,name:assets[slot.id].name,cid:assets[slot.id].ipfsUpload.cid,
-      encryptedSha256:assets[slot.id].encryption?.sha256})),
-   metadata:packet?.bricks?.filter(b=>b.metadataCipherCid).map(b=>({role:b.role,cid:b.metadataCipherCid}))||[]};
-  const url=URL.createObjectURL(new Blob([JSON.stringify(kit,null,2)],{type:'application/json'}));
-  const a=document.createElement('a');a.href=url;a.download='ybr-private-recovery-keys.json';a.click();
-  setTimeout(()=>URL.revokeObjectURL(url),5000);
+  try{
+   const kit=buildRecoveryFile({secret:vault.current.secret,assets,packet});
+   const url=URL.createObjectURL(new Blob([JSON.stringify(kit,null,2)],{type:'application/json'}));
+   const a=document.createElement('a');a.href=url;a.download='ybr-private-recovery-keys.json';a.click();
+   setTimeout(()=>URL.revokeObjectURL(url),5000);
+  }catch(e){setError(e.message||'Unable to export the private recovery file.');}
  };
  const exportPacket=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='road-demo-mint.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000)};
  const reset=()=>{fileGeneration.current+=1;vault.current={secret:null,encrypted:new Map()};refs.current={};setMeta(initial);setAssets({});setPacket(null);setMint(null);setDialog('');setStatus('');setError('');setStep(0);setIpCategoryId('sound-recording');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpfsEnabled(false);setIpfsHealth('')};
@@ -262,11 +261,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  <p>The CID references below point to encrypted metadata, not public metadata JSON. This node has verified local pins, not multi-region replicas.</p>
  {packet.bricks.filter(b=>b.metadataCipherCid).map(b=><p key={b.localId}>{b.role}: <CopyField label={b.role+' metadata CID'} value={b.metadataCipherCid}/></p>)}
  <button type="button" className="ms-outline" onClick={exportRecovery}>Download private recovery keys ↓</button>
+ <p>Save this file before closing the page. Use <strong>Recover files</strong> to retrieve your originals later, or recover from <strong>My Bricks</strong> to verify the registered metadata.</p>
  </div>}
  <button className="ms-primary" onClick={exportPacket}>Download JSON packet ↓</button><button className="ms-outline" onClick={reset}>Start another work</button></>}
  {error&&<p className="ms-error" role="alert">{error}</p>}
  {step<4&&<div className="ms-actions">{step>0&&<button className="ms-outline" disabled={busy} onClick={()=>{setStep(i=>i-1);setError('')}}>← Back</button>}<button className="ms-primary" disabled={busy} onClick={next}>{busy?'Encrypting…':step===1?'Encrypt & Continue →':step===3?(execution==='simulated'?'Simulate mint →':'Review wallet mint →'):'Continue →'}</button></div>}
  </section><aside className="ms-side"><strong>THE CREATOR'S ROAD</strong><ol><li>Connect a wallet or continue with simulation</li><li>Attach all source files</li><li>Automatic client-side encryption</li><li>Separate Bricks for applicable creative rights</li><li>Draft dataset ingestion and use fees</li><li>Confirm simulated receipts or wallet transactions</li><li>Decrypt after simulated authorization</li></ol><p>PILOT ONLY. Original files and decryption keys never leave the browser. Optional ciphertext pinning uses your local YBR IPFS node. Authorized remote delivery, managed key recovery and royalty payouts are not implemented. Wallets deploy test Bricks on Ganache or Sepolia.</p></aside></div>
- {dialog&&<div className="ms-demo-overlay"><div role="dialog" aria-modal="true" className="ms-demo-dialog"><b>0x🟨 ROAD · DEMO</b>{dialog==='confirm'?<><h2>Confirm your Yellow Bricks?</h2><p>{execution==='simulated'?'This is a simulation. No transaction will occur.':`Mint ${packet?.bricks.length} Bricks on chain ${chainId} through factory ${factoryAddress}. Confirm each transaction in your wallet. ${ipfsEnabled?'You also authorize the permanent publication of encrypted files and metadata to local IPFS before minting. Keep the private recovery key.':'No files are hosted; only local demo metadata URIs are committed.'}`}</p><button className="ms-outline" onClick={()=>setDialog('')}>Cancel</button><button className="ms-primary" onClick={()=>void mintDemo()}>{execution==='simulated'?'Confirm simulation':'Request wallet signatures'}</button></>:dialog==='waiting'?<><span className="ms-demo-spinner"/><h2>Preparing your Bricks…</h2><p role="status">{activeExecution.current!=='simulated'?status:['Validating rights declarations','Preparing separate IP Bricks','Preparing contextual Building','Simulating confirmation'][stage]}</p><small>{activeExecution.current==='simulated'?'No blockchain transaction is being sent.':'Do not close this page while transactions are pending.'}</small></>:<><h2>Mint complete</h2><p>{mint?.receipts.length||0} Brick receipt(s) are ready.</p><button className="ms-primary" onClick={()=>setDialog('')}>View receipts →</button></>}</div></div>}
+ {dialog&&<div className="ms-demo-overlay"><div role="dialog" aria-modal="true" className="ms-demo-dialog"><b>0x🟨 ROAD · DEMO</b>{dialog==='confirm'?<><h2>Confirm your Yellow Bricks?</h2><p>{execution==='simulated'?(ipfsEnabled?'You authorize a real upload of encrypted files and metadata to your local IPFS node. The mint receipts are simulated; no blockchain transaction occurs. Save your private recovery key.':'This is a simulation. No transaction will occur.'):`Mint ${packet?.bricks.length} Bricks on chain ${chainId} through factory ${factoryAddress}. Confirm each transaction in your wallet. ${ipfsEnabled?'You also authorize the permanent publication of encrypted files and metadata to local IPFS before minting. Keep the private recovery key.':'No files are hosted; only local demo metadata URIs are committed.'}`}</p><button className="ms-outline" onClick={()=>setDialog('')}>Cancel</button><button className="ms-primary" onClick={()=>void mintDemo()}>{execution==='simulated'?'Confirm simulation':'Request wallet signatures'}</button></>:dialog==='waiting'?<><span className="ms-demo-spinner"/><h2>Preparing your Bricks…</h2><p role="status">{status||['Validating rights declarations','Preparing separate IP Bricks','Preparing contextual Building','Simulating confirmation'][stage]}</p><small>{activeExecution.current==='simulated'?'No blockchain transaction is being sent.':'Do not close this page while transactions are pending.'}</small></>:<><h2>Mint complete</h2><p>{mint?.receipts.length||0} Brick receipt(s) are ready.</p><button className="ms-primary" onClick={()=>setDialog('')}>View receipts →</button></>}</div></div>}
  </div>;
 }
