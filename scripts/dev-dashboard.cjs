@@ -49,7 +49,7 @@ class DevDashboard{
      this.state.restartConfirm=false;
      this.mnemonicEditor=new MnemonicEditor({...this.mnemonicControl,current:this.mnemonicControl.current(),
       onSecret:value=>this.addSecrets(value),
-      onChange:menu=>{this.state.mnemonicMenu=menu;if(!menu)this.mnemonicEditor=null;this.lastFrame=[];this.draw(true);}});
+      onChange:menu=>{this.state.mnemonicMenu=menu;if(!menu)this.mnemonicEditor=null;this.draw(true);}});
      this.mnemonicEditor.publish();
     }catch(error){this.state.error=redact(error.message,this.secrets);this.log('launcher',error.message);this.draw(true);}
     return;
