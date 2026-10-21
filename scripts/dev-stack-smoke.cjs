@@ -12,7 +12,7 @@ async function get(url,options){
  return res;
 }
 async function untilReady(){
- for(let i=0;i<120;i++){
+ for(let i=0;i<200;i++){
   try{
    const status=await (await get('http://127.0.0.1:4173/road/api/status')).json();
    const web=await fetch('http://127.0.0.1:5173',{signal:AbortSignal.timeout(2000)});
@@ -24,6 +24,14 @@ async function untilReady(){
 }
 async function main(){
  const status=await untilReady();
+ const ipfs=await (await get('http://127.0.0.1:8791/api/road-ipfs/health')).json();
+ const proxiedIpfs=await (await get('http://127.0.0.1:5173/api/road-ipfs/health')).json();
+ for(const health of [ipfs,proxiedIpfs]){
+  assert.equal(health.ok,true,'IPFS must be ready before the application is ready');
+  assert.equal(health.provider,'ybr-local-kubo');
+  assert.ok(typeof health.peerId==='string'&&health.peerId.length>0);
+ }
+ assert.equal(proxiedIpfs.peerId,ipfs.peerId,'Mint Studio must reach the same Kubo node');
  assert.equal(status.chainId,1337);
  assert.match(status.factoryAddress,/^0x[a-f0-9]{40}$/i);
  const rpc=new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
@@ -51,6 +59,6 @@ async function main(){
  assert.match(ui,/<div id="root"><\/div>/);
  const blocked=await fetch('http://127.0.0.1:4173/api/bricks');
  assert.equal(blocked.status,401,'Private Player library remains authenticated');
- console.log('INTEGRATED STACK PASS: Ganache 1337 + verified factory + web UI + player + published Brick + cross-player streaming + integrity.');
+ console.log('INTEGRATED STACK PASS: Ganache 1337 + verified factory + web UI + player + published Brick + cross-player streaming + integrity + healthy Kubo/bridge through the web proxy.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -4,7 +4,9 @@
  *
  * Reuses healthy services, deploys missing Ganache factory on chain 1337,
  * seeds ONLY the first-party generated audio fixture, and launches the
- * standalone Player alongside Vite. Never uploads Mint Studio files or keys.
+ * standalone Player alongside Vite, plus the local IPFS node and bridge.
+ * Docker with Compose must be running unless IPFS is already healthy.
+ * Never uploads Mint Studio files or keys automatically.
  *
  * Usage: npm run dev (repo root), or cd web && npm run dev.
  */
@@ -14,6 +16,7 @@ const {spawn}=require('node:child_process');
 const {setTimeout:sleep}=require('node:timers/promises');
 const {ethers}=require('ethers');
 const crypto=require('node:crypto');
+const {ensureIpfs,IPFS_URL}=require('./dev-ipfs.cjs');
 
 const ROOT=path.resolve(__dirname,'..');
 const PLAYER=path.join(ROOT,'apps','ybr-player');
@@ -47,7 +50,7 @@ function stopOwned(){
 function shutdown(reason,code=0){
  if(stopping)return;
  stopping=true;
- console.log('\n[YBR] '+reason+'. Shutting down services started by this launcher.');
+ console.log('\n[YBR] '+reason+'. Stopping managed processes; persistent Kubo is left running.');
  stopOwned();
  process.exitCode=code;
 }
@@ -199,6 +202,8 @@ async function main(){
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));
  process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
+  await ensureIpfs({run,spawnOwned,command,waitUntil,isStopping:()=>stopping});
+  if(stopping)return;
   await ensureGanache();
   const factory=await ensureFactory();
   const env={...process.env,YBR_GANACHE_FACTORY:factory,VITE_ROAD_GANACHE_FACTORY:factory};
@@ -208,10 +213,12 @@ async function main(){
   console.log('\n[YBR] INTEGRATED ROAD READY');
   console.log('[YBR] Road Explorer  '+WEB_URL);
   console.log('[YBR] YBR Player     '+PLAYER_URL);
+  console.log('[YBR] IPFS storage   '+IPFS_URL+' (healthy, encrypted-content bridge)');
   console.log('[YBR] Public Music   '+WEB_URL+'/road/api/music');
   console.log('[YBR] Factory        '+factory+' (local Ganache 1337)');
   console.log('[YBR] Synthetic-fixture access is local only. No user media or private IPFS content is published.');
-  console.log('[YBR] Ctrl+C stops the services started here; pre-existing Ganache/Player instances are left running.\n');
+  console.log('[YBR] Ctrl+C stops managed processes, including a bridge started here. Existing services and persistent Kubo are left running.');
+  console.log('[YBR] To stop Kubo separately without deleting pins: npm run ipfs:down.\n');
   // Keep parent alive to manage child processes and their exit status.
   await new Promise((resolve,reject)=>{
    for(const {label,proc} of OWNED.values()){
