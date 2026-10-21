@@ -57,3 +57,9 @@ You can substitute an audio file that you own or have permission to stream:
 Replace the local `loadBricks()` manifest adapter with an authenticated YBR registry lookup. Replace `canStream()` policy checks with an actual YBR rights-decision API. Preserve the same three conceptual application operations: `resolveBrick()`, `authorizeMedia()`, and `openMediaStream()`. Keep usage accounting and settlement **in the YBR core**, not in the player.
 
 Standards orientation: W3C PROV-O for graph provenance, C2PA where applicable for signed media assertions, DDEX for established music metadata and usage reporting, and YBR-specific logic only where existing standards do not address attribution accounting and compensation.
+
+## Road Music v0.2: authorized Ganache tracks
+
+The player now discovers opted-in sound-recording Bricks from the **same local Ganache factory as the main Road app** and plays them alongside local demo tracks. Tracks must have an on-chain SHA-256 media hash, chain-committed public metadata, a current-controller public playback grant, and locally available unencrypted public audio. Private Mint Studio Bricks remain private and are never included.
+
+See [Road public music guide](../../docs/ROAD_PUBLIC_MUSIC.md) for setup, opt-in publishing, shared `/road/api/music` and `/road/media/:ipId` endpoints, browser CORS and revocation. Before using Road mode, run `npm install` in this app (the adapter uses ethers v5), deploy the existing factory with `npm run ganache:deploy` from the repository root, and publish a demonstration track via `npm run road:publish` in this app. This proof is not a commercial license or royalty settlement.

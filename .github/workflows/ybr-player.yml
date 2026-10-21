@@ -4,10 +4,12 @@ on:
   push:
     paths:
       - 'apps/ybr-player/**'
+      - 'schemas/brick-metadata-v1.schema.json'
       - '.github/workflows/ybr-player.yml'
   pull_request:
     paths:
       - 'apps/ybr-player/**'
+      - 'schemas/brick-metadata-v1.schema.json'
       - '.github/workflows/ybr-player.yml'
 
 jobs:
@@ -21,5 +23,41 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Run YBR Player tests
+      - name: Install YBR Player dependencies
+        run: npm install --no-package-lock
+      - name: Test YBR Player
         run: npm test
+
+  ganache-road-music:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Road contracts and player dependencies
+        run: |
+          npm install --no-package-lock
+          npm install --no-package-lock --prefix apps/ybr-player
+      - name: Compile existing Road contracts
+        run: npm run compile
+      - name: Start disposable local Ganache
+        run: |
+          (npm run ganache > /tmp/ybr-ganache.log 2>&1 &)
+          for i in $(seq 1 45); do
+            if curl -s -X POST -H 'Content-Type: application/json' \
+              --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+              http://127.0.0.1:8545 | grep -q '0x539'; then break; fi
+            sleep 2
+          done
+          curl --fail -s -X POST -H 'Content-Type: application/json' \
+            --data '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}' \
+            http://127.0.0.1:8545 | grep -q '0x539'
+      - name: Deploy existing factory to Ganache
+        run: npm run ganache:deploy
+      - name: Create original demonstration audio
+        run: npm run generate-audio --prefix apps/ybr-player
+      - name: Explicitly publish one public playback Brick
+        run: npm run road:publish --prefix apps/ybr-player
+      - name: Test discovery, cross-player playback, integrity and revocation
+        run: npm run road:smoke --prefix apps/ybr-player

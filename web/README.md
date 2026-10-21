@@ -107,3 +107,7 @@ npm run ipfs:bridge
 Run `npm run ipfs:bridge` in its own terminal. Then in a third terminal start `cd web && npm install && npm run dev`, open `http://127.0.0.1:5173`, and opt in under Step 02. An independent actual pin/upload smoke test is `npm run ipfs:smoke`. **Do not expose Kubo's RPC port 5001 or the upload bridge to the public internet.** The Docker volume retains local pins across service restarts, but there is no offsite replication or production recovery guarantee.
 
 The browser offers a **private recovery key** download after ingestion. You must save it securely to decrypt your encrypted source assets later; never upload that key to IPFS. See [YBR IPFS storage pilot](../docs/IPFS_YBR_STORAGE_PILOT.md).
+
+## Shared Ganache music playback demonstration
+
+The independent [YBR Player](../apps/ybr-player) can connect to the **same local Ganache factory** used by the Mint Studio. Tracks don't become streamable merely because they were minted; their current controller must separately opt in through public, chain-committed playback metadata and an unencrypted delivery copy. Encrypted IPFS assets remain private. Start the player separately on `http://127.0.0.1:4173` and follow [Road Music](../docs/ROAD_PUBLIC_MUSIC.md) to publish a disposable demo recording.

@@ -60,9 +60,9 @@ function renderList() {
     const cover=document.createElement('span');cover.className=`track-thumbnail ${brick.theme==='violet'?'violet':'gold'}`;cover.textContent='◆';
     const info=document.createElement('div');info.className='track-info';
     const name=document.createElement('strong');name.textContent=brick.title;
-    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+brick.id;
+    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+(brick.source==='road'?'GANACHE · '+brick.id.slice(0,12)+'…':brick.id);
     info.append(name,creator);
-    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.streamAllowed?'◈ STREAM READY':'⌁ RESTRICTED';
+    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
     const duration=document.createElement('span');duration.className='track-duration';duration.textContent=stamp(brick.durationSeconds);
     const play=document.createElement('button');play.className='track-action';play.type='button';play.setAttribute('aria-label',`${brick.streamAllowed?'Play':'Inspect restricted'} ${brick.title}`);play.textContent=brick.streamAllowed?'▶':'⌁';
     const action=()=>choose(brick,true);
@@ -72,7 +72,7 @@ function renderList() {
     row.append(ix,cover,info,tag,duration,play);
     list.append(row);
   });
-  $('trackCount').textContent=`${bricks.length} registered bricks`;
+  $('trackCount').textContent=`${bricks.length} audio bricks · ${bricks.filter(b=>b.source==='road').length} from Ganache`;
 }
 async function choose(brick, playNow=true) {
   if (!brick) return;
@@ -113,6 +113,7 @@ async function refreshSession() {
   $('signedInAs').textContent=`Signed in as ${session.user}`;
   const library=await request('/api/bricks');
   bricks=library.bricks;
+  if(library.network?.ready===false) toast('Road offline: '+library.network.reason+' · local demo music remains available');
   const previous=selected?.id;
   selected=bricks.find(b=>b.id===previous) || bricks[0] || null;
   if (selected) {
