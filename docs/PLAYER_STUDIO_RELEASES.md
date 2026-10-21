@@ -4,8 +4,8 @@
 
 Start the existing integrated app with `npm run dev` from the repository root or `web/`. Mint Studio runs on port 5173 and the separate YBR Player on port 4173.
 
-1. Attach an audio master or preview, cover artwork, and lyrics in Mint Studio. Complete the simulated mint or an actual test-chain mint.
-2. In **Mint results**, find **Your release / YBR Player**. The player prefers an attached audio preview; otherwise it uses the supported master.
+1. Attach a Master Recording and a separate Audio Preview, cover artwork, and lyrics in Mint Studio. Complete the simulated mint or an actual test-chain mint.
+2. In **Mint results**, find **Your release / YBR Player**. The Player uses only the Audio Preview. A master is never a fallback.
 3. Choose whether to include the cover and lyrics. Confirm permission to share the selected copies and release/file labels with local Player users, then select **Add release to Player**.
 4. Open the release in YBR Player and sign in with the credentials printed by the integrated launcher. Its library also refreshes every five seconds while visible, without restarting playback.
 
@@ -27,7 +27,7 @@ This change concerns the Player and its release/file views. It does **not** rewr
 
 ## Supported preview inputs
 
-- Audio: MP3, WAV, OGG/Opus, M4A/MP4 audio, FLAC, WEBM or AAC, up to **32 MiB**. Actual decoding depends on the browser; supply an MP3/WAV preview when a master format is unsupported.
+- Audio: MP3, WAV, OGG/Opus, M4A/MP4 audio, FLAC, WEBM or AAC, up to **32 MiB**. Actual decoding depends on the browser; supply a browser-supported MP3/WAV Audio Preview.
 - Cover: PNG, JPEG or WebP, up to **8 MiB**. SVG and HTML are rejected, and declared media types must match the image signature.
 - Lyrics: UTF-8 TXT or WebVTT, up to **512 KiB**. DOCX, PDF and LRC are not parsed by this version. They can remain associated evidence without being shared as display lyrics.
 
@@ -50,3 +50,9 @@ The public `/road/api/music` catalog is unchanged: private local previews are **
 Player discovery uses the existing authenticated `/api/bricks` endpoint. The local adapter adds `source: "studio-demo"`, a release-level artwork reference, optional plain/WebVTT lyrics and associated-file records. This is an internal demo adapter, not a replacement for YBR metadata, PROV-O, C2PA or music-industry standards.
 
 Tests cover the existing browser vault-to-preview flow, refusal without consent, source-checksum verification, safe media types, no key serialization, local-origin/CSRF protection, authenticated media access, byte-range playback, library persistence, idempotency, withdrawal, and real Chromium upload/playback with shared cover art and synchronized WebVTT lyrics. Existing Ganache and IPFS integration workflows continue separately.
+
+## Preview-only playback
+
+The Audio Preview slot is the sole playback source for uploaded releases. A supported Master Recording is never a fallback. Missing or unsupported previews leave **Add release to Player** disabled with instructions to attach an Audio Preview. The browser adapter will not read/decrypt the master for playback; the server independently rejects a non-preview source declaration or an associated-file list that shares a master. Masters and projects can still appear as unshared file labels with the release cover.
+
+Legacy local demo publications marked as playing the master are no longer listed or served; their local files are not silently deleted. Re-publish with an attached Audio Preview or explicitly remove the old record. This does not alter the separately authorized synthetic Ganache fixture, commercial licenses, or encrypted IPFS sources.

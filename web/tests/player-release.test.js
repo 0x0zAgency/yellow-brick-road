@@ -48,3 +48,24 @@ test('aborted publication never starts its upload',async()=>{
  const opts=await fixture();const abort=new AbortController();abort.abort();
  await assert.rejects(buildPlayerRelease({...opts,signal:abort.signal}),{name:'AbortError'});
 });
+
+test('missing or unsupported Audio Preview never falls back to a playable Master Recording',async()=>{
+ const opts=await fixture(),preview=opts.packet.bricks[0].metadata.media[0];
+ const master={...preview,role:'master',name:'private-master.mp3'};
+ opts.packet.bricks[0].metadata.media=[master];
+ const forbidden={secret:'present',encrypted:{get(){throw Error('The master must never be read or decrypted');}}};
+ assert.equal(playerReleaseFiles(opts.packet).audio,null);
+ await assert.rejects(buildPlayerRelease({...opts,vault:forbidden}),/Audio Preview/);
+ opts.packet.bricks[0].metadata.media.push({...preview,name:'bad.flp',mediaType:'application/octet-stream'});
+ assert.equal(playerReleaseFiles(opts.packet).audio,null);
+ await assert.rejects(buildPlayerRelease({...opts,vault:forbidden}),/Audio Preview/);
+});
+test('a valid preview is the only audio role read, even with a distinct supported master',async()=>{
+ const opts=await fixture(),preview=opts.packet.bricks[0].metadata.media[0];
+ opts.packet.bricks[0].metadata.media.unshift({...preview,role:'master',name:'secret-master.wav'});
+ const reads=[],entries=opts.vault.encrypted;
+ opts.vault={...opts.vault,encrypted:{get(role){reads.push(role);assert.notEqual(role,'master');return entries.get(role);}}};
+ const result=await buildPlayerRelease(opts);
+ assert.equal(result.audioSourceRole,'preview');assert.ok(reads.includes('preview'));assert.ok(!reads.includes('master'));
+ assert.equal(result.files.find(f=>f.role==='master').sharedAs,null);
+});

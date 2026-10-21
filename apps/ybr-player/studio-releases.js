@@ -52,6 +52,7 @@ function decodeAsset(role, item) {
 }
 function normalizePublication(body) {
   if (!body || body.format !== 'ybr-studio-preview/1' || body.consent !== 'share-selected-copies-with-local-player') throw error('Explicit local-player sharing consent is required.',403);
+  if(body.audioSourceRole!=='preview')throw error('Audio Preview source is required. Master Recordings cannot be published to the Player.');
   const title = text(body.title,'release title'), creator = text(body.creator,'creator');
   const description = text(body.description || '', 'description',2000,false);
   const album = text(body.album || '', 'album',200,false);
@@ -60,11 +61,13 @@ function normalizePublication(body) {
   for (const role of ['artwork','lyrics']) if (body.assets[role]) decoded[role] = decodeAsset(role,body.assets[role]);
   if (!Array.isArray(body.files) || body.files.length > 64) throw error('Invalid associated-file list.');
   const files = body.files.map(item => ({ role: text(item?.role,'file role',80), name: safeName(item?.name), shared: ['audio','artwork','lyrics'].includes(item?.sharedAs) ? item.sharedAs : null }));
+  const audioFiles=files.filter(file=>file.shared==='audio');
+  if(audioFiles.length!==1||audioFiles[0].role!=='preview'||audioFiles[0].name!==decoded.audio.info.name||files.some(file=>file.role==='master'&&file.shared!==null))throw error('Only the Audio Preview may supply playable audio.');
   // Receipt references are labels only; never promote supplied addresses to chain proof.
   const references = Array.isArray(body.bricks) ? body.bricks.slice(0,64).map(item => ({ role: text(item?.role,'Brick role',100), title: text(item?.title || title,'Brick title'), address: /^0x[0-9a-fA-F]{40}$/.test(item?.address || '') ? item.address : null })) : [];
   if(body.credits!==undefined&&(!Array.isArray(body.credits)||body.credits.length>64))throw error('Invalid credit list.');
   const credits=(body.credits||[]).map(person=>({name:text(person?.name,'credit name'),role:text(person?.role,'credit role',80)}));
-  const metadata = { format:'ybr-studio-preview/1', title, creator, album, description, files, references, credits,
+  const metadata = { format:'ybr-studio-preview/1', audioSourceRole:'preview', title, creator, album, description, files, references, credits,
     provenanceStatus:'local-creator-preview-not-chain-verified', assets:Object.fromEntries(Object.entries(decoded).map(([role,asset])=>[role,asset.info])) };
   const id = 'STUDIO-' + sha256(JSON.stringify(metadata));
   return { id, metadata:{...metadata,id}, decoded };
@@ -90,6 +93,10 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
       return data;
     } catch (e) { if (e.code === 'ENOENT') return null; throw e; }
   }
+  function safePreview(data) {
+    const playable=data?.files?.filter(file=>file.shared==='audio')||[];
+    return playable.length===1&&playable[0].role==='preview'&&playable[0].name===data?.assets?.audio?.name&&!data.files.some(file=>file.role==='master'&&file.shared!=null);
+  }
   function describe(data) {
     const url = role => '/api/studio-releases/' + data.id + '/' + role;
     const artwork = data.assets.artwork ? {...data.assets.artwork,url:url('artwork')} : null;
@@ -104,7 +111,7 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
   function list() {
     let names; try { names=fs.readdirSync(root); } catch(e) { if(e.code==='ENOENT')return [];throw e; }
     if(names.filter(name=>ID.test(name)).length>maxReleases)throw error('Local preview library exceeds its configured limit.',409);
-    return names.filter(name=>ID.test(name)).sort().map(read).filter(Boolean).map(describe);
+    return names.filter(name=>ID.test(name)).sort().map(read).filter(data=>data&&safePreview(data)).map(describe);
   }
   function publish(body) {
     const {id,metadata,decoded} = normalizePublication(body);
@@ -122,12 +129,12 @@ function createStudioLibrary({directory=path.resolve(__dirname,'../../.road-loca
   function asset(id,role) {
     if(!Object.hasOwn(LIMITS,role))return null;
     const record=read(id),info=record?.assets?.[role];
-    if(!info)return null;
+    if(!info||!safePreview(record))return null;
     const bytes=readRegular(path.join(root,id,role+'.bin'),LIMITS[role]);
     if(bytes.length!==info.byteLength||sha256(bytes)!==info.sha256)throw error('Preview integrity check failed.',409);
     return {bytes,...info};
   }
   function remove(id) { if(!read(id))return false;fs.rmSync(path.join(root,id),{recursive:true});return true; }
-  return {list,publish,asset,remove,get:id=>{const data=read(id);return data?describe(data):null;}};
+  return {list,publish,asset,remove,get:id=>{const data=read(id);return data&&safePreview(data)?describe(data):null;}};
 }
 module.exports={createStudioLibrary,normalizePublication,LIMITS,MAX_REQUEST_BYTES,sha256};

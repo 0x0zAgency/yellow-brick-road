@@ -10,8 +10,8 @@ import {mintOnChain,mintMode} from './chain-mint.js';
 import {factoryStorageKey} from './brick-viewer-model.js';
 import {Fragment,useEffect,useRef,useState} from 'react';
 import {uploadSectionBefore} from './mint-file-sections.js';
-import {aliasFor,availableAssetSlots,makeRegistrationPacket,trainingModes,validateMintInput,parseMetadataText} from './mint-model.js';
-import {extractId3} from './mp3-tags.js';
+import {aliasFor,availableAssetSlots,makeRegistrationPacket,trainingModes,validateMintInput} from './mint-model.js';
+import useUploadMetadata from './useUploadMetadata.js';
 import {encryptDemoBatch,openDemoDownload} from './demo-vault.js';
 import {simulateMintReceipts} from './demo-mint.js';
 import {uploadEncryptedAsset,checkLocalIpfs,pinEncryptedBrickMetadata} from './ipfs-upload.js';
@@ -33,12 +33,15 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
   const store=typeof window==='undefined'?null:window.localStorage;
   return {form:loadMintForm(store)||defaultMintForm(),settings:loadMintNetwork(store)};
  });
- const [step,setStep]=useState(0),[meta,setMeta]=useState(saved.form.meta),[assets,setAssets]=useState({});
+ const [step,setStep]=useState(0),[assets,setAssets]=useState({});
+ const autofill=useUploadMetadata(saved.form.meta);
+ const {meta}=autofill;
  const [ipCategoryId,setIpCategoryId]=useState(saved.form.ipCategoryId),[spatial,setSpatial]=useState(saved.form.spatial);
  const category=getIpCategory(ipCategoryId),isMusic=!!category.musical;
  const visibleSlots=availableAssetSlots(ipCategoryId);
  const slotLabel=id=>id==='master'?category.primary:id==='project'&&category.spatial?'Spatial / skeletal tracking data':labels[id];
  const refs=useRef({}),vault=useRef({secret:null,encrypted:new Map()}),fileGeneration=useRef(0);
+ useEffect(()=>()=>{fileGeneration.current++;refs.current={};},[]);
  const [busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState('');
  const [ipfsEnabled,setIpfsEnabled]=useState(false),[ipfsHealth,setIpfsHealth]=useState('');
  const [composition,setComposition]=useState(saved.form.composition),[training,setTraining]=useState(saved.form.training),[share,setShare]=useState(saved.form.share);
@@ -86,7 +89,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  const chooseCategory=id=>{
   if(id===ipCategoryId)return;
   // Files from another category must not become this category's registered work.
-  fileGeneration.current+=1;
+  fileGeneration.current+=1;autofill.clearFiles();
   refs.current={};vault.current={secret:null,encrypted:new Map()};
   setAssets({});setStatus('');setError('');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpCategoryId(id);
  };
@@ -95,14 +98,18 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
   setError('');refs.current[id]=file;vault.current.encrypted.delete(id);
   const record={name:file.name,type:file.type,size:file.size,status:'hashing'};
   setAssets(old=>({...old,[id]:record}));
+  const extraction=autofill.inspect(id,file);
   if(file.size>256*1048576){setAssets(old=>({...old,[id]:{...record,error:'Prototype limit 256 MB per file',status:'failed'}}));return}
+  const current=()=>generation===fileGeneration.current&&refs.current[id]===file;
+  // Start the filename fallback immediately; worker tags and SHA-256 run locally.
   try{
    const raw=await file.arrayBuffer(),hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',raw)),b=>b.toString(16).padStart(2,'0')).join('');
-   if(generation!==fileGeneration.current)return;
-   setAssets(old=>old[id]?.name===file.name?{...old,[id]:{...record,hash,status:'ready'}}:old);
-   if(id==='preview'){const t=extractId3(new Uint8Array(raw));setMeta(old=>{const n={...old};for(const [k,v] of Object.entries(t.fields))if(k in n&&!n[k])n[k]=String(v);return n;});}
-   if(id==='metadata'&&file.size<262144){const entries=parseMetadataText(await file.text());if(generation!==fileGeneration.current)return;setMeta(old=>{const n={...old};for(const [k,v] of Object.entries(entries))if(k in n&&!n[k]&&typeof v!=='object')n[k]=String(v);return n;});}
-  }catch(e){if(generation===fileGeneration.current)setAssets(old=>({...old,[id]:{...record,error:e.message||'File read failed',status:'failed'}}));}
+   const extracted=await extraction;
+   if(!current())return;
+   setAssets(old=>({...old,[id]:{...record,hash,status:'ready',extracted}}));
+  }catch{
+   if(current())setAssets(old=>({...old,[id]:{...record,error:'File read failed',status:'failed'}}));
+  }
  };
  const encryptAndAdvance=async()=>{
   if(busy)return;
@@ -202,12 +209,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
   }catch(e){setError(e.message||'Unable to export the private recovery file.');}
  };
  const exportPacket=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='road-demo-mint.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000)};
- const reset=()=>{fileGeneration.current+=1;vault.current={secret:null,encrypted:new Map()};refs.current={};setMeta(initial);setAssets({});setPacket(null);setMint(null);setDialog('');setStatus('');setError('');setStep(0);setIpCategoryId('sound-recording');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpfsEnabled(false);setIpfsHealth('')};
+ const reset=()=>{fileGeneration.current+=1;vault.current={secret:null,encrypted:new Map()};refs.current={};autofill.reset(initial);setAssets({});setPacket(null);setMint(null);setDialog('');setStatus('');setError('');setStep(0);setIpCategoryId('sound-recording');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpfsEnabled(false);setIpfsHealth('')};
  return <div className="ms-wrap"><section className="ms-hero"><span>0x🟨 ROAD / CREATOR STUDIO</span><h2>Your studio → Yellow Bricks.</h2><p>Register original works while keeping originals and encryption keys private in your browser. Optionally pin encrypted files to YBR IPFS, then use a simulated or wallet-signed test mint.</p><b>{execution==='simulated'?'SIMULATED · NO ON-CHAIN MINT':network==='sepolia'?'SEPOLIA · WALLET-SIGNED TRANSACTIONS':'GANACHE · REAL LOCAL TRANSACTIONS'}</b></section>
  <div className="ms-progress">{stages.map((s,i)=><div key={s} className={step===i?'active':step>i?'done':''}><span>{i+1}</span>{s}</div>)}</div>
  <div className="ms-grid" inert={dialog?true:undefined}><section className="ms-panel">
  {step===0&&<><h2>01. Identify the creator.</h2><p>{wallet?`Connected: ${displayName||wallet}. You’ll configure the mint network in Step 4.`:'Continue with the simulation, or connect a wallet for real minting. Network setup comes in Step 4.'}</p><div className="ms-ip-choice"><label htmlFor="road-ip-category">Select a type of intellectual property</label><select id="road-ip-category" value={ipCategoryId} onChange={e=>chooseCategory(e.target.value)}>{groupedIpCategories().map(([group,entries])=><optgroup key={group} label={group}>{entries.map(entry=><option key={entry.id} value={entry.id}>{entry.label}</option>)}</optgroup>)}</select><small>{category.examples} · {IP_CATEGORIES.length} available categories</small><small>Switching IP categories clears attached demo files to prevent accidental reuse under the wrong rights category.</small>{category.notice&&<p className="ms-ip-warning">{category.notice}</p>}</div>{!wallet&&<button className="ms-primary" onClick={onConnect}>Connect wallet</button>}<div className="ms-local-pref"><label><input type="checkbox" checked={rememberForm} onChange={e=>setRememberForm(e.target.checked)}/> Remember form fields on this device</label><small>Local browser storage, not encrypted. Original files, wallet secrets, signing data and encryption keys are never saved. Ganache network and factory settings remain saved separately.</small><button type="button" onClick={()=>{setRememberForm(false);clearMintForm(window.localStorage)}}>Clear saved form</button></div><div className="ms-highlight"><strong>Creator alias</strong><code>{aliasFor(meta.artist||'artist')}</code><p>Separate from ENS and Ethereum addresses.</p></div></>}
- {step===1&&<><h2>02. Attach files.</h2><p>Any file format is accepted. Files are encrypted in your browser. Optional IPFS upload occurs only after rights validation and your final confirmation.</p><div className="ms-files">{visibleSlots.map(slot=><Fragment key={slot.id}><UploadSectionHeading slotId={slot.id} category={category}/><label><div><strong>{slotLabel(slot.id)}{slot.required?' *':''}</strong><small>{assets[slot.id]?.name||'Any file extension'}</small><small>{assets[slot.id]?.error|| (assets[slot.id]?.status==='hashing'?'Hashing…':assets[slot.id]?.ipfsUpload?.verified?'🔒 Pinned to IPFS · '+assets[slot.id].ipfsUpload.cid:assets[slot.id]?.demoUpload?'🔒 Encrypted / DEMO receipt '+assets[slot.id].demoUpload.receiptId:assets[slot.id]?.hash?'✓ Ready':'Choose file')}</small></div><span>Browse</span><input type="file" aria-label={'Choose '+slotLabel(slot.id)} onChange={e=>{if(e.target.files[0])void attach(slot.id,e.target.files[0]);e.target.value=''}}/></label></Fragment>)}</div><section className="ms-encrypt"><h3>🔒 Browser encryption &amp; IPFS</h3>
+ {step===1&&<><h2>02. Attach files.</h2><p>Any file format is accepted. Filenames supply title defaults. Supported embedded tags fill descriptive fields locally without replacing your edits. Files are encrypted in your browser; optional IPFS upload requires your final confirmation.</p><div className="ms-files">{visibleSlots.map(slot=><Fragment key={slot.id}><UploadSectionHeading slotId={slot.id} category={category}/><label><div><strong>{slotLabel(slot.id)}{slot.required?' *':''}</strong><small>{assets[slot.id]?.name||'Any file extension'}</small><small>{assets[slot.id]?.error|| (assets[slot.id]?.status==='hashing'?'Hashing…':assets[slot.id]?.ipfsUpload?.verified?'🔒 Pinned to IPFS · '+assets[slot.id].ipfsUpload.cid:assets[slot.id]?.demoUpload?'🔒 Encrypted / DEMO receipt '+assets[slot.id].demoUpload.receiptId:assets[slot.id]?.hash?'✓ Ready':'Choose file')}</small>{assets[slot.id]?.extracted&&<small>Title: {assets[slot.id].extracted.fields.title} · {assets[slot.id].extracted.parser}{assets[slot.id].extracted.notice?' · '+assets[slot.id].extracted.notice:''}</small>}</div><span>Browse</span><input type="file" aria-label={'Choose '+slotLabel(slot.id)} onChange={e=>{if(e.target.files[0])void attach(slot.id,e.target.files[0]);e.target.value=''}}/></label></Fragment>)}</div><section className="ms-encrypt"><h3>🔒 Browser encryption &amp; IPFS</h3>
  <p>All originals are encrypted locally with AES-256-GCM. Choose whether to pin the encrypted files to your own YBR IPFS node, or use the offline demonstration.</p>
  <label className="ms-ipfs-option"><input type="checkbox" checked={ipfsEnabled} onChange={e=>{setIpfsEnabled(e.target.checked);setIpfsHealth('')}}/>
   Upload encrypted files to my local YBR IPFS node (experimental)</label>
@@ -221,7 +228,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect}){
  {step===2&&<><h2>03. IP and licensing.</h2>{ipfsEnabled&&<div className="ms-ipfs-confirm"><strong>Files encrypted locally, pending creator approval</strong>
  <p>Nothing has been sent to IPFS yet. You can download an early private key backup now, then download it again after confirmed upload to include final CIDs. Keep the backup private; losing it makes pinned ciphertext inaccessible.</p>
  <button type="button" className="ms-outline" onClick={exportRecovery}>Download private key backup ↓</button>
- </div>}<p>{isMusic?'Recording and songwriting become separate Bricks by default. Writers are credited separately from the recording artist.':'Register a work and supporting evidence. Creator claims are not independently verified by this demo.'}</p><p className="ms-ip-hint">IP category: <strong>{category.label}</strong></p><div className="ms-fields">{fields.filter(([id])=>isMusic||(id==='genre'&&category.group==='Music & audio')||(id==='songwriters'&&category.writers)||!['songwriters','daw','release','genre','bpm','key','isrc','iswc'].includes(id)).map(([id,label])=><label key={id}><span>{id==='title'&&!isMusic?'Work title':id==='artist'&&!isMusic?'Creator / claimant':label}</span>{id==='genre'?<MusicGenreSelect value={meta.genre} onChange={genre=>setMeta(p=>({...p,genre}))}/>:id==='description'?<textarea value={meta[id]} onChange={e=>setMeta(p=>({...p,[id]:e.target.value}))}/>:<input value={meta[id]} onChange={e=>setMeta(p=>({...p,[id]:e.target.value}))}/>}</label>)}</div>{category.spatial&&<section className="ms-spatial-fields"><h3>Spatial capture &amp; provenance</h3><p>Dates and credits below are creator-declared; attaching spatial video or motion capture does not establish first performance or exclusive rights. SHA-256 of the original file is recorded.</p><div className="ms-fields">{SPATIAL_FIELDS.map(field=><label key={field.id}><span>{field.label}</span><input placeholder={field.placeholder} value={spatial[field.id]||''} onChange={e=>setSpatial(p=>({...p,[field.id]:e.target.value}))}/></label>)}</div><small>Optional C2PA and PROV-O references link to external evidence, not automatically verified attestations.</small></section>}{category.group==='Music & audio'&&<section className="ms-link-panel">
+ </div>}<p>{isMusic?'Recording and songwriting become separate Bricks by default. Writers are credited separately from the recording artist.':'Register a work and supporting evidence. Creator claims are not independently verified by this demo.'}</p><p className="ms-ip-hint">IP category: <strong>{category.label}</strong></p><p className="ms-ip-hint">Autofilled descriptions and credits are unverified suggestions. Review them before minting. Artist tags do not establish ownership. {Object.keys(autofill.sources).length>0?'Autofilled fields: '+Object.keys(autofill.sources).join(', ')+'.':''}</p><div className="ms-fields">{fields.filter(([id])=>isMusic||(id==='genre'&&category.group==='Music & audio')||(id==='songwriters'&&category.writers)||!['songwriters','daw','release','genre','bpm','key','isrc','iswc'].includes(id)).map(([id,label])=><label key={id}><span>{id==='title'&&!isMusic?'Work title':id==='artist'&&!isMusic?'Creator / claimant':label}</span>{id==='genre'?<MusicGenreSelect value={meta.genre} onChange={genre=>autofill.edit('genre',genre)}/>:id==='description'?<textarea value={meta[id]} onChange={e=>autofill.edit(id,e.target.value)}/>:<input value={meta[id]} onChange={e=>autofill.edit(id,e.target.value)}/>}</label>)}</div>{category.spatial&&<section className="ms-spatial-fields"><h3>Spatial capture &amp; provenance</h3><p>Dates and credits below are creator-declared; attaching spatial video or motion capture does not establish first performance or exclusive rights. SHA-256 of the original file is recorded.</p><div className="ms-fields">{SPATIAL_FIELDS.map(field=><label key={field.id}><span>{field.label}</span><input placeholder={field.placeholder} value={spatial[field.id]||''} onChange={e=>setSpatial(p=>({...p,[field.id]:e.target.value}))}/></label>)}</div><small>Optional C2PA and PROV-O references link to external evidence, not automatically verified attestations.</small></section>}{category.group==='Music & audio'&&<section className="ms-link-panel">
  <h3>Cover artwork · independent visual IP Brick</h3>
  <p>The recording artist is also credited as cover artist by default. You can explicitly select another cover creator, or reference an existing visual Brick with controller approval.</p>
  {assets.artwork?.hash?<div className="ms-fields">

@@ -38,6 +38,7 @@ async function main(){
   await studio.getByRole('button',{name:'Mint Studio',exact:true}).click();
   await studio.getByRole('button',{name:'Continue →',exact:true}).click();
   await studio.locator('input[aria-label="Choose Master recording"]').setInputFiles(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'));
+  await studio.getByLabel('Choose Audio preview',{exact:true}).setInputFiles(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'));
   await studio.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles(path.join(tmp,'cover.png'));
   await studio.getByLabel('Choose Lyrics manuscript / writing evidence',{exact:true}).setInputFiles(path.join(tmp,'lyrics.txt'));
   await studio.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
@@ -68,11 +69,14 @@ async function main(){
   assert.ok(covers.length>=3);assert.equal(new Set(covers).size,1,'All associated file cards share the release cover');
   await player.locator('#playPause').click();
   await player.waitForFunction(()=>document.getElementById('audio').currentTime>0.2,{},{timeout:15000});
+  const servedHash=await player.evaluate(async()=>{const response=await fetch(document.getElementById('audio').src);const bytes=await response.arrayBuffer();return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');});
+  assert.equal(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'))),'Player must stream the selected Audio Preview, not the distinct Master Recording');
+  assert.notEqual(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'))));
   await player.screenshot({path:path.join(OUT,'uploaded-release.png'),fullPage:true});
   // Publish a WebVTT companion through the same local ingestion boundary.
   const audio=fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'));
   const vtt=Buffer.from('WEBVTT\n\n00:00.000 --> 00:02.000\nFirst timed line\n\n00:02.000 --> 00:23.500\nSecond timed line\n');
-  const timed={format:'ybr-studio-preview/1',consent:'share-selected-copies-with-local-player',title:'Timed lyric test',creator:'Synthetic Artist',files:[{role:'master',name:'audio.wav',sharedAs:'audio'}],assets:{audio:encode(audio,'audio.wav','audio/wav'),artwork:encode(png,'cover.png','image/png'),lyrics:encode(vtt,'lyrics.vtt','text/vtt')}};
+  const timed={format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',title:'Timed lyric test',creator:'Synthetic Artist',files:[{role:'preview',name:'audio.wav',sharedAs:'audio'}],assets:{audio:encode(audio,'audio.wav','audio/wav'),artwork:encode(png,'cover.png','image/png'),lyrics:encode(vtt,'lyrics.vtt','text/vtt')}};
   const published=await studio.evaluate(async payload=>{
    const {token}=await(await fetch('/api/player-publish/config')).json();
    const res=await fetch('/api/player-publish/releases',{method:'POST',headers:{'Content-Type':'application/json','X-YBR-Publish-Token':token},body:JSON.stringify(payload)});

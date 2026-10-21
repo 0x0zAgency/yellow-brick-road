@@ -11,9 +11,9 @@ const image=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR
 const encode=(bytes,name,mime)=>({name,mime,sha256:sha256(bytes),base64:bytes.toString('base64')});
 const audio=Buffer.from('RIFF-original-preview-fixture');
 const lyrics=Buffer.from('This is a lyric.\n<script>notExecutable()</script>\n');
-function publication(){return {format:'ybr-studio-preview/1',consent:'share-selected-copies-with-local-player',title:'My uploaded release',creator:'Creator',album:'Demo album',description:'Preview',
+function publication(){return {format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',title:'My uploaded release',creator:'Creator',album:'Demo album',description:'Preview',
  assets:{audio:encode(audio,'demo.wav','audio/wav'),artwork:encode(image,'cover.png','image/png'),lyrics:encode(lyrics,'lyrics.txt','text/plain')},
- files:[{role:'master',name:'demo.wav',sharedAs:'audio'},{role:'artwork',name:'cover.png',sharedAs:'artwork'},{role:'lyrics',name:'lyrics.txt',sharedAs:'lyrics'},{role:'project',name:'private.flp'}],
+ files:[{role:'preview',name:'demo.wav',sharedAs:'audio'},{role:'artwork',name:'cover.png',sharedAs:'artwork'},{role:'lyrics',name:'lyrics.txt',sharedAs:'lyrics'},{role:'project',name:'private.flp'}],
  bricks:[{role:'Sound recording',title:'My uploaded release',address:'0x'+'1'.repeat(40)}],key:'DO-NOT-STORE-THIS-SECRET'};}
 function fixture(t){const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-studio-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return {dir,library:createStudioLibrary({directory:dir})};}
 
@@ -83,4 +83,22 @@ test('local publish API, authenticated artwork/lyrics/audio, byte ranges and wit
  assert.equal(response.headers.get('access-control-allow-origin'),null);
  response=await fetchAt('/api/player-publish/releases/'+brick.id,{method:'DELETE',headers:{'X-YBR-Publish-Token':token}});assert.equal(response.status,200);
  response=await fetchAt('/api/bricks/'+brick.id+'/media',{headers});assert.equal(response.status,404);
+});
+
+test('server rejects master/ambiguous sources independently of the browser',()=>{
+ const payload=publication();
+ delete payload.audioSourceRole;
+ assert.throws(()=>normalizePublication(payload),/Audio Preview/);
+ payload.audioSourceRole='preview';payload.files[0].role='master';
+ assert.throws(()=>normalizePublication(payload),/Audio Preview/);
+ payload.files[0].role='preview';payload.files.push({...payload.files[0]});
+ assert.throws(()=>normalizePublication(payload),/Audio Preview/);
+});
+test('stored legacy master copies remain on disk but cannot be listed or served',t=>{
+ const {dir,library}=fixture(t),{brick}=library.publish(publication());
+ const file=path.join(dir,brick.id,'release.json'),record=JSON.parse(fs.readFileSync(file,'utf8'));
+ record.files[0].role='master';delete record.audioSourceRole;fs.writeFileSync(file,JSON.stringify(record));
+ assert.equal(library.list().length,0);assert.equal(library.get(brick.id),null);assert.equal(library.asset(brick.id,'audio'),null);
+ assert.equal(fs.existsSync(path.join(dir,brick.id,'audio.bin')),true,'Do not delete user files implicitly');
+ assert.equal(library.remove(brick.id),true,'Explicit removal still works');
 });

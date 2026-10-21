@@ -17,8 +17,9 @@ function mimeFor(file,role){
 export function playerReleaseFiles(packet){
  const files=new Map();
  for(const brick of packet?.bricks||[])for(const file of brick.metadata?.media||[]){if(file?.role&&!files.has(file.role))files.set(file.role,file);}
- const preview=files.get('preview'),master=files.get('master');
- const audio=mimeFor(preview,'audio')?preview:mimeFor(master,'audio')?master:null;
+ const preview=files.get('preview');
+ // Player delivery must never decrypt or substitute the Master Recording.
+ const audio=mimeFor(preview,'audio')?preview:null;
  const artwork=files.get('artwork'),lyrics=files.get('lyrics');
  return {audio,artwork,lyrics,files:[...files.values()]};
 }
@@ -31,7 +32,7 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
  if(consent!==true)throw Error('Confirm sharing selected preview copies with the local Player.');
  if(!packet?.bricks?.length||!mint||(mint.simulated!==true&&mint.status!=='confirmed'))throw Error('Finish the demo or test-chain mint before sharing a preview.');
  const selection=playerReleaseFiles(packet);
- if(!selection.audio)throw Error('Attach a supported audio preview (MP3, WAV, OGG, FLAC, M4A, WEBM or AAC).');
+ if(!selection.audio)throw Error('Attach a supported Audio Preview (MP3, WAV, OGG, FLAC, M4A, WEBM or AAC). The Master Recording is never used for Player playback.');
  if(!vault?.secret||!vault.encrypted?.get)throw Error('This browser session no longer has the encrypted uploads. Reattach the originals in Mint Studio.');
  const picked={audio:selection.audio};
  if(includeArtwork&&selection.artwork)picked.artwork=selection.artwork;
@@ -55,7 +56,7 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
  checkAbort(signal);
  const primary=packet.bricks.find(brick=>brick.localId==='master')||packet.bricks[0];
  const metadata=primary.metadata;
- return {format:'ybr-studio-preview/1',consent:'share-selected-copies-with-local-player',
+ return {format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',
   title:metadata.title,creator:metadata.creators?.[0]?.name||'Creator',album:metadata.music?.release||'',description:(metadata.description||'').slice(0,2000),assets,
   files:selection.files.map(file=>({role:file.role,name:file.name,sharedAs:Object.entries(picked).find(([,selected])=>selected.role===file.role)?.[0]||null})),
   credits:[...new Map(packet.bricks.flatMap(brick=>(brick.metadata.creators||[]).map(person=>({name:person.name,role:person.role||'creator'}))).map(person=>[person.name+'|'+person.role,person])).values()],

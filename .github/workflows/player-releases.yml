@@ -7,6 +7,8 @@ on:
       - 'web/tests/**'
       - 'web/vite.config.js'
       - 'scripts/player-release-browser.cjs'
+      - 'scripts/upload-metadata-browser.cjs'
+      - 'web/package.json'
       - '.github/workflows/player-releases.yml'
   pull_request:
     paths:
@@ -15,6 +17,8 @@ on:
       - 'web/tests/**'
       - 'web/vite.config.js'
       - 'scripts/player-release-browser.cjs'
+      - 'scripts/upload-metadata-browser.cjs'
+      - 'web/package.json'
       - '.github/workflows/player-releases.yml'
 permissions:
   contents: read
@@ -44,7 +48,7 @@ jobs:
       - name: Test Player and browser release adapter
         run: |
           npm test --prefix apps/ybr-player
-          node --test web/tests/player-release.test.js
+          node --test web/tests/player-release.test.js web/tests/upload-metadata.test.js
           npm run build --prefix web
       - name: Install isolated Chromium test runner
         run: |
@@ -62,6 +66,7 @@ jobs:
           WEB_PID=$!
           trap 'kill -TERM "$PLAYER_PID" "$WEB_PID" 2>/dev/null || true; cat /tmp/ybr-browser-web.log' EXIT
           node scripts/player-release-browser.cjs
+          node scripts/upload-metadata-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
