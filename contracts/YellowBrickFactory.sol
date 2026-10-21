@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {YellowBrick} from "./YellowBrick.sol";
+import {YellowBrickContentPolicy} from "./YellowBrickContentPolicy.sol";
 import {YellowBrickReceipt} from "./YellowBrickReceipt.sol";
 
 /// @notice No-platform-fee contract factory. Originator pays blockchain gas.
@@ -53,6 +54,26 @@ contract YellowBrickFactory {
         require(brick != address(0), "Factory: duplicate or failed");
         bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
         YellowBrick(brick).initializeWithDigest(id, contentHash, msg.sender, uri, metadataDigest);
+        isBrick[brick] = true;
+        brickById[id] = brick;
+        YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
+        emit BrickDeployed(id, brick, msg.sender, contentHash);
+    }
+
+    /// @notice Capability check; old immutable factories cannot retroactively support this method.
+    function contentPolicyVersion() external pure returns (uint8) { return 1; }
+
+    function deployBrickWithPolicy(bytes32 contentHash, string calldata uri, bytes32 metadataDigest, bytes32 nonce,
+        YellowBrickContentPolicy.InitialPolicy calldata policy) external returns (address brick)
+    {
+        require(contentHash != bytes32(0) && bytes(uri).length > 0 && bytes(uri).length <= 8192 && metadataDigest != bytes32(0),
+            "Factory: invalid metadata registration");
+        bytes32 salt = deploymentSalt(msg.sender, contentHash, nonce);
+        bytes memory code = minimalProxyCode(implementation);
+        assembly { brick := create2(0, add(code, 32), mload(code), salt) }
+        require(brick != address(0), "Factory: duplicate or failed");
+        bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
+        YellowBrick(brick).initializeWithPolicy(id, contentHash, msg.sender, uri, metadataDigest, policy);
         isBrick[brick] = true;
         brickById[id] = brick;
         YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {YellowBrickContentPolicy} from "./YellowBrickContentPolicy.sol";
+
 /// @notice Per-work IP identity. Registration is not copyright adjudication.
 /// @dev Deployed as an EIP-1167 clone. Implementation instance is locked.
-contract YellowBrick {
+contract YellowBrick is YellowBrickContentPolicy {
     bytes32 public ipId;
     bytes32 public contentHash;
     address public originator;
@@ -41,6 +43,27 @@ contract YellowBrick {
         _initialize(id, hash, creator, uri);
         metadataDigest = digest;
         emit MetadataCommitted(1, digest);
+    }
+
+    /// @notice File commitments and Player permissions are initialized atomically with the Brick.
+    function initializeWithPolicy(bytes32 id, bytes32 hash, address creator, string calldata uri,
+        bytes32 digest, InitialPolicy calldata policy) external
+    {
+        require(digest != bytes32(0), "Brick: empty digest");
+        _initialize(id, hash, creator, uri);
+        metadataDigest = digest;
+        emit MetadataCommitted(1, digest);
+        _initializeContentPolicy(hash, policy);
+    }
+
+    function _policyController() internal view override returns (address) { return controller; }
+    function _policyMetadataVersion() internal view override returns (uint64) { return metadataVersion; }
+    function _policyCommitMetadata(string memory uri, bytes32 digest) internal override {
+        metadataURI = uri;
+        metadataVersion++;
+        metadataDigest = digest;
+        emit MetadataUpdated(metadataVersion, uri);
+        emit MetadataCommitted(metadataVersion, digest);
     }
 
     function _initialize(bytes32 id, bytes32 hash, address creator, string memory uri) internal {
