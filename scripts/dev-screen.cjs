@@ -20,6 +20,10 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  const gold=s=>p('38;5;220',s),cyan=s=>p('38;5;51',s),pink=s=>p('38;5;201',s),dim=s=>p('38;5;244',s);
  const status=k=>(state.services?.[k]||'WAIT').padEnd(5);
  const phase=clean(state.phase||'BOOTING'),g=state.ganache||{},a=state.access||{};
+ const music=state.music||{};
+ const musicLine='Test music: '+(music.state==='VERIFIED'?'Golden Hour / PLAYBACK VERIFIED':music.state==='REGISTERED'?'Golden Hour / REGISTERED':music.state==='SKIPPED'?'SKIPPED (explicit opt-out)':'preparing synthetic fixture');
+ const login=name=>secret(a[name],showSecrets,a.source==='reused'?'[r] restart Player here':'verifying Player login');
+ const logins=['Username: listener   Password: '+login('listener'),'Username: artist     Password: '+login('artist')];
  const elapsed=Math.max(0,(state.now??Date.now())-(state.startedAt??Date.now()));
  const tick=motion?Math.floor(elapsed/180):0;
  const seconds=Math.floor(elapsed/1000),uptime=Math.floor(seconds/60)+':'+String(seconds%60).padStart(2,'0');
@@ -42,6 +46,13 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  const buttons=gold(clip('[d] details [l] logs [s] secrets [p] pause [a] FX [r] player [q] stop',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip('LOCAL TEST KEYS ONLY / Never send real funds / '+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
+ if((w<70||h<22)&&w>=60&&h>=14){
+  // Short windows keep the login information, not just a resize prompt.
+  return [gold(clip('FOLLOW THE YELLOW BRICK ROAD',w)),cyan(clip(phase+' / Node '+(state.nodeVersion||process.version),w)),
+   ...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING'),logins,w,gold),
+   ...Object.entries(URLS).map(([key,url])=>clip(key+' '+status(key)+url,w)),
+   clip(musicLine,w),warning,buttons].slice(0,h);
+ }
  if(w<70||h<22){
   return [gold(clip('YBR // YELLOW BRICK ROAD',w)),cyan(clip(phase+' / Node '+(state.nodeVersion||process.version),w)),
    ...Object.entries(URLS).map(([key,url])=>clip(key+' '+status(key)+url,w)),
@@ -49,25 +60,25 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logo=[' __   __ ____   ____  ',' \\ \\ / /| __ ) |  _ \\ ','  \\ V / |  _ \\ | |_) |','   |_|  |____/ |_| \\_\\'];
  const labels=['YELLOW BRICK ROAD // DEV CONTROL',phase+' / Node '+(state.nodeVersion||process.version)+' / '+uptime,
-  'LOCAL CHAIN 1337 / ENCRYPTED IPFS',motion?'[ LIVE ] // FOLLOW THE BRICKS':'[ STILL ] // MOTION OFF'];
+  'LOCAL CHAIN 1337 / ENCRYPTED IPFS',(motion?'[ LIVE ]':'[ STILL ]')+' // FOLLOW THE YELLOW BRICK ROAD'];
  const head=logo.map((l,i)=>gold(l.padEnd(25))+(i===0?pink:p.bind(null,'38;5;51'))(clip(labels[i],w-25)));
  const unknown=g.source==='reused'?'reused node; see original terminal':'verifying local Ganache';
  const mnemonic=secret(g.mnemonic,showSecrets,unknown);
- const login=name=>secret(a[name],showSecrets,a.source==='reused'?'[r] restart Player here':'waiting for Player');
  const services=['Explorer '+status('web')+URLS.web,'Player   '+status('player')+URLS.player,'IPFS     '+status('ipfs')+URLS.ipfs];
  const chain=[status('ganache')+' RPC '+URLS.ganache+' | Chain 1337',
   'Account 0 '+(g.account||'waiting for RPC'),
   'Balance   '+(g.balance||'--')+' ETH | Block '+(g.block??'--'),
-  'Factory   '+(state.factory||'waiting for deployment')];
+  'Factory   '+(state.factory||'waiting for deployment'),musicLine];
  if(view==='details'){
   const detail=[...box('ACCESS // '+(a.verified?'LOGIN VERIFIED':a.source||'STARTING'),[
-   ...wrap('listener / '+login('listener'),w-4),...wrap('artist   / '+login('artist'),w-4),
+   ...logins.flatMap(line=>wrap(line,w-4)),
    ...wrap('Mnemonic: '+mnemonic,w-4),...wrap('Account 0 key: '+secret(g.privateKey,showSecrets,unknown),w-4),
    "HD path: m/44'/60'/0'/0/0 | ETH | Chain 1337",
    'Wallet: '+(g.source||'pending')+' | Player: '+(a.source||'pending'),
    ...wrap(a.notice||'Player passwords: private .road-local/player-access.json',w-4)],w,gold),
    ...box('CONNECTION REFERENCE',[
     ...wrap('Factory: '+(state.factory||'pending'),w-4),...wrap('IPFS peer: '+(state.peerId||'pending'),w-4),
+    musicLine,...wrap('Test Brick: '+(music.id||'pending'),w-4),...wrap('Test playback: '+(music.mediaUrl||'pending'),w-4),
     'Kubo RPC: '+(state.kuboRpc||'http://127.0.0.1:5001'),
     'Ciphertext: http://127.0.0.1:8080/ipfs/<CID>',
     'Public music: '+URLS.web+'/road/api/music','Health: '+URLS.web+'/api/road-ipfs/health',
@@ -93,12 +104,11 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
   panels=box('SERVICES + GANACHE // '+(g.source||'BOOT'),[
    ...services,status('ganache')+' RPC '+URLS.ganache+' | Chain 1337 | Block '+(g.block??'--'),
    'A0 '+(g.account||'waiting for RPC')+' | '+(g.balance||'--')+' ETH',
-   'Factory '+(state.factory||'waiting for deployment')],w,cyan);
+   'Factory '+(state.factory||'waiting for deployment'),musicLine],w,cyan);
  }
- let access=['listener / '+login('listener')+'    artist / '+login('artist')];
- if(access[0].length>w-4)access=['listener / '+clip(login('listener'),w-15),'artist   / '+clip(login('artist'),w-15)];
+ const access=[...logins];
  access.push(...wrap('Mnemonic: '+mnemonic,w-4));
- const lines=[...head,bricks(),...panels,...box('YBR ACCESS // '+(a.verified?'VERIFIED':'LOCAL')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold)];
+ const lines=[...head,bricks(),...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold),...panels];
  const room=h-lines.length-2;
  if(room>=3)lines.push(...box('ACTIVITY // [l] EXPAND',(state.logs||[]).slice(-Math.min(room-2,4)),w,pink));
  else if(room>0)lines.push(dim(clip(state.error||(state.logs||[]).at(-1)||'Bringing local services online...',w)));

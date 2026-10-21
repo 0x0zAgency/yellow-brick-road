@@ -6,7 +6,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {ethers}=require('ethers');
 const {setTimeout:sleep}=require('node:timers/promises');
-const {fixtureDigest,ensurePlayer}=require('./dev-stack.cjs');
+const {fixtureDigest,ensurePlayer,ensureDemoTrack}=require('./dev-stack.cjs');
 const {readPlayerAccess,accessFile,verifyPlayerAccess}=require('./dev-player-access.cjs');
 async function get(url,options){
  const res=await fetch(url,{signal:AbortSignal.timeout(5000),...options});assert.ok(res.ok,url+' returned HTTP '+res.status);return res;
@@ -39,12 +39,19 @@ async function main(){
  if(process.platform!=='win32')assert.equal(fs.statSync(accessFile(root)).mode&0o777,0o600);
  // Exercise the same reuse branch as a second launcher, without binding a second Vite.
  assert.deepEqual(await ensurePlayer(status.factoryAddress,{}),{source:'reused',verified:true});
+ // Re-run fixture publication against the same chain: no duplicate Brick.
+ const reusedDemo=await ensureDemoTrack(status.factoryAddress,{...process.env,YBR_GANACHE_FACTORY:status.factoryAddress});
+ assert.equal(reusedDemo.disposition,'reused');assert.equal(reusedDemo.id,demo.id);
+ const after=await (await get('http://127.0.0.1:4173/road/api/music')).json();
+ assert.deepEqual(after.tracks.map(t=>t.id),playerCatalog.tracks.map(t=>t.id));
  const log=fs.readFileSync(path.join(root,'.road-local/dev-stack.log'),'utf8');
+ assert.match(log,/TEST MUSIC VERIFIED:/,'The launcher must verify playback before starting Vite');
+ if(process.env.YBR_TEST_EXPECT_LEGACY_PLAYER==='1')assert.match(log,/Repairing this checkout's Player automatically/);
  for(const [username,key] of [['listener','YBR_LISTENER_PASSWORD'],['artist','YBR_ARTIST_PASSWORD']]){
   const password=process.env[key];if(password)assert.equal(saved[username],password);
   assert.ok(!log.includes(saved[username]),'Saved dashboard logs must not contain Player passwords');
  }
  assert.doesNotMatch(log,/Mnemonic:\s+(?!\[redacted\])[a-z]+ [a-z]+/);assert.doesNotMatch(log,/\(\d+\)\s+0x[a-f\d]{64}\b/i);
- console.log('INTEGRATED STACK PASS: Node 24 + Ganache + verified factory + Vite + IPFS proxy + public playback/integrity + private credentials + verified Player reuse + log redaction.');
+ console.log('INTEGRATED STACK PASS: Node 24 + Ganache + verified factory + Vite + IPFS proxy + public playback/integrity + private credentials + automatic legacy Player repair + verified Player reuse + idempotent test publication + log redaction.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
