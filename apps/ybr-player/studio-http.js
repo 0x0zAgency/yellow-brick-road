@@ -1,0 +1,68 @@
+'use strict';
+/** Development-only preview ingestion. Same-origin loopback plus per-process
+ * CSRF token, no wildcard CORS. Never use this as production identity/auth.
+ */
+const crypto=require('node:crypto');
+const {MAX_REQUEST_BYTES,LIMITS}=require('./studio-releases');
+function trustedLocalRequest(req){
+ const ip=req.socket.remoteAddress;
+ if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(ip))return false;
+ let host;
+ try{host=new URL('http://'+req.headers.host);}catch{return false;}
+ if(!['127.0.0.1','localhost','[::1]'].includes(host.hostname)||host.pathname!=='/'||host.username||host.password||host.search||host.hash)return false;
+ if(req.headers.origin&&req.headers.origin!==host.origin)return false;
+ return !['cross-site','none'].includes(req.headers['sec-fetch-site']);
+}
+async function readPublication(req){
+ if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')throw Object.assign(Error('Expected application/json.'),{status:415});
+ const length=req.headers['content-length'];
+ if(length&&(!/^\d+$/.test(length)||Number(length)>MAX_REQUEST_BYTES))throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});
+ const chunks=[];let count=0;
+ for await(const chunk of req){count+=chunk.length;if(count>MAX_REQUEST_BYTES)throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});chunks.push(chunk);}
+ try{return JSON.parse(Buffer.concat(chunks,count).toString('utf8'));}catch{throw Object.assign(Error('Invalid preview JSON.'),{status:400});}
+}
+function createStudioHttp({library,sendJson,requireSession,parseRange}){
+ const token=crypto.randomBytes(32).toString('hex');
+ const validToken=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)&&crypto.timingSafeEqual(Buffer.from(value,'hex'),Buffer.from(token,'hex'));
+ function deliver(req,res,id,role){
+  const asset=library.asset(id,role);
+  if(!asset){sendJson(res,404,{error:'Preview asset not found.'});return;}
+  const range=role==='audio'?parseRange(req.headers.range,asset.bytes.length):{start:0,end:asset.bytes.length-1,partial:false};
+  if(!range){res.writeHead(416,{'Content-Range':'bytes */'+asset.bytes.length,'Cache-Control':'no-store'});res.end();return;}
+  const {start,end,partial}=range;
+  res.writeHead(partial?206:200,{
+   'Content-Type':asset.mime+(asset.mime.startsWith('text/')?'; charset=utf-8':''),
+   'Content-Length':end-start+1,'Cache-Control':'private, no-store','X-Content-Type-Options':'nosniff',
+   'Cross-Origin-Resource-Policy':'same-origin','X-YBR-Content-SHA256':asset.sha256,
+   ...(role==='audio'?{'Accept-Ranges':'bytes'}:{}),
+   ...(partial?{'Content-Range':`bytes ${start}-${end}/${asset.bytes.length}`}:{})
+  });
+  res.end(req.method==='HEAD'?undefined:asset.bytes.subarray(start,end+1));
+ }
+ async function handle(req,res,route){
+  if(route.startsWith('/api/player-publish')){
+   if(!trustedLocalRequest(req)){sendJson(res,403,{error:'Preview publishing requires the same-origin local Road application.'});return true;}
+   if(route==='/api/player-publish/config'&&req.method==='GET'){
+    sendJson(res,200,{mode:'local-creator-preview',token,limits:LIMITS});return true;
+   }
+   if(!validToken(req.headers['x-ybr-publish-token'])){sendJson(res,403,{error:'Local publishing token required.'});return true;}
+   if(route==='/api/player-publish/releases'&&req.method==='POST'){
+    const result=library.publish(await readPublication(req));sendJson(res,result.created?201:200,result);return true;
+   }
+   const removal=/^\/api\/player-publish\/releases\/(STUDIO-[a-f0-9]{64})$/.exec(route);
+   if(removal&&req.method==='DELETE'){
+    sendJson(res,200,{removed:library.remove(removal[1])});return true;
+   }
+   sendJson(res,404,{error:'Publishing endpoint not found.'});return true;
+  }
+  const media=/^\/api\/studio-releases\/(STUDIO-[a-f0-9]{64})\/(artwork|lyrics)$/.exec(route);
+  if(media){
+   if(!requireSession(req,res))return true;
+   if(req.method!=='GET'&&req.method!=='HEAD'){sendJson(res,405,{error:'Read-only asset endpoint.'});return true;}
+   deliver(req,res,media[1],media[2]);return true;
+  }
+  return false;
+ }
+ return {handle,deliver};
+}
+module.exports={createStudioHttp,trustedLocalRequest};

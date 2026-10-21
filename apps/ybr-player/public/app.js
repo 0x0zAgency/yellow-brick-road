@@ -5,6 +5,7 @@ let bricks = [];
 let selected = null;
 let toastTimeout;
 let currentMediaBrick = null;
+let signedIn = false, refreshing = false, librarySignature = '', lastRoadState = '';
 audio.volume = .75;
 
 function toast(message) {
@@ -49,20 +50,21 @@ function updateInspector(brick) {
   $('brickHash').title=brick?.media?.sha256 || 'SHA-256 hash';
   $('brickProvenance').textContent=brick ? `${brick.provenance.agent} · ${brick.provenance.activity}. ${brick.rights.notes} SHA-256 binds this manifest to the original audio bytes.` : 'Select an audio brick to inspect its source and origin.';
   $('inspectorCover').classList.toggle('violet',brick?.theme==='violet');
+  window.dispatchEvent(new CustomEvent('ybr:selection',{detail:{brick}}));
 }
 function renderList() {
   const list=$('trackList'); list.replaceChildren();
   bricks.forEach((brick,i)=>{
     const row=document.createElement('div'); row.className='track-row'+(selected?.id===brick.id?' active':'');
-    row.setAttribute('role','listitem');
+    row.setAttribute('role','listitem');row.dataset.brickId=brick.id;
     row.tabIndex=0;
     const ix=document.createElement('span');ix.className='track-index';ix.textContent=String(i+1).padStart(2,'0');
     const cover=document.createElement('span');cover.className=`track-thumbnail ${brick.theme==='violet'?'violet':'gold'}`;cover.textContent='◆';
     const info=document.createElement('div');info.className='track-info';
     const name=document.createElement('strong');name.textContent=brick.title;
-    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+(brick.source==='road'?'GANACHE · '+brick.id.slice(0,12)+'…':brick.id);
+    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+(brick.source==='road'?'GANACHE · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
     info.append(name,creator);
-    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
+    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
     const duration=document.createElement('span');duration.className='track-duration';duration.textContent=stamp(brick.durationSeconds);
     const play=document.createElement('button');play.className='track-action';play.type='button';play.setAttribute('aria-label',`${brick.streamAllowed?'Play':'Inspect restricted'} ${brick.title}`);play.textContent=brick.streamAllowed?'▶':'⌁';
     const action=()=>choose(brick,true);
@@ -72,6 +74,7 @@ function renderList() {
     row.append(ix,cover,info,tag,duration,play);
     list.append(row);
   });
+  window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks}}));
   $('trackCount').textContent=`${bricks.length} audio bricks · ${bricks.filter(b=>b.source==='road').length} from Ganache`;
 }
 async function choose(brick, playNow=true) {
@@ -108,12 +111,19 @@ async function togglePlay() {
 }
 async function refreshSession() {
   const session=await request('/api/session');
-  if (!session.authenticated) { $('loginOverlay').hidden=false;return; }
+  signedIn=!!session.authenticated;
+  if (!session.authenticated) { audio.pause();currentMediaBrick=null;$('loginOverlay').hidden=false;return; }
   $('loginOverlay').hidden=true;
   $('signedInAs').textContent=`Signed in as ${session.user}`;
   const library=await request('/api/bricks');
+  const signature=JSON.stringify(library.bricks);
+  if(signature===librarySignature&&selected)return;
+  librarySignature=signature;
   bricks=library.bricks;
-  if(library.network?.ready===false) toast('Road offline: '+library.network.reason+' · local demo music remains available');
+  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick)){audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;}
+  const roadState=JSON.stringify(library.network);
+  if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · local demo music remains available');
+  lastRoadState=roadState;
   const previous=selected?.id;
   selected=bricks.find(b=>b.id===previous) || bricks[0] || null;
   if (selected) {
@@ -145,7 +155,7 @@ $('loginForm').addEventListener('submit',async e=>{
   finally {button.disabled=false;}
 });
 $('logout').addEventListener('click',async()=>{
-  audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;selected=null;bricks=[];
+  signedIn=false;librarySignature='';audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=null;selected=null;bricks=[];
   await post('/api/logout');
   $('loginOverlay').hidden=false;
   $('signedInAs').textContent='Not connected';
@@ -168,5 +178,16 @@ $('inspectorNav').addEventListener('click',()=>{$('inspector').scrollIntoView({b
 $('libraryNav').addEventListener('click',()=>{$('trackList').scrollIntoView({behavior:'smooth',block:'center'});});
 for(const event of ['timeupdate','durationchange','play','pause','ended','loadedmetadata']) audio.addEventListener(event,updatePlayback);
 for(const event of ['play','pause','ended']) audio.addEventListener(event,()=>recordEvent(event));
-audio.addEventListener('error',()=>{if(audio.getAttribute('src'))toast('Audio could not be loaded. Your authorization may have expired. Click the track to retry.');});
+audio.addEventListener('error',()=>{if(audio.getAttribute('src')){currentMediaBrick=null;toast('Audio could not be loaded. Your authorization may have expired. Click the track to retry.');}});
 refreshSession().catch(e=>toast(e.message));
+
+async function refreshLibrary(){
+  if(!signedIn||refreshing)return;
+  refreshing=true;
+  try{await refreshSession();}catch{window.dispatchEvent(new Event('ybr:library-error'));}
+  finally{refreshing=false;}
+}
+window.addEventListener('ybr:refresh-request',()=>void refreshLibrary());
+window.addEventListener('ybr:select-release',event=>{const found=bricks.find(brick=>brick.id===event.detail?.id);if(found)void choose(found,false);});
+setInterval(()=>{if(!document.hidden)void refreshLibrary();},5000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLibrary();});
