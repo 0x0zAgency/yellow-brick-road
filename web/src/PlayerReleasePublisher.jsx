@@ -1,9 +1,13 @@
 import {useEffect,useRef,useState} from 'react';
 import {playerReleaseFiles,publishPlayerRelease,removePlayerRelease} from './player-release.js';
 import './player-release.css';
+import NftCoverPublisher from './NftCoverPublisher.jsx';
 
 /** Explicit publication of local demo copies, independent of the mint transaction. */
-export default function PlayerReleasePublisher({packet,mint,vault}){
+export default function PlayerReleasePublisher(props){
+ return <><NftCoverPublisher {...props}/><PlayerPreviewPublisher {...props}/></>;
+}
+function PlayerPreviewPublisher({packet,mint,vault}){
  const [consent,setConsent]=useState(false),[artwork,setArtwork]=useState(true),[lyrics,setLyrics]=useState(true);
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[published,setPublished]=useState(null);
  const work=useRef(null),revision=useRef(0),lock=useRef(false);
