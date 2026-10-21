@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react';
 import CopyField from './CopyField.jsx';
+import NftCoverPublisher from './NftCoverPublisher.jsx';
 import IpfsRecovery from './IpfsRecovery.jsx';
 import {validCid} from './ipfs-upload.js';
 import {BrickOwnerApprovals} from './BrickLinkApprovals.jsx';
@@ -92,6 +93,7 @@ export default function WalletBricks({wallet,onConnect}){
      <div className="wb-brick-links">{chainId===11155111?<><a href={'https://sepolia.etherscan.io/address/'+brick.address} rel="noreferrer" target="_blank">View contract on Sepolia ↗</a><a href={'https://sepolia.etherscan.io/tx/'+brick.transactionHash} rel="noreferrer" target="_blank">View mint transaction ↗</a></>:<span>Ganache transaction: {short(brick.transactionHash)}</span>}</div>
      {brick.metadataURI?.startsWith('ipfs://')&&validCid(brick.metadataURI.slice(7))&&<button type="button" className="outline-btn wb-recover" onClick={()=>setRecoveryAddress(brick.address)}>Recover encrypted files</button>}
      {recoveryAddress===brick.address&&<IpfsRecovery key={chainId+':'+brick.address+':'+brick.metadataDigest} brick={brick} onClose={()=>setRecoveryAddress(null)}/>}
+     {brick.nftContractAddress&&brick.tokenId&&<details className="wb-nft-cover"><summary>Set or update NFT cover</summary><NftCoverPublisher wallet={wallet} mint={{simulated:false,status:'confirmed',chainId,factoryAddress:result.verifiedFactory,receipts:[{status:'verified',chainId,nftContractAddress:brick.nftContractAddress,tokenId:brick.tokenId,contractAddress:brick.address}]}}/></details>}
     </article>)}</div>
    </div>}
   </>}

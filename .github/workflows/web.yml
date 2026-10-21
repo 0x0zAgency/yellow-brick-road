@@ -5,6 +5,7 @@ on:
       - 'web/**'
       - 'scripts/dev*'
       - 'scripts/use-node24.sh'
+      - 'scripts/nft-cover-smoke.cjs'
       - 'package.json'
       - '.nvmrc'
       - 'infra/ipfs/**'
@@ -15,6 +16,7 @@ on:
       - 'web/**'
       - 'scripts/dev*'
       - 'scripts/use-node24.sh'
+      - 'scripts/nft-cover-smoke.cjs'
       - 'package.json'
       - '.nvmrc'
       - 'infra/ipfs/**'
@@ -78,3 +80,4 @@ jobs:
           trap 'kill -TERM "$STACK_PID" 2>/dev/null || true; kill -TERM "$LEGACY_PID" 2>/dev/null || true; sleep 2; cat /tmp/ybr-integrated.log; rm -f /tmp/ybr-legacy-player.log' EXIT
           node scripts/dev-stack-smoke.cjs
           node scripts/dev-registry-smoke.cjs
+          node scripts/nft-cover-smoke.cjs
