@@ -132,6 +132,17 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       if (req.method === 'POST' && origin && origin !== expectedOrigin) return fail(res, 403, 'Cross-origin requests are not allowed');
       const url = new URL(req.url || '/', expectedOrigin);
       const route = url.pathname;
+      // Public playback is a deliberately open, rights-gated API.
+      // Cross-origin reads are allowed only here, never on private session APIs.
+      if (route.startsWith('/road/')) {
+        res.setHeader('Access-Control-Allow-Origin','*');
+        res.setHeader('Access-Control-Allow-Methods','GET, HEAD, OPTIONS');
+        res.setHeader('Access-Control-Expose-Headers','Content-Length, Content-Range, Accept-Ranges, X-YBR-Content-SHA256');
+        if (req.method==='OPTIONS') {
+          res.writeHead(204,{'Cache-Control':'no-store','Access-Control-Max-Age':'600'});
+          return res.end();
+        }
+      }
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Referrer-Policy', 'no-referrer');
       res.setHeader('X-Frame-Options', 'DENY');
