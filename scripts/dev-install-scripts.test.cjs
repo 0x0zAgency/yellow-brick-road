@@ -4,7 +4,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {approvalArgs,projectDirs,readPolicy,prepareInstallScripts}=require('./dev-install-scripts.cjs');
+const {approvalArgs,npmHelp,projectDirs,readPolicy,prepareInstallScripts}=require('./dev-install-scripts.cjs');
 
 function harness(t,{installed=true,policy={},help='All commands: install, install-scripts, rebuild',change=true}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-approve-test-'));
@@ -106,4 +106,22 @@ test('bootstrap keeps Node-only checks before approvals, and approvals before st
  const code=fs.readFileSync(path.join(__dirname,'dev.cjs'),'utf8');
  assert.ok(code.indexOf("args.includes('--check-node')")<code.indexOf('prepareInstallScripts'));
  assert.ok(code.indexOf('prepareInstallScripts')<code.indexOf("require('./dev-stack.cjs').main()"));
+});
+
+test('accepts npm general help exiting 1 only when a complete valid usage screen is returned',async()=>{
+ const stdout='npm <command>\nUsage:\nAll commands:\n install, install-scripts, rebuild';
+ const help=await npmHelp('npm',{},async()=>{throw Object.assign(Error('Command failed'),{code:1,stdout,stderr:''});});
+ assert.deepEqual(approvalArgs(help),['install-scripts','approve','--all']);
+});
+test('help exit 1 is not a blanket exception for config errors, partial output or timeouts',async()=>{
+ for(const values of [
+  {code:1,stdout:'npm <command>\nAll commands: install-scripts',stderr:'npm error Invalid config'},
+  {code:1,stdout:'install-scripts'},
+  {code:1,killed:true,stdout:'npm <command>\nAll commands: install-scripts'},
+  {code:'EACCES',stdout:'npm <command>\nAll commands: install-scripts'}
+ ])await assert.rejects(npmHelp('npm',{},async()=>{throw Object.assign(Error('failure'),values);}));
+});
+test('reads real installed npm help without installing or changing any policy',async()=>{
+ const help=await npmHelp(process.platform==='win32'?'npm.cmd':'npm',{timeout:10000,maxBuffer:1024*1024});
+ assert.match(help,/npm <command>/);assert.match(help,/All commands:/);
 });
