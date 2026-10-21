@@ -9,6 +9,7 @@ on:
       - 'scripts/player-release-browser.cjs'
       - 'scripts/player-library-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
+      - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
       - '.github/workflows/player-releases.yml'
   pull_request:
@@ -20,6 +21,7 @@ on:
       - 'scripts/player-release-browser.cjs'
       - 'scripts/player-library-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
+      - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
       - '.github/workflows/player-releases.yml'
 permissions:
@@ -69,6 +71,7 @@ jobs:
           trap 'kill -TERM "$PLAYER_PID" "$WEB_PID" 2>/dev/null || true; cat /tmp/ybr-browser-web.log' EXIT
           node scripts/player-release-browser.cjs
           node scripts/upload-metadata-browser.cjs
+          node scripts/nft-cover-browser.cjs
           node scripts/player-library-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
