@@ -14,3 +14,15 @@ web/.env.local
 
 # Disposable Ganache receipts
 .road-local/
+web/test_files/Back To The Fire.mp3
+web/test_files/Be Menaced By Orn.mp3
+web/test_files/cover art.jpg
+web/test_files/Cruise Contol.mp3
+web/test_files/Endeavor \[Master v1\].wav
+web/test_files/Exceed.mp3
+web/test_files/Irrevocable Dream.mp3
+web/test_files/Knights of Legend.mp3
+web/test_files/lyrics sample.txt
+web/test_files/Synethian \[Master v1\].wav
+web/test_files/Truth.mp3
+web/test_files/Violet \[Master v1\].wav
