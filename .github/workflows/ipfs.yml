@@ -1,4 +1,4 @@
-name: YBR IPFS Encrypted Upload
+name: YBR IPFS Encrypted Upload and Recovery
 on:
   push:
     paths:
@@ -44,11 +44,11 @@ jobs:
           done
           cat /tmp/ybr-ipfs-bridge.log
           exit 1
-      - name: Upload real encrypted bytes and verify pinned CID
+      - name: Upload, export, import and recover real encrypted IPFS files
         run: npm run ipfs:smoke
       - name: Restart Kubo without deleting its persistent volume
         run: docker compose -f infra/ipfs/compose.yaml restart kubo
-      - name: Verify CID and pin survive restart
+      - name: Recover originals and metadata after the node restart
         run: |
           ready=0
           for attempt in {1..60}; do

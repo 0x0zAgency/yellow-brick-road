@@ -41,6 +41,12 @@ test('IPFS metadata is itself encrypted, can be recovered with secret, and is re
  };
  const result=await pinEncryptedBrickMetadata({packet,secret:key,fetchImpl});
  assert.equal(result.bricks[0].metadataCipherCid,CID);
+ assert.match(result.bricks[0].metadataCipherSha256,/^[a-f0-9]{64}$/);
+ assert.equal(result.bricks[0].metadataCipherSize,seen[0].byteLength);
+ const expectedMetadata=new TextEncoder().encode(JSON.stringify(original));
+ const expectedDigest=[...new Uint8Array(await crypto.subtle.digest('SHA-256',expectedMetadata))].map(b=>b.toString(16).padStart(2,'0')).join('');
+ assert.equal(result.bricks[0].metadataPlaintextSha256,expectedDigest);
+ assert.equal(result.bricks[0].metadataPlaintextSize,expectedMetadata.byteLength);
  assert.equal(result.storage.uploaded,true);assert.equal(result.storage.encrypted,true);
  assert.equal(result.storage.provider,'ybr-local-kubo');
  assert.equal(result.storage.approvedProvider,false);

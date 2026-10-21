@@ -4,7 +4,7 @@
 
 This is the first **real content-addressed upload** path for Yellow Brick Road. It is opt-in, local-first, and intended for small test assets only. Mint Studio hashes and encrypts original files in the browser and sends only the encrypted `0ZROAD01` container through the local YBR upload bridge into our own pinned Kubo node. New per-Brick metadata documents are likewise encrypted in the browser, pinned, and referenced by `ipfs://<CID>` in subsequent test-chain mints.
 
-This is not a production storage, creator-recovery, rights licensing, or durable global availability guarantee.
+The pilot supports creator recovery with a locally imported private backup. It is not a production storage, custodial recovery, rights licensing, or durable global availability guarantee.
 
 ## Start the persistent local node
 
@@ -15,7 +15,7 @@ npm run ipfs:up
 npm run ipfs:status
 ```
 
-`infra/ipfs/compose.yaml` starts official Kubo and persists its repository in the Docker named volume `ybr-kubo-data`. `docker compose down` or `npm run ipfs:down` stops the container **without deleting its volume**. **Do not use `down -v`** unless you intend to delete all locally pinned content. Back up the Docker volume and the creator's separate key file.
+`infra/ipfs/compose.yaml` starts official Kubo and persists its repository in the Docker named volume `ybr-kubo-data`. `docker compose -f infra/ipfs/compose.yaml down` or `npm run ipfs:down` stops the container **without deleting its volume**. **Do not use `down -v`** unless you intend to delete all locally pinned content. Back up the Docker volume and the creator's separate key file.
 
 In terminal two, run the narrow upload bridge:
 
@@ -23,7 +23,7 @@ In terminal two, run the narrow upload bridge:
 npm run ipfs:bridge
 ```
 
-The bridge is bound to `127.0.0.1:8791`. It accepts only encrypted binary `POST /api/road-ipfs/upload` (maximum **32 MiB per encrypted container**) and a health read. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. The pin and returned CID are authoritative only for the local node at that moment. Automated CI also restarts Kubo and rechecks that the pin and bytes survive when the named Docker volume remains attached.
+The bridge is bound to `127.0.0.1:8791`. It accepts encrypted binary `POST /api/road-ipfs/upload`, `GET /api/road-ipfs/content/<CID>` for locally pinned ciphertext, and a health read. Both upload and retrieval have a **32 MiB per encrypted container** limit. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. Reads require a direct or recursive local pin before fetching content. The pin and returned CID are authoritative only for the local node at that moment. Automated CI also restarts Kubo and recovers the original and metadata through the narrow bridge when the named Docker volume remains attached.
 
 In terminal three:
 
@@ -48,6 +48,44 @@ docker compose -f infra/ipfs/compose.yaml exec kubo ipfs pin ls --type=recursive
 ```
 
 The Kubo HTTP gateway is loopback-only at `http://127.0.0.1:8080/ipfs/<CID>` for inspecting **ciphertext**. CID retrieval via the public IPFS network is possible when reachable and connected, but this setup alone does not provide a public endpoint or geographic redundancy.
+
+## Recover files after reopening the app
+
+Keep the original Kubo data volume and run the node, bridge, and Vite frontend as above. The key and all decryption stay in the browser; the bridge receives only a CID when retrieving a file.
+
+### Recovery from a private backup
+
+1. After upload, download **private recovery keys** from Mint Studio. New exports use `0x-road-ipfs-recovery-v2` and include the key, CIDs, ciphertext checksums and sizes, and original checksums and sizes. This is a private local backup format, not a provenance standard or a license.
+2. Close/reopen the app or choose **Recover files** in the sidebar.
+3. Select the private recovery JSON. Import is local and sends no request.
+4. Click **Recover & download** beside an original file or encrypted metadata document. The browser fetches ciphertext, checks its hash and size, authenticates/decrypts the container, checks the original hash and size, then offers a download.
+5. Use **Clear recovery session** to discard the imported key and cancel pending retrieval. No key or recovered plaintext is saved in localStorage.
+
+Files are downloaded as attachments, never rendered as arbitrary HTML or SVG in the application. No wallet signature is needed for private key-holder recovery. Possession of a key does not establish legal rights or a streaming license.
+
+### Recovery from an on-chain Brick
+
+1. In **My Bricks**, scan the correct network and factory.
+2. On a Brick whose metadata reference is a supported `ipfs://` CID, choose **Recover encrypted files**.
+3. Import the private backup and click **Retrieve & verify registered metadata**.
+4. The browser compares the exact decrypted metadata bytes with the metadata digest read from that Brick contract. A mismatch stops recovery before metadata-derived file references are shown.
+5. Recover the referenced originals. Their ciphertext and plaintext checksums come from the verified metadata.
+
+This path can use an early key-only backup: the observed on-chain metadata URI supplies the missing CID. It verifies the scanned registration's commitment, not copyright ownership or a live license decision. Changing wallet/network or rerunning the scan clears the recovery session.
+
+### Older and incomplete backups
+
+Version-one recovery files remain supported. Their asset entries have ciphertext digests but no independently recorded original digests, and their metadata entries have no saved checksums. The UI reports these weaker checks explicitly. A selected on-chain metadata commitment can supply an independent plaintext check for a legacy or key-only backup.
+
+An early backup with no CIDs cannot locate content by itself. Use it with an IPFS-backed Brick in My Bricks, or import the final backup exported after upload. Recovery cannot restore a missing key or content whose pins/storage were lost.
+
+### Recovery boundary and verification
+
+- Only bare CIDs are accepted. No arbitrary gateway URL, path suffix, query string, redirect, or generic Kubo RPC is exposed.
+- The bridge checks a local pin, bounds streamed response bytes, validates generic encrypted-container headers, and returns ciphertext with `no-store`, `nosniff`, and attachment headers.
+- The browser independently hashes the returned bytes against its imported or metadata-derived commitment. A bridge-provided hash alone is not the trust anchor.
+- Imported backups are capped at 1 MiB and 64 entries per list. Retrieval has a 30-second browser timeout and supports cancellation; stale operations cannot download after a new backup is imported or the panel closes.
+- The smoke test exercises real encrypted source and metadata upload, private-backup export/import, recovery, wrong-key rejection, and checksum mismatch rejection. The restart check recovers source bytes again through the same endpoint.
 
 ## Private data and recovery
 
