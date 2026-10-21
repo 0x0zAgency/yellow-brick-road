@@ -330,3 +330,14 @@ and decryption keys stay in the browser in both modes; the optional IPFS path
 publishes only their encrypted containers. Integration tests exercise both network paths
 using disposable local chains, including one configured with Sepolia's chain ID;
 they do not spend funds on public Sepolia.
+
+## Start the integrated YBR development stack
+
+For local testing, the main web app now launches the **standalone YBR Player**, Ganache (or reuses your existing chain 1337), the verified YellowBrickFactory, and one opt-in synthetic audio Brick together:
+
+```sh
+npm run setup:dev  # first time only
+npm run dev
+```
+
+The same integrated workflow runs from `cd web && npm run dev`. Main web: `http://127.0.0.1:5173` • YBR Player: `http://127.0.0.1:4173` • Public Road Music: `http://127.0.0.1:5173/road/api/music`. Only our generated test recording is automatically published on disposable local Ganache; private IPFS and other creator assets remain private. For standalone Vite, use `cd web && npm run dev:web`. Read [integrated setup and safety guidance](docs/INTEGRATED_DEV_STACK.md).
