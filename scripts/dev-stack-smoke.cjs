@@ -2,6 +2,8 @@
 /** CI smoke: must run against the integrated local stack after npm run dev. */
 const assert=require('node:assert/strict');
 const crypto=require('node:crypto');
+const fs=require('node:fs');
+const path=require('node:path');
 const {ethers}=require('ethers');
 const {setTimeout:sleep}=require('node:timers/promises');
 const {fixtureDigest}=require('./dev-stack.cjs');
@@ -59,6 +61,19 @@ async function main(){
  assert.match(ui,/<div id="root"><\/div>/);
  const blocked=await fetch('http://127.0.0.1:4173/api/bricks');
  assert.equal(blocked.status,401,'Private Player library remains authenticated');
- console.log('INTEGRATED STACK PASS: Ganache 1337 + verified factory + web UI + player + published Brick + cross-player streaming + integrity + healthy Kubo/bridge through the web proxy.');
+ // Test the exact local credentials supplied to the launcher, without printing them.
+ const log=fs.readFileSync(path.join(__dirname,'..','.road-local','dev-stack.log'),'utf8');
+ for(const [username,key] of [['listener','YBR_LISTENER_PASSWORD'],['artist','YBR_ARTIST_PASSWORD']]){
+  const password=process.env[key];
+  if(!password)continue;
+  const session=await (await get('http://127.0.0.1:4173/api/session',{
+   method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username,password})
+  })).json();
+  assert.equal(session.authenticated,true);assert.equal(session.user,username);
+  assert.ok(!log.includes(password),'Saved dashboard logs must not contain player passwords');
+ }
+ assert.doesNotMatch(log,/Mnemonic:\s+(?!\[redacted\])[a-z]+ [a-z]+/);
+ assert.doesNotMatch(log,/\(\d+\)\s+0x[a-f\d]{64}\b/i);
+ console.log('INTEGRATED STACK PASS: Ganache 1337 + verified factory + web UI + player + published Brick + cross-player streaming + integrity + healthy Kubo/bridge through the web proxy + dashboard credential forwarding and redaction.');
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -9,6 +9,7 @@
  * Never uploads Mint Studio files or keys automatically.
  *
  * Usage: npm run dev (repo root), or cd web && npm run dev.
+ * Dashboard controls and plain-output mode: docs/DEV_DASHBOARD.md.
  */
 const fs=require('node:fs');
 const path=require('node:path');
@@ -16,7 +17,8 @@ const {spawn}=require('node:child_process');
 const {setTimeout:sleep}=require('node:timers/promises');
 const {ethers}=require('ethers');
 const crypto=require('node:crypto');
-const {ensureIpfs,IPFS_URL}=require('./dev-ipfs.cjs');
+const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
+const {DevDashboard,playerCredentials}=require('./dev-dashboard.cjs');
 
 const ROOT=path.resolve(__dirname,'..');
 const PLAYER=path.join(ROOT,'apps','ybr-player');
@@ -28,13 +30,20 @@ const WEB_URL='http://127.0.0.1:5173';
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const ABI=['function implementation() view returns (address)'];
 const OWNED=new Map();
-let stopping=false;
+let stopping=false,dashboard=null,healthTimer=null,healthBusy=false;
+const log=message=>dashboard?dashboard.log('launcher',message):console.log(message);
 
 function command(){return process.platform==='win32'?'npm.cmd':'npm';}
-function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio='inherit'}={}){
+function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio=dashboard?['ignore','pipe','pipe']:'inherit'}={}){
+ if(stopping)throw Error('Startup cancelled.');
  const proc=spawn(executable,args,{cwd,env,stdio,detached:process.platform!=='win32'});
+ dashboard?.attach(label,proc);
  OWNED.set(proc.pid, {label,proc});
- proc.once('exit',()=>OWNED.delete(proc.pid));
+ proc.once('exit',(code,signal)=>{
+  OWNED.delete(proc.pid);
+  if(!stopping&&['ganache','YBR Player','Road Explorer','YBR IPFS bridge'].includes(label))
+   shutdown(label+' unexpectedly exited ('+(signal||code)+')',1);
+ });
  proc.once('error',()=>OWNED.delete(proc.pid));
  return proc;
 }
@@ -44,13 +53,15 @@ function stopOwned(){
   try{
    if(process.platform!=='win32'&&proc.pid)process.kill(-proc.pid,'SIGTERM');
    else proc.kill('SIGTERM');
-  }catch(e){if(e.code!=='ESRCH')console.error('Could not stop '+proc.pid+': '+e.message);}
+  }catch(e){if(e.code!=='ESRCH')log('Could not stop '+proc.pid+': '+e.message);}
  }
 }
 function shutdown(reason,code=0){
  if(stopping)return;
  stopping=true;
- console.log('\n[YBR] '+reason+'. Stopping managed processes; persistent Kubo is left running.');
+ clearInterval(healthTimer);
+ log(reason+'. Stopping managed processes; persistent Kubo is left running.');
+ dashboard?.close(reason+'. Persistent Kubo and its pins are left intact.');
  stopOwned();
  process.exitCode=code;
 }
@@ -118,13 +129,14 @@ function fixtureDigest(){
 async function ensureGanache(){
  const current=await probeGanache();
  if(current.online){
-  console.log('[YBR] Reusing running Ganache 1337 on '+RPC);
-  return;
+  log('Reusing running Ganache 1337 on '+RPC);
+  return 'reused';
  }
- console.log('[YBR] Starting local Ganache on '+RPC);
+ log('Starting local Ganache on '+RPC);
  const proc=spawnOwned('ganache',command(),['run','ganache'],{cwd:ROOT});
  proc.on('error',e=>shutdown('Ganache startup error: '+e.message,1));
  await waitUntil('Ganache 1337',async()=> (await probeGanache()).online,{timeoutMs:45000});
+ return 'owned';
 }
 async function ensureFactory(){
  const provider=new ethers.providers.JsonRpcProvider(RPC,{name:'ganache-local',chainId:1337});
@@ -134,13 +146,13 @@ async function ensureFactory(){
   throw Error('Configured factory '+fromEnv+' is not a compatible deployment on Ganache 1337. Fix YBR_GANACHE_FACTORY/VITE_ROAD_GANACHE_FACTORY.');
  }
  if(found && (await validateFactory(provider,found))){
-  console.log('[YBR] Reusing YellowBrickFactory '+found);
+  log('Reusing YellowBrickFactory '+found);
   return found;
  }
- if(found)console.log('[YBR] Previous factory not present on this chain; deploying a fresh one.');
- console.log('[YBR] Compiling the existing Yellow Brick contracts...');
+ if(found)log('Previous factory not present on this chain; deploying a fresh one.');
+ log('Compiling the existing Yellow Brick contracts...');
  await run('Hardhat compile',command(),['run','compile']);
- console.log('[YBR] Deploying the existing YellowBrickFactory to Ganache...');
+ log('Deploying the existing YellowBrickFactory to Ganache...');
  await run('Ganache factory deploy',command(),['run','ganache:deploy']);
  const deployed=factoryFromFile();
  if(!(await validateFactory(provider,deployed)))throw Error('Deployed factory could not be verified.');
@@ -148,7 +160,7 @@ async function ensureFactory(){
 }
 async function ensureDemoTrack(factoryAddress,env){
  if(process.env.YBR_STACK_NO_DEMO_MUSIC==='1'){
-  console.log('[YBR] Automatic synthetic fixture publication skipped (YBR_STACK_NO_DEMO_MUSIC=1).');
+  log('Automatic synthetic fixture publication skipped (YBR_STACK_NO_DEMO_MUSIC=1).');
   return;
  }
  await run('Generate first-party synthetic demo audio',process.execPath,
@@ -159,10 +171,10 @@ async function ensureDemoTrack(factoryAddress,env){
  const hash=fixtureDigest();
  if(catalog.tracks.some(t=>t.creator==='The Amber Sessions' &&
   t.title==='Golden Hour — Road Release'&&t.media.sha256===hash)){
-  console.log('[YBR] Reusing already published synthetic Road audio Brick.');
+  log('Reusing already published synthetic Road audio Brick.');
   return;
  }
- console.log('[YBR] Publishing our generated Golden Hour fixture to Ganache (not private user media)...');
+ log('Publishing our generated Golden Hour fixture to Ganache (not private user media)...');
  await run('Publish original demo music',process.execPath,
   [path.join(PLAYER,'scripts','publish-road-track.js'),'--publish',
    '--file',path.join(PLAYER,'media','golden-hour.wav'),'--title','Golden Hour — Road Release',
@@ -175,10 +187,15 @@ async function ensurePlayer(factoryAddress,env){
    String(previous.factoryAddress).toLowerCase()!==factoryAddress.toLowerCase()){
    throw Error('Port 4173 has another Player instance using a different or unhealthy factory. Stop it before launching the integrated stack.');
   }
-  console.log('[YBR] Reusing existing YBR Player on '+PLAYER_URL);
+  log('Reusing existing YBR Player on '+PLAYER_URL);
+  dashboard?.update({access:{source:'reused'}});
   return;
  }
- console.log('[YBR] Starting YBR Player on '+PLAYER_URL);
+ const credentials=playerCredentials(env);
+ dashboard?.addSecrets(credentials.listener,credentials.artist);
+ env={...env,YBR_LISTENER_PASSWORD:credentials.listener,YBR_ARTIST_PASSWORD:credentials.artist};
+ dashboard?.update({access:{...credentials,source:'owned'}});
+ log('Starting YBR Player on '+PLAYER_URL);
  const proc=spawnOwned('YBR Player',command(),['run','start'],{cwd:PLAYER,env});
  proc.on('error',e=>shutdown('Player startup error: '+e.message,1));
  await waitUntil('YBR Player',async()=>{
@@ -189,7 +206,7 @@ async function ensurePlayer(factoryAddress,env){
 async function launchWeb(env){
  const existing=await fetch(WEB_URL,{signal:AbortSignal.timeout(900)}).then(r=>r.ok).catch(()=>false);
  if(existing)throw Error('Port 5173 already has a web server. Stop the old Vite process before starting the integrated stack.');
- console.log('[YBR] Starting Road Explorer on '+WEB_URL);
+ log('Starting Road Explorer on '+WEB_URL);
  const proc=spawnOwned('Road Explorer',command(),['run','dev:web'],{cwd:WEB,env});
  proc.on('error',e=>shutdown('Vite startup error: '+e.message,1));
  await waitUntil('Road Explorer Vite',async()=>{
@@ -197,31 +214,84 @@ async function launchWeb(env){
   return response.ok;
  },{timeoutMs:30000});
 }
+/** Read the live chain, never assume a reused node has our deterministic seed. */
+async function refreshWallet(source){
+ const provider=new ethers.providers.JsonRpcProvider({url:RPC,timeout:2500},{name:'ganache-local',chainId:1337});
+ const [accounts,block]=await Promise.all([provider.listAccounts(),provider.getBlockNumber()]);
+ const account=accounts[0];
+ const balance=account?ethers.utils.formatEther(await provider.getBalance(account)):'--';
+ const wallet={source,account,block,balance};
+ const candidate=dashboard?.candidateMnemonic;
+ if(source==='owned'&&candidate&&account){
+  try{
+   const derived=ethers.Wallet.fromMnemonic(candidate);
+   if(derived.address.toLowerCase()===account.toLowerCase()){
+    wallet.mnemonic=candidate;wallet.privateKey=derived.privateKey;
+    dashboard.addSecrets(candidate,derived.privateKey);
+   }else log('Ganache seed did not match account 0; refusing to display it.');
+  }catch{log('Could not verify Ganache wallet seed; see the node configuration.');}
+ }
+ dashboard?.update({ganache:wallet});
+}
+async function refreshHealth(){
+ if(stopping||healthBusy)return;
+ healthBusy=true;
+ try{
+  const [ganache,player,ipfs,web]=await Promise.all([
+   probeGanache().catch(()=>({online:false})),fetchJson(PLAYER_URL+'/road/api/status'),
+   probeIpfs().catch(()=>({ready:false})),
+   fetch(WEB_URL,{signal:AbortSignal.timeout(1500)}).then(r=>r.ok).catch(()=>false)]);
+  if(stopping)return;
+  dashboard.service('ganache',ganache.online?'UP':'DOWN');
+  dashboard.service('player',player?.ready===true&&
+   player?.factoryAddress?.toLowerCase()===dashboard.state.factory.toLowerCase()?'UP':'DOWN');
+  dashboard.service('ipfs',ipfs.ready?'UP':'DOWN');
+  dashboard.service('web',web?'UP':'DOWN');
+  if(ganache.online)await refreshWallet(dashboard.state.ganache.source);
+  if(stopping)return;
+  dashboard.update({phase:Object.values(dashboard.state.services).every(s=>s==='UP')?'READY':'DEGRADED'});
+ }catch(error){if(!stopping)log('Health refresh: '+error.message);}
+ finally{healthBusy=false;}
+}
 async function main(){
- ensureDependencies();
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));
  process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
-  await ensureIpfs({run,spawnOwned,command,waitUntil,isStopping:()=>stopping});
+  dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard')});
+  process.once('exit',()=>dashboard.close('Launcher exited'));
+  dashboard.start();
+  // Register env overrides before any child can echo them into captured output.
+  dashboard.addSecrets(process.env.YBR_LISTENER_PASSWORD,process.env.YBR_ARTIST_PASSWORD);
+  ensureDependencies();
+  dashboard.update({phase:'STARTING IPFS',kuboRpc:process.env.YBR_KUBO_RPC});
+  dashboard.service('ipfs','START');
+  const ipfs=await ensureIpfs({run,spawnOwned,command,waitUntil,log,isStopping:()=>stopping});
   if(stopping)return;
-  await ensureGanache();
+  dashboard.service('ipfs','UP');dashboard.update({peerId:ipfs.peerId,phase:'STARTING GANACHE'});
+  dashboard.service('ganache','START');
+  const source=await ensureGanache();
+  dashboard.service('ganache','UP');
+  await refreshWallet(source);
+  dashboard.update({phase:'VERIFYING FACTORY'});
   const factory=await ensureFactory();
+  dashboard.update({factory,phase:'PREPARING DEMO MUSIC'});
   const env={...process.env,YBR_GANACHE_FACTORY:factory,VITE_ROAD_GANACHE_FACTORY:factory};
   await ensureDemoTrack(factory,env);
+  dashboard.update({phase:'STARTING PLAYER'});dashboard.service('player','START');
   await ensurePlayer(factory,env);
+  dashboard.service('player','UP');dashboard.update({phase:'STARTING EXPLORER'});
+  dashboard.service('web','START');
   await launchWeb(env);
-  console.log('\n[YBR] INTEGRATED ROAD READY');
-  console.log('[YBR] Road Explorer  '+WEB_URL);
-  console.log('[YBR] YBR Player     '+PLAYER_URL);
-  console.log('[YBR] IPFS storage   '+IPFS_URL+' (healthy, encrypted-content bridge)');
-  console.log('[YBR] Public Music   '+WEB_URL+'/road/api/music');
-  console.log('[YBR] Factory        '+factory+' (local Ganache 1337)');
-  console.log('[YBR] Synthetic-fixture access is local only. No user media or private IPFS content is published.');
-  console.log('[YBR] Ctrl+C stops managed processes, including a bridge started here. Existing services and persistent Kubo are left running.');
-  console.log('[YBR] To stop Kubo separately without deleting pins: npm run ipfs:down.\n');
-  // Keep parent alive to manage child processes and their exit status.
+  if(stopping)return;
+  dashboard.service('web','UP');
+  // Verify storage through the exact proxy used by Mint Studio before READY.
+  const proxied=await fetchJson(WEB_URL+'/api/road-ipfs/health',{timeout:6500});
+  if(proxied?.ok!==true||proxied.peerId!==ipfs.peerId)throw Error('Mint Studio IPFS proxy did not reach the expected healthy Kubo node.');
+  dashboard.ready();
+  healthTimer=setInterval(()=>void refreshHealth(),4000);healthTimer.unref();
   await new Promise((resolve,reject)=>{
    for(const {label,proc} of OWNED.values()){
+    if(proc.exitCode!==null||proc.signalCode!==null){reject(Error(label+' exited during startup'));break;}
     proc.on('exit',(code,signal)=>{
      if(stopping)return;
      reject(Error(label+' unexpectedly exited ('+(signal||code)+')'));
@@ -229,8 +299,8 @@ async function main(){
    }
   });
  }catch(e){
-  console.error('[YBR] '+e.message);
-  shutdown('Integrated launch failed',1);
+  log(e.message);
+  shutdown('Integrated launch failed: '+e.message,1);
  }
 }
 if(require.main===module){void main();}
