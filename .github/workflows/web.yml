@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - 'web/**'
+      - 'scripts/dev-dashboard*'
       - 'scripts/dev-ipfs.cjs'
       - 'scripts/dev-ipfs.test.cjs'
       - 'infra/ipfs/**'
@@ -14,6 +15,7 @@ on:
   pull_request:
     paths:
       - 'web/**'
+      - 'scripts/dev-dashboard*'
       - 'scripts/dev-ipfs.cjs'
       - 'scripts/dev-ipfs.test.cjs'
       - 'infra/ipfs/**'
@@ -50,12 +52,15 @@ jobs:
           npm install --no-package-lock --no-audit --no-fund
           npm install --no-package-lock --no-audit --no-fund --prefix web
           npm install --no-package-lock --no-audit --no-fund --prefix apps/ybr-player
-      - name: Test lifecycle and synthetic fixture
+      - name: Test lifecycle, dashboard and synthetic fixture
         run: npm run test:dev-stack
       - name: Pull Kubo image before timing stack readiness
         run: docker compose -f infra/ipfs/compose.yaml pull kubo
       - name: Start complete Road application and test web, player and IPFS
         shell: bash
+        env:
+          YBR_LISTENER_PASSWORD: ci-listener-demo-only
+          YBR_ARTIST_PASSWORD: ci-artist-demo-only
         run: |
           set -euo pipefail
           node scripts/dev-stack.cjs > /tmp/ybr-integrated.log 2>&1 &
