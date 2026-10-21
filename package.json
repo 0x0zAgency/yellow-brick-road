@@ -8,6 +8,7 @@
     "test": "hardhat test",
     "demo": "hardhat run scripts/demo.js",
     "clean": "hardhat clean",
+    "preganache": "node scripts/dev-ganache-storage.cjs",
     "ganache": "ganache --server.host 127.0.0.1 --server.port 8545 --chain.chainId 1337 --chain.networkId 1337 --chain.hardfork shanghai --wallet.deterministic --database.dbPath .road-local/ganache",
     "ganache:smoke": "hardhat run scripts/ganache-smoke.js --network ganache",
     "ganache:test": "hardhat test --network ganache",
@@ -21,7 +22,7 @@
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
     "dev": "node scripts/dev.cjs",
     "setup:dev": "node scripts/dev.cjs --setup",
-    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs"
+    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",

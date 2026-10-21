@@ -37,6 +37,8 @@ wrong selected RPC, not a cache problem.
 
 `npm run ganache`, including the node started by `npm run dev`, now stores the
 chain in `.road-local/ganache` and uses network ID 1337 as well as chain ID 1337.
+A pre-start hook creates both private storage directories on a fresh checkout;
+it refuses symlinks or foreign-owned paths and never removes existing files.
 Normal stop/start keeps the blocks, contracts, balances and nonces in that DB.
 The directory is already ignored by Git. Do not delete it as a troubleshooting
 step. Kubo volumes and IPFS recovery files are separate and unchanged.

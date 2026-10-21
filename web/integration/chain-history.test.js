@@ -15,6 +15,7 @@ import {makeRegistrationPacket} from '../src/mint-model.js';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const require=createRequire(import.meta.url);
 const {redact}=require('../../scripts/dev-dashboard.cjs');
+const {prepareGanacheStorage}=require('../../scripts/dev-ganache-storage.cjs');
 const options=time=>({logging:{quiet:true},chain:{chainId:1337,networkId:1337,time:new Date(time)},wallet:{deterministic:true}});
 
 test('a recreated local chain can mint despite a previous generation numbered-block cache; a foreign chain is still refused', {timeout:60000},async t=>{
@@ -105,8 +106,10 @@ async function rpc(url,method,params=[]){
 }
 test('the actual npm Ganache command retains block hashes, nonce, balance and deployed code after restart', {timeout:60000},async()=>{
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-chain-persistence-'));
- fs.mkdirSync(path.join(tmp,'.road-local'),{mode:0o700});
- const script=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).scripts.ganache;
+ const scripts=JSON.parse(fs.readFileSync(path.join(root,'package.json'))).scripts;
+ assert.equal(scripts.preganache,'node scripts/dev-ganache-storage.cjs');
+ prepareGanacheStorage(tmp); // Exercise the exact preganache hook on a fresh checkout.
+ const script=scripts.ganache;
  const [executable,...args]=script.split(/\s+/);
  assert.equal(executable,'ganache');
  assert.equal(args[args.indexOf('--database.dbPath')+1],'.road-local/ganache');
