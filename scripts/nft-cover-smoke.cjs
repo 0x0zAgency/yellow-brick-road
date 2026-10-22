@@ -29,6 +29,19 @@ async function main(){
  assert.ok(chainReceipt.logs.some(log=>{try{return nft.interface.parseLog(log).name==='MetadataUpdate';}catch{return false;}}));
  const brick=new ethers.Contract(event.args.brick,['function contentHash() view returns (bytes32)','function metadataDigest() view returns (bytes32)','function metadataURI() view returns (string)'],rpc);
  assert.equal(await brick.contentHash(),content);assert.equal(await brick.metadataDigest(),digest);assert.equal(await brick.metadataURI(),privateURI);
+ // Exercise the exact new mint orchestration, not only an isolated cover setter.
+ const {mintWithReviewedCover}=await import('../web/src/nft-cover-mint.js');
+ const {makeRegistrationPacket}=await import('../web/src/mint-model.js');
+ const hash=crypto.createHash('sha256').update(bytes).digest('hex');
+ const packet=makeRegistrationPacket({metadata:{title:'Original cover workflow fixture',artist:'YBR test'},
+  assets:{master:{name:'work.bin',hash:'ab'.repeat(32),size:4},artwork:{name:'cover.png',hash,size:bytes.length,type:'image/png'}},
+  identity:{mode:'external',connected:true,address:await signer.getAddress()},royalties:{creatorBps:10000},training:'not-authorized',composition:false,storage:'demo-encrypted-in-browser'});
+ const covered=await mintWithReviewedCover({packet,provider,rpcUrl:'http://127.0.0.1:8545',chainId:1337,factoryAddress:factory.address,
+  nftCover:{bytes:new Uint8Array(bytes),sourceDigest:'0x'+hash,consent:true}},
+  {upload:(data,options)=>uploadNftCover(data,{...options,fetchImpl:(url,request)=>fetch('http://127.0.0.1:5173'+url,request)})});
+ assert.equal(covered.status,'confirmed');assert.equal(covered.nftCover.status,'verified');assert.equal(covered.receipts.length,2);
+ for(const entry of covered.receipts)assert.equal(decodeReceiptMetadata(await nft.tokenURI(entry.tokenId)).image,image.imageURI);
+ console.log('MINT COVER WORKFLOW PASS: reviewed cover pinned, both real registration NFTs minted, cover transaction completed, actual tokenURI images verified without reminting.');
  console.log('NFT COVER PASS: exact public PNG pinned/retrieved through Vite and Kubo; real wallet-backed setCovers; tokenURI image verified; ERC-4906 emitted; private Brick commitments unchanged.');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

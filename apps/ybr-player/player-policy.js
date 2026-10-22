@@ -35,14 +35,18 @@ function createPlayerPolicyReader({provider,factoryAddress,ethers}){
  async function check(record,role='audio'){
   if(!record?.authorization){
    // Legacy locally stored records carrying chain references are not silently promoted.
-   return {allowed:!(record?.references||record?.bricks||[]).some(item=>item.address),onChain:false};
+   const claimed=(record?.references||record?.bricks||[]).some(item=>item.address);
+   return {allowed:!claimed,onChain:false,reason:claimed?'legacy-permission':'local-preview'};
   }
   try{
    const auth=normalizeAuthorization(record.authorization),source=auth.sources[role];
-   if(!source||!factoryAddress||lower(auth.factoryAddress)!==lower(factoryAddress))return {allowed:false};
-   if((await provider.getNetwork()).chainId!==1337)return {allowed:false};
+   if(!source)return {allowed:false,onChain:true,reason:'asset-not-authorized'};
+   if(!factoryAddress)return {allowed:false,onChain:true,reason:'chain-unavailable'};
+   if((await provider.getNetwork()).chainId!==1337)return {allowed:false,onChain:true,reason:'different-chain'};
    const genesis=await provider.getBlock(0),head=await provider.getBlock('latest');
-   if(lower(genesis.hash)!==lower(auth.genesisHash)||!head)return {allowed:false};
+   if(!genesis||!head)return {allowed:false,onChain:true,reason:'chain-unavailable'};
+   if(lower(genesis.hash)!==lower(auth.genesisHash))return {allowed:false,onChain:true,reason:'different-chain'};
+   if(lower(auth.factoryAddress)!==lower(factoryAddress))return {allowed:false,onChain:true,reason:'different-factory'};
    const factory=new ethers.Contract(factoryAddress,['function isBrick(address) view returns (bool)'],provider);
    const brick=new ethers.Contract(source.brickAddress,abi,provider),at={blockTag:head.number};
    const [code,registered,enabled,controller,revision,permissions,locked,files]=await Promise.all([
@@ -51,9 +55,9 @@ function createPlayerPolicyReader({provider,factoryAddress,ethers}){
    ]);
    const asset=record.assets?.[role]||(role==='audio'?record.media:null);
    const allowed=validateGrant({source,role,sha256:asset?.sha256,state:{code,registered,enabled,controller,revision,permissions,files}});
-   if(lower((await provider.getBlock(head.number)).hash)!==lower(head.hash)||lower((await provider.getBlock(0)).hash)!==lower(auth.genesisHash))return {allowed:false};
-   return {allowed,onChain:true,contentLocked:locked,revision:String(revision),permissions:Number(permissions),brickAddress:source.brickAddress};
-  }catch{return {allowed:false,onChain:true};}
+   if(lower((await provider.getBlock(head.number)).hash)!==lower(head.hash)||lower((await provider.getBlock(0)).hash)!==lower(auth.genesisHash))return {allowed:false,onChain:true,reason:'chain-changed'};
+   return {allowed,reason:allowed?'authorized':'permission-changed',onChain:true,contentLocked:locked,revision:String(revision),permissions:Number(permissions),brickAddress:source.brickAddress};
+  }catch{return {allowed:false,onChain:true,reason:'verification-unavailable'};}
  }
  return {check};
 }

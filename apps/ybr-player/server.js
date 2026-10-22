@@ -1,4 +1,5 @@
 'use strict';
+const {describeSavedUpload,newestSavedUploads}=require('./studio-catalog');
 // YBR Player proof 001. Local-only reference implementation: no external SDKs.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -130,10 +131,10 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
     return s;
   }
   const checkPermission=async(record,role='audio')=>road.playerPolicy?road.playerPolicy.check(record,role):{allowed:!record?.authorization};
-  async function permittedStudio(idOrBrick){
+  async function permittedStudio(idOrBrick,knownGrant){
     const brick=typeof idOrBrick==='string'?studio.get(idOrBrick):idOrBrick;
     if(!brick)return null;
-    const grant=await checkPermission(brick);
+    const grant=knownGrant||await checkPermission(brick);
     if(!grant.allowed)return null;
     const result={...brick,policy:grant.onChain?grant:null};
     if(brick.artwork&&!(await checkPermission(brick,'artwork')).allowed){result.artwork=null;result.files=brick.files.map(file=>({...file,artworkUrl:null}));}
@@ -231,9 +232,14 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         let catalog;
         try { catalog=await readPlayerCatalog(road); }
         catch { catalog={status:{ready:false,reason:'Registry verification failed. Check Ganache and refresh.'},bricks:[]}; }
-        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.3',
+        const stored=await Promise.all(studio.list().map(async item=>{
+          const grant=await checkPermission(item);
+          return {summary:describeSavedUpload(item,grant),playable:await permittedStudio(item,grant)};
+        }));
+        return sendJson(res,200,{format:'ybr-player-demo-manifest/0.4',
           network:catalog.status,registry:catalog.registry?{matchingEvents:catalog.registry.matchingEvents,limitReached:catalog.registry.limitReached,limited:catalog.registry.limited}:null,
-          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,(await Promise.all(studio.list().map(item=>permittedStudio(item)))).filter(Boolean))});
+          uploads:newestSavedUploads(stored.map(item=>item.summary)),
+          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,stored.map(item=>item.playable).filter(Boolean))});
       }
       const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
@@ -287,7 +293,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res,405,'Method not allowed');
       const staticPath = route==='/'?'/index.html':route;
-      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js'].includes(staticPath)) return fail(res,404,'Not found');
+      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js'].includes(staticPath)) return fail(res,404,'Not found');
       const filePath=path.join(PUBLIC,staticPath.slice(1));
       const body=fs.readFileSync(filePath);
       res.writeHead(200,{

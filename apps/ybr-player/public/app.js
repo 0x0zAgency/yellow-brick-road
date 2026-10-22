@@ -2,7 +2,7 @@
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
 const {playableNewest,selectionFor,isPlayable}=window.YBRLibrary;
-let bricks = [], catalogBricks = [];
+let bricks = [], catalogBricks = [], savedUploads = [];
 const unavailable = new Set();
 let selectionPinned = false, selectionRevision = 0, sessionRevision = 0, currentUser = null;
 let selected = null;
@@ -92,7 +92,7 @@ function renderList() {
   document.querySelector('.feature-copy > p').textContent=newest?newest.creator+' · Newest playable release':'Share an Audio Preview from Mint Studio to start listening.';
   $('featurePlay').title=newest?'Play '+newest.title:'No playable tracks available';
   $('trackCount').textContent=`${bricks.length} playable track${bricks.length===1?'':'s'} · newest first${registryPartial?' · partial registry scan':''}`;
-  window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks}}));
+  window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks,uploads:savedUploads}}));
 }
 function stopMedia() {
   selectionRevision++;
@@ -161,7 +161,7 @@ async function refreshSession() {
   if(revision!==sessionRevision)return;
   signedIn=!!session.authenticated;
   if (!signedIn) {
-    stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];
+    stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];savedUploads=[];
     unavailable.clear();librarySignature='';applyLibrary();$('loginOverlay').hidden=false;return;
   }
   if(currentUser!==session.user){
@@ -172,11 +172,11 @@ async function refreshSession() {
   $('signedInAs').textContent=`Signed in as ${session.user}`;
   const library=await request('/api/bricks');
   if(revision!==sessionRevision)return;
-  const signature=JSON.stringify([library.bricks,library.network,library.registry]);
+  const signature=JSON.stringify([library.bricks,library.network,library.registry,library.uploads]);
   registryPartial=!!(library.registry?.limited||library.registry?.limitReached);
   if(signature===librarySignature)return;
   librarySignature=signature;
-  catalogBricks=library.bricks;
+  catalogBricks=library.bricks;savedUploads=Array.isArray(library.uploads)?library.uploads:[];
   const roadState=JSON.stringify(library.network);
   if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · local demo music remains available');
   lastRoadState=roadState;
@@ -202,7 +202,7 @@ $('loginForm').addEventListener('submit',async e=>{
   finally {button.disabled=false;}
 });
 $('logout').addEventListener('click',async()=>{
-  sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];
+  sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];savedUploads=[];
   selectionPinned=false;currentUser=null;unavailable.clear();
   await post('/api/logout');
   $('loginOverlay').hidden=false;

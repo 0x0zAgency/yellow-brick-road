@@ -71,6 +71,28 @@ test('real signed mint initializes permissions and Player checks revocation, has
  response=await fetch(base+'/api/bricks/'+id+'/authorize',{method:'POST',headers:auth});assert.equal(response.status,200);
  const stream=()=>fetch(base+'/api/bricks/'+id+'/media',{headers:{...auth,Range:'bytes=0-63'}});
  response=await stream();assert.equal(response.status,206);assert.equal(response.headers.get('X-YBR-Content-SHA256'),hash(data.preview));
+ // Reopen the exact saved preview library against another real Ganache wallet profile.
+ const otherChain=ganache.server({logging:{quiet:true},chain:{chainId:1337,time:new Date('2020-01-01')},wallet:{mnemonic:'test test test test test test test test test test test junk'}});
+ await otherChain.listen(0,'127.0.0.1');t.after(()=>otherChain.close());
+ const otherRoad=makeGateway({rpcUrl:'http://127.0.0.1:'+otherChain.address().port,factoryAddress});
+ const {server:otherPlayer}=createApp({accounts:{listener:'test-only-password'},roadGateway:otherRoad,studioLibrary:createStudioLibrary({directory:temp})});
+ await new Promise(resolve=>otherPlayer.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{otherPlayer.closeAllConnections();otherPlayer.close(resolve);}));
+ const otherBase='http://127.0.0.1:'+otherPlayer.address().port;
+ const otherLogin=await fetch(otherBase+'/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'listener',password:'test-only-password'})});
+ const otherAuth={Cookie:otherLogin.headers.get('set-cookie').split(';')[0]};
+ const otherCatalog=await(await fetch(otherBase+'/api/bricks',{headers:otherAuth})).json();
+ assert.ok(!otherCatalog.bricks.some(item=>item.id===id));
+ const retained=otherCatalog.uploads.find(item=>item.id===id);
+ assert.equal(retained.title,payload.title);assert.equal(retained.available,false);assert.equal(retained.reason,'different-chain');
+ assert.equal(retained.chain.genesisHash,mint.genesisHash);assert.equal(retained.assets,undefined);
+ for(const suffix of ['authorize','media']){
+  const denied=await fetch(otherBase+'/api/bricks/'+id+'/'+suffix,{headers:otherAuth,method:suffix==='authorize'?'POST':'GET'});
+  assert.ok([403,404].includes(denied.status));
+ }
+ assert.equal(studio.list().length,1,'Profile change retains the one uploaded preview, no duplicate or deletion.');
+ assert.equal((await stream()).status,206,'The original chain still authorizes the exact saved preview.');
+ console.log('PROFILE UPLOAD PASS: real alternate mnemonic keeps saved upload metadata, blocks playback on the wrong history, and the original chain restores playback.');
  const audioBrick=mint.receipts.find(r=>r.sourceId==='master').contractAddress,coverBrick=mint.receipts.find(r=>r.sourceId==='artwork').contractAddress;
  const editor={provider,chainId:1337,factoryAddress,brickAddress:audioBrick,walletAddress:account.address};
  let review=await readBrickPolicy(editor);

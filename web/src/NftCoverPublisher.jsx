@@ -9,10 +9,11 @@ export default function NftCoverPublisher(props){
  if(!props.mint||props.mint.simulated===true||props.mint.status!=='confirmed')return null;
  return <CoverEditor {...props}/>;
 }
-function CoverEditor({packet,mint,vault,wallet}){
- const [file,setFile]=useState(null),[prepared,setPrepared]=useState(null),[preview,setPreview]=useState('');
- const [consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState('');
- const [saved,setSaved]=useState(null),[txHash,setTxHash]=useState(''),[pinned,setPinned]=useState(null);
+function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=>{}}){
+ const [file,setFile]=useState(null),[prepared,setPrepared]=useState(preparedCover?.bytes||null),[preview,setPreview]=useState('');
+ const [consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(mint.nftCover?.error||''),[status,setStatus]=useState('');
+ const [saved,setSaved]=useState(mint.nftCover?.status==='verified'?mint.nftCover:null),[txHash,setTxHash]=useState(mint.nftCover?.transactionHash||''),[pinned,setPinned]=useState(mint.nftCover?.upload||null);
+ const [inspection,setInspection]=useState(null);
  const revision=useRef(0),work=useRef(null),lock=useRef(false);
  const existing=attachedCover(packet),canUseAttached=!!(existing&&vault?.secret&&vault.encrypted?.get);
  useEffect(()=>()=>{revision.current++;work.current?.abort();},[]);
@@ -46,13 +47,29 @@ function CoverEditor({packet,mint,vault,wallet}){
    if(id!==revision.current)return;setPinned(image);
    setStatus('Confirm the NFT artwork update in your wallet. This is a separate gas-paid transaction.');
    const result=await session.update(image.imageURI,{onTransaction:hash=>{if(id===revision.current){setTxHash(hash);setStatus('Artwork transaction submitted. Waiting for confirmation…');}}});
-   if(id===revision.current){setSaved(result);setStatus('Verified: the NFT tokenURI now contains your cover image.');}
+   if(id===revision.current){setSaved(result);onCoverVerified(result);setStatus('Verified: the NFT tokenURI now contains your cover image.');}
   }catch(e){if(id===revision.current){setError(e.shortMessage||e.message);setStatus('');}}
+  finally{if(id===revision.current){lock.current=false;setBusy(false);}}
+ };
+ const inspect=async()=>{
+  if(lock.current)return;lock.current=true;setBusy(true);setError('');
+  const id=++revision.current;setInspection(null);
+  try{
+   const session=await nftCoverSession({mint,provider:window.ethereum,expectedAccount:wallet||packet?.account?.address});
+   const data=await session.inspect();
+   if(id!==revision.current)return;
+   setInspection(data);
+   if(pinned&&data.every(item=>item.image===pinned.imageURI)){
+    setSaved({imageURI:pinned.imageURI});onCoverVerified({imageURI:pinned.imageURI});setStatus('Verified: every selected NFT currently points to this public cover.');
+   }else {setSaved(null);setStatus(data.every(item=>item.hasCover)?'Public cover set on-chain. If the wallet shows a square, check its image retrieval and metadata cache.':'The actual NFT metadata still contains fallback artwork. Publish a cover below; do not remint.');}
+  }catch(e){if(id===revision.current)setError(e.shortMessage||e.message);}
   finally{if(id===revision.current){lock.current=false;setBusy(false);}}
  };
  return <section className="nft-cover" aria-label="NFT cover artwork">
   <span className="eyebrow">ACTUAL NFT / ERC-721 ARTWORK</span>
   <h3>Put your cover on the registration NFTs.</h3>
+  <button type="button" className="ms-outline" disabled={busy} onClick={()=>void inspect()}>Inspect actual NFT metadata</button>
+  {inspection&&<div className="nft-cover-inspection">{inspection.map(item=><div key={item.tokenId}><strong>{item.hasCover?'PUBLIC COVER SET':'DEFAULT ARTWORK'}</strong><p>Token {item.tokenId}</p><p>Name: {item.name}</p><p>Image: <code>{item.hasCover?item.image:'Embedded fallback image (not a public cover)'}</code></p></div>)}<p>The metadata name may still be “Yellow Brick Registration”. The image field determines the artwork.</p></div>}
   <p>This updates the actual NFT <code>tokenURI</code>, not just the Player image. The same cover can be applied to this batch’s {mint.receipts?.length||0} registration receipt(s), without minting new Bricks.</p>
   <p>{file?'Selected: '+file.name:canUseAttached?'Attached cover: '+existing.name:'Choose a cover image to prepare a public display copy.'}</p>
   <label>Use another cover (PNG, JPEG or WebP; up to 8 MiB)<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||!!txHash} onChange={e=>{setFile(e.target.files?.[0]||null);setPrepared(null);setConsent(false);setPinned(null);setSaved(null);setError('');}}/></label>
