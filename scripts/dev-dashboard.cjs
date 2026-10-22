@@ -9,7 +9,7 @@ const crypto=require('node:crypto');
 const {renderDashboard,URLS}=require('./dev-screen.cjs');
 const {MnemonicEditor}=require('./dev-mnemonic-menu.cjs');
 const LOG_LIMIT=1024*1024;
-const rpcLine=/^(?:eth|net|web3|debug|evm|miner|personal|txpool)_[A-Za-z0-9_]+(?:\s|$)/;
+const rpcLine=/^(?:eth|net|web3|debug|evm|miner|personal|txpool)_[A-Za-z0-9_]+$/;
 const diagnosticLine=/\b(?:error|warn(?:ing)?|fatal|exception|fail(?:ed|ure)?|unavailable|refus(?:e|ed|ing)|timed? out|timeout|revert(?:ed)?|cannot|could not)\b|^at (?:async )?/i;
 // Filter before both the in-memory ring and disk. stderr remains diagnostic;
 // Ganache's routine RPC method names are verbose-only even on stderr.
