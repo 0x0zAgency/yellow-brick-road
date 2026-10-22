@@ -1,1 +1,4 @@
 .nft-cover{margin:1.5rem 0;padding:1.4rem;border:1px solid #756239;border-radius:14px;background:#1b2026;color:#f3eee3}.nft-cover h3{margin:.6rem 0}.nft-cover label{display:block;margin:1rem 0}.nft-cover input[type=file]{display:block;margin:.5rem 0;max-width:100%}.nft-cover .nft-cover-consent{display:flex;align-items:flex-start;gap:.75rem}.nft-cover-preview{display:block;width:200px;max-width:100%;height:auto;margin:1rem 0;border-radius:10px}.nft-cover p{line-height:1.55}.nft-cover code{overflow-wrap:anywhere;word-break:break-word}.nft-cover-note{font-size:.85rem;color:#bab7ae}.nft-cover-success{border-left:3px solid #e9c969;padding:.65rem 1rem;margin-top:1rem}.nft-cover button{margin:.3rem .4rem .3rem 0}
+
+.nft-cover-inspection{overflow-wrap:anywhere;border:1px solid #665b32;padding:14px;border-radius:10px;margin:14px 0}
+.nft-cover-inspection p{font-size:12px;line-height:1.6}

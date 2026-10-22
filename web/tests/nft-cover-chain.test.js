@@ -55,3 +55,13 @@ test('malformed or unexpected tokenURI responses are rejected',()=>{
  assert.equal(decodeReceiptMetadata(tokenURI(image)).image,image);
  for(const bad of ['https://host/metadata','data:application/json;base64,!',tokenURI(image)+'a'.repeat(32000)])assert.throws(()=>decodeReceiptMetadata(bad));
 });
+test('read-only NFT inspection distinguishes fallback metadata from a published image',async()=>{
+ const h=harness(),session=await nftCoverSession({mint:mint(),...h});
+ let state=await session.inspect();assert.equal(state[0].hasCover,false);assert.equal(state[0].name,'Yellow Brick Registration');assert.equal(h.state.sends,0);
+ h.state.image=image;state=await session.inspect();assert.equal(state[0].hasCover,true);assert.equal(state[0].image,image);assert.equal(h.state.sends,0);
+});
+test('NFT update refuses a different chain history even with identical collection addresses',async()=>{
+ const h=harness();h.clients.client.getBlock=async()=>({hash:'0x'+'b'.repeat(64)});
+ await assert.rejects(nftCoverSession({mint:{...mint(),genesisHash:'0x'+'a'.repeat(64)},...h}),/different Ganache chain history/);
+ assert.equal(h.state.sends,0);
+});

@@ -47,6 +47,10 @@ export async function nftCoverSession({mint,provider,expectedAccount,clients}={}
   try{version=await client.readContract({address:targets.collection,abi:coverAbi,functionName:'artworkVersion'});}
   catch{throw Error('This deployed NFT collection has fixed yellow-square artwork. It cannot be upgraded in place. Deploy the updated factory for future mints; existing Bricks and NFTs remain unchanged. See docs/NFT_COVERS.md.');}
   if(version!==1n)throw Error('Unsupported NFT artwork contract version.');
+  if(mint.genesisHash){
+   const genesis=await client.getBlock({blockNumber:0n});
+   if(!same(genesis.hash,mint.genesisHash))throw Error('These NFTs belong to a different Ganache chain history. Switch back to the original wallet profile before updating artwork.');
+  }
   const linkedFactory=await client.readContract({address:targets.collection,abi:coverAbi,functionName:'factory'});
   const collection=await client.readContract({address:mint.factoryAddress,abi:factoryAbi,functionName:'receiptToken'});
   if(!same(linkedFactory,mint.factoryAddress)||!same(collection,targets.collection))throw Error('NFT collection does not belong to the mint factory.');
@@ -85,5 +89,17 @@ export async function nftCoverSession({mint,provider,expectedAccount,clients}={}
   }
   return {transactionHash:receipt.transactionHash,imageURI,collection:targets.collection,tokenIds:targets.tokenIds.map(String),metadata};
  }
- return {check,update,targets};
+ async function inspect(){
+  await check();
+  const metadata=[];
+  for(const tokenId of targets.tokenIds){
+   const tokenURI=await client.readContract({address:targets.collection,abi:coverAbi,functionName:'tokenURI',args:[tokenId],blockTag:'latest'});
+   const data=decodeReceiptMetadata(tokenURI);
+   metadata.push({tokenId:tokenId.toString(),tokenURI,name:data.name,image:data.image,
+    hasCover:typeof data.image==='string'&&data.image.startsWith('ipfs://')&&validCoverCid(data.image.slice(7))});
+  }
+  await check();
+  return metadata;
+ }
+ return {check,update,inspect,targets};
 }

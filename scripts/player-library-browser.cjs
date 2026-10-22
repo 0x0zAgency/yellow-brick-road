@@ -26,7 +26,7 @@ async function main(){
   const newer=await publish('Library newest preview');
   assert.ok(Date.parse(newer.publishedAt)>Date.parse(older.publishedAt));
   assert.equal(newer.publishedAtSource,'local-publication');
-  let empty=false,revokedId=null;
+  let empty=false,revokedId=null,otherProfile=false;
   page=await context.newPage();const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.route('**/api/bricks',async route=>{
    const response=await route.fetch(),data=await response.json();
@@ -35,6 +35,10 @@ async function main(){
     {...sample,id:'UNSUPPORTED',title:'Unsupported codec',media:{mimeType:'audio/x-ybr-not-supported'}},
     {...sample,id:'NO-AUDIO',title:'No Audio Preview',media:null}];
    data.bricks=data.bricks.concat(extra).map(brick=>empty||brick.id===revokedId?{...brick,streamAllowed:false}:brick);
+   if(otherProfile){
+    data.bricks=data.bricks.filter(brick=>brick.id!==newer.id);
+    data.uploads=(data.uploads||[]).map(item=>item.id===newer.id?{...item,available:false,reason:'different-chain',message:'Saved on a different Ganache chain history. Switch back to the original test mnemonic/profile; do not remint.',chain:{chainId:1337,factoryAddress:'0x'+'1'.repeat(40),genesisHash:'0x'+'2'.repeat(64)}}:item);
+   }
    await route.fulfill({response,json:data});
   });
   await page.goto(base);
@@ -85,6 +89,14 @@ async function main(){
   await page.locator('#username').fill('artist');await page.locator('#password').fill('browser-test-artist-only');
   await page.getByRole('button',{name:'Authorize session',exact:false}).click();
   await page.locator('.track-row[data-brick-id="BRK-AUD-002"]').waitFor();
+  otherProfile=true;await page.locator('#refreshLibrary').click();
+  await page.waitForFunction(id=>document.querySelector('[data-upload-id="'+id+'"] .saved-upload-badge')?.textContent==='OTHER CHAIN',newer.id);
+  const retained=page.locator('[data-upload-id="'+newer.id+'"]');
+  assert.ok((await retained.textContent()).includes('original test mnemonic/profile'));
+  assert.equal(await retained.locator('button').count(),0,'Other-profile upload has no play/select action');
+  assert.equal(await page.locator('.track-row[data-brick-id="'+newer.id+'"]').count(),0);
+  otherProfile=false;await page.locator('#refreshLibrary').click();
+  await page.waitForFunction(id=>document.querySelector('[data-upload-id="'+id+'"] .saved-upload-badge')?.textContent==='PLAYABLE',newer.id);
   assert.deepEqual(errors,[],'No unexpected browser exceptions');
   const out=path.join(ROOT,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
   await page.screenshot({path:path.join(out,'playable-newest-library.png'),fullPage:true});

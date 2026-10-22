@@ -102,3 +102,32 @@ test('stored legacy master copies remain on disk but cannot be listed or served'
  assert.equal(fs.existsSync(path.join(dir,brick.id,'audio.bin')),true,'Do not delete user files implicitly');
  assert.equal(library.remove(brick.id),true,'Explicit removal still works');
 });
+
+test('saved uploads survive permission/profile filtering without authorizing media',async t=>{
+ const {dir,library}=fixture(t),first=library.publish(publication()).brick;
+ let allowed=true,reason='authorized';
+ const roadGateway={ready:async()=>({ready:false,reason:'Test profile'}),list:async()=>({status:{ready:false},tracks:[]}),track:async()=>null,
+  playerPolicy:{check:async()=>({allowed,reason,onChain:true})}};
+ const {server}=createApp({accounts:{listener:'test-password'},roadGateway,studioLibrary:library});
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+ t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);}));
+ const base='http://127.0.0.1:'+server.address().port;
+ assert.equal((await fetch(base+'/api/bricks')).status,401);
+ assert.equal((await fetch(base+'/saved-uploads.js')).status,200);
+ const login=await fetch(base+'/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'listener',password:'test-password'})});
+ const headers={Cookie:login.headers.get('set-cookie').split(';')[0]};
+ const catalog=async()=>(await fetch(base+'/api/bricks',{headers})).json();
+ assert.equal((await catalog()).uploads[0].available,true);
+ const snapshot=fs.readFileSync(path.join(dir,first.id,'release.json'));
+ for(const why of ['different-chain','different-factory','legacy-permission','permission-changed']){
+  allowed=false;reason=why;
+  const data=await catalog();assert.ok(!data.bricks.some(item=>item.id===first.id));
+  assert.equal(data.uploads[0].id,first.id);assert.equal(data.uploads[0].reason,why);assert.equal(data.uploads[0].available,false);
+  assert.equal(data.uploads[0].artwork,undefined);assert.equal(data.uploads[0].assets,undefined);assert.equal(data.uploads[0].media,undefined);
+  for(const route of ['/api/bricks/'+first.id+'/authorize','/api/bricks/'+first.id+'/media',first.artwork.url,first.lyrics.url]){
+   const response=await fetch(base+route,{headers,method:route.endsWith('/authorize')?'POST':'GET'});assert.ok([403,404].includes(response.status));
+  }
+  assert.deepEqual(fs.readFileSync(path.join(dir,first.id,'release.json')),snapshot);
+ }
+ allowed=true;reason='authorized';const restored=await catalog();assert.equal(restored.uploads[0].available,true);assert.ok(restored.bricks.some(item=>item.id===first.id));
+});
