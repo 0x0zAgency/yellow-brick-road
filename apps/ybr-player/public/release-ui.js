@@ -95,8 +95,7 @@
   const bricks=event.detail.bricks;
   const lookup=new Map(bricks.map(brick=>[brick.id,brick]));
   for(const row of document.querySelectorAll('.track-row'))paintCover(row.querySelector('.track-thumbnail'),lookup.get(row.dataset.brickId));
-  const saved=event.detail.uploads||[],playable=bricks.filter(brick=>brick.source==='studio-demo').length;
-  status.textContent=saved.length+' saved upload(s) · '+playable+' playable here · library refreshes automatically';
+  status.textContent=bricks.length+' playable track(s) · library refreshes automatically';
   if(!linked&&location.hash.startsWith('#release=')){
    const id=location.hash.slice(9);if(lookup.has(id)){linked=true;window.dispatchEvent(new CustomEvent('ybr:select-release',{detail:{id}}));}
   }

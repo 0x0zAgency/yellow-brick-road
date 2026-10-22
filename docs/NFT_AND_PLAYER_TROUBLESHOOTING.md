@@ -41,17 +41,16 @@ The mnemonic control selects an **isolated persistent chain profile**, not a key
 rotation on the old chain. Bricks and their permissions stay on their original
 chain. Local Player preview copies stay in `.road-local/player-releases/`.
 
-Previously, permission-filtered uploads were silently omitted. The Player now
-shows a separate **Saved uploads** inventory, newest first. It retains descriptive
-metadata and original chain references when a preview cannot be played. Badges
-and explanations distinguish another chain history, another factory, older uploads
-without policy proofs, changed permissions, and unavailable verification.
+The Player shows only eligible **Playable tracks**, newest first. The entire
+**Saved uploads** section and its counts are hidden, including after refresh,
+sign-in or a chain-profile change. Its former UI area is reserved for future
+playlists and library tools; no playlist feature or visible placeholder is added.
 
-The normal **Playable tracks** list still contains only eligible playable tracks.
-Unavailable inventory entries have no media URLs or play actions. Authorization,
-audio, artwork and lyrics endpoints still enforce live permissions. Merely seeing
-a saved title does not grant access. A mnemonic switch never reauthorizes an old
-preview or changes its controller, revision or file commitments.
+Saved preview files, descriptive metadata, original chain references and the
+existing authenticated diagnostic metadata remain intact. Hiding the section
+does not delete or migrate uploads. Authorization, audio, artwork and lyrics
+endpoints still enforce live permissions. A mnemonic switch never reauthorizes
+an old preview or changes its controller, revision or file commitments.
 
 To return to the original default chain, use dashboard **m > d**, type **SWITCH**,
 then run `npm run dev`. For a previous custom profile, use **m > i** with that
@@ -60,9 +59,14 @@ The selector stores only the currently selected mnemonic; keep local backups of
 custom test phrases needed for return visits. See `GANACHE_WALLETS.md`.
 
 Reload the Player and sign back in after restarting it. Select the corresponding
-test account in your wallet. Mint Studio now warns when its saved local factory
-differs from the startup factory and offers **Use startup factory**; it never
-silently overwrites a saved selection. Do not reset chain storage to fix visibility.
+test account in your wallet. Mint Studio defaults to the running Ganache factory for the launcher's
+loopback RPC on chain 1337. The **Use running Ganache factory (automatic)**
+option follows the current startup address instead of a stale browser value.
+Turn it off to use a manual factory. Manual addresses are retained separately;
+Sepolia, other RPC ports and other chain IDs never inherit this local default.
+A changed effective factory cancels an open mint confirmation, and ordinary
+on-chain contract/history verification still runs before signing. Do not reset
+chain storage to fix visibility.
 
 A work that was only minted, without the separate **Add release to Player** action,
 has no saved playable preview here. Its registration belongs in the IP Registry.
@@ -75,5 +79,20 @@ Tests cover source-bound public-cover consent, rejected and uncertain artwork
 transactions, actual mint-plus-cover orchestration on Ganache/Kubo, read-only
 metadata inspection, authenticated metadata-only saved inventories, denied media
 routes and restoring playback through the original real chain. Browser regressions
-exercise pre-mint thumbnail review and the separate saved-upload view. The browser
+exercise pre-mint thumbnail review and ensure the saved-upload section remains
+absent across refreshes, sign-in and profile changes. The browser
 wallet is mocked; the separate integration tests use real disposable Ganache.
+
+## Player permissions are chosen in Step 2
+
+Choose Audio Preview playback, artwork display and lyrics display alongside the
+attached files in **Step 2 / Files**. Missing or still-hashing files cannot receive
+a grant. Step 4 presents a read-only summary with **Edit permissions in Step 2**.
+The existing `deployBrickWithPolicy` mint commits each applicable permission, file
+commitment and optional permanent content lock on the Brick in the same transaction
+as registration. The mint adapter reads those fields back to verify the result.
+The local Player database stores delivery copies and references, not authority to
+override an on-chain grant. Post-mint sharing remains a separate explicit delivery
+action; it cannot make a denied preview playable or expose masters/project files.
+Simulation does not write any policy to a blockchain. No contract upgrade or new
+factory deployment is introduced by this UI change.

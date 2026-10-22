@@ -25,7 +25,7 @@ const defaults={
  fees:{masterIngestionCents:10000,masterUseCents:500,writingIngestionCents:5000,writingUseCents:250}
 };
 const networkDefaults={
- network:'ganache',rpcUrl:'http://127.0.0.1:8545',ganacheChainId:'1337',rememberForm:true,
+ network:'ganache',rpcUrl:'http://127.0.0.1:8545',ganacheChainId:'1337',rememberForm:true,useStartupFactory:true,
  factories:{'ganache:1337:http://127.0.0.1:8545':'','sepolia:11155111':''}
 };
 export const defaultMintForm=()=>JSON.parse(JSON.stringify(defaults));
@@ -56,6 +56,7 @@ export function sanitizeMintNetwork(value={}){
  if(!value||typeof value!=='object'||Array.isArray(value))return clean;
  if(value.network==='ganache'||value.network==='sepolia')clean.network=value.network;
  if(typeof value.rememberForm==='boolean')clean.rememberForm=value.rememberForm;
+ if(typeof value.useStartupFactory==='boolean')clean.useStartupFactory=value.useStartupFactory;
  const url=text(value.rpcUrl,255);
  try{const u=new URL(url);if((u.protocol==='http:'||u.protocol==='https:')&&['localhost','127.0.0.1','[::1]'].includes(u.hostname)&&!u.username&&!u.password)clean.rpcUrl=url;}catch{}
  const id=text(value.ganacheChainId,12);
