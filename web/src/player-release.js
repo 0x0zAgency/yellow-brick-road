@@ -29,13 +29,10 @@ function base64(bytes){
  return btoa(parts.join(''));
 }
 function checkAbort(signal){if(signal?.aborted)throw new DOMException('Preview sharing canceled.','AbortError');}
-export async function buildPlayerRelease({packet,mint,vault,consent=false,includeArtwork=true,includeLyrics=true,signal}={}){
- if(consent!==true)throw Error('Confirm sharing selected preview copies with the local Player.');
- if(!packet?.bricks?.length||!mint||(mint.simulated!==true&&mint.status!=='confirmed'))throw Error('Finish the demo or test-chain mint before sharing a preview.');
+export function validatePlayerReleaseSelection(packet,{includeArtwork=true,includeLyrics=true}={}){
  const selection=playerReleaseFiles(packet);
  if(!permissionForFile(packet,'preview'))throw Error('Audio Preview playback was disabled in the pre-mint permissions. Update the Brick permissions before publishing.');
  if(!selection.audio)throw Error('Attach a supported Audio Preview (MP3, WAV, OGG, FLAC, M4A, WEBM or AAC). The Master Recording is never used for Player playback.');
- if(!vault?.secret||!vault.encrypted?.get)throw Error('This browser session no longer has the encrypted uploads. Reattach the originals in Mint Studio.');
  const picked={audio:selection.audio};
  if(includeArtwork&&selection.artwork&&permissionForFile(packet,'artwork'))picked.artwork=selection.artwork;
  if(includeLyrics&&selection.lyrics&&permissionForFile(packet,'lyrics'))picked.lyrics=selection.lyrics;
@@ -45,6 +42,13 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
   if(!Number.isSafeInteger(file.byteLength)||file.byteLength<1||file.byteLength>LIMITS[role])throw Error(role+' exceeds the local preview limit. Audio: 32 MiB; cover: 8 MiB; lyrics: 512 KiB.');
   if(!/^0x[0-9a-f]{64}$/i.test(file.integrity?.digest||''))throw Error('The selected '+role+' has no original-file checksum.');
  }
+ return {selection,picked};
+}
+export async function buildPlayerRelease({packet,mint,vault,consent=false,includeArtwork=true,includeLyrics=true,signal}={}){
+ if(consent!==true)throw Error('Confirm sharing selected preview copies with the local Player.');
+ if(!packet?.bricks?.length||!mint||(mint.simulated!==true&&mint.status!=='confirmed'))throw Error('Finish the demo or test-chain mint before sharing a preview.');
+ const {selection,picked}=validatePlayerReleaseSelection(packet,{includeArtwork,includeLyrics});
+ if(!vault?.secret||!vault.encrypted?.get)throw Error('This browser session no longer has the encrypted uploads. Reattach the originals in Mint Studio.');
  let authorization=null;
  if(mint.simulated!==true){
   if(mint.chainId!==1337||!/^0x[0-9a-f]{64}$/i.test(mint.genesisHash||''))throw Error('The local Player requires Ganache policy-enabled mint receipts. Legacy mints need a policy-enabled registration; Sepolia delivery is not configured.');

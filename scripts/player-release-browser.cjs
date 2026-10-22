@@ -42,6 +42,8 @@ async function main(){
   await studio.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles(path.join(tmp,'cover.png'));
   await studio.getByLabel('Choose Lyrics manuscript / writing evidence',{exact:true}).setInputFiles(path.join(tmp,'lyrics.txt'));
   await studio.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
+  assert.equal(await studio.getByRole('region',{name:'Pre-mint Player permissions and content lock'}).count(),0);
+  await studio.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
   const review=studio.getByRole('region',{name:'Pre-mint Player permissions and content lock'});
   await review.waitFor();
   assert.equal(await review.getByRole('checkbox',{name:'Play Audio Preview',exact:false}).isChecked(),true);
@@ -51,22 +53,23 @@ async function main(){
   assert.equal(await seal.isChecked(),false);await seal.check();
   assert.match(await review.textContent(),/Permanent file lock/);await seal.uncheck();
   assert.match(await review.textContent(),/Simulation only/);
-  await studio.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
   await studio.getByLabel('Track title',{exact:true}).fill('Browser release test');
   await studio.getByLabel('Recording artist / claimant',{exact:true}).fill('Synthetic Artist');
   await studio.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Synthetic Writer');
+  const deliveryConsent=studio.getByRole('checkbox',{name:'Deliver approved copies to YBR Player automatically after mint',exact:false});
+  assert.equal(await deliveryConsent.isChecked(),false);await deliveryConsent.check();
   await studio.getByRole('button',{name:'Continue →',exact:true}).click();
   const summary=studio.getByRole('region',{name:'Player permissions summary'});
   await summary.waitFor();
-  assert.equal(await summary.locator('input').count(),0,'Final review summarizes Step 2; it does not create another policy editor');
+  assert.equal(await summary.locator('input').count(),0,'Final review summarizes Step 3; it does not create another policy editor');
   assert.equal(await summary.getByText('Allowed',{exact:true}).count(),3);
   await studio.getByRole('button',{name:'Simulate mint →',exact:true}).click();
   await studio.getByRole('button',{name:'Confirm simulation',exact:true}).click();
   await studio.getByRole('button',{name:'View receipts →',exact:true}).click({timeout:30000});
-  const add=studio.getByRole('button',{name:'Add release to Player',exact:true});
-  assert.equal(await add.isDisabled(),true,'Sharing must require explicit consent');
-  await studio.getByLabel('I have permission to share these selected copies',{exact:false}).check();
-  await add.click();
+  assert.equal(await studio.getByRole('button',{name:'Add release to Player',exact:true}).count(),0,'There is no second Player-enablement step');
+  const deliveryStatus=studio.getByRole('region',{name:'YBR Player delivery status'});
+  assert.equal(await deliveryStatus.locator('input').count(),0,'Receipts contain no delivery consent or permission controls');
+  assert.equal(await studio.getByText('Hear it. See the cover. Follow the lyrics.',{exact:true}).count(),0);
   const open=studio.getByRole('link',{name:'Open release in Player ↗',exact:true});
   await open.waitFor({timeout:30000});
   const popup=studio.waitForEvent('popup');await open.click();player=await popup;
@@ -110,7 +113,7 @@ async function main(){
   await player.waitForFunction(()=>!document.body.innerText.includes('Timed lyric test'));
   assert.equal(await player.locator('#audio').evaluate(el=>el.paused),true);
   assert.deepEqual(errors,[],'Unexpected browser JavaScript errors');
-  console.log('PASS: Mint Studio encryption + opt-in upload + persistent Player release + shared cover + safe plain lyrics + native WebVTT synchronization + preview withdrawal.');
+  console.log('PASS: Step 3 approval + Mint Studio encryption + automatic post-mint delivery + persistent Player release + shared cover + safe plain lyrics + native WebVTT synchronization + preview withdrawal.');
  }catch(e){
   if(studio)await studio.screenshot({path:path.join(OUT,'studio-failure.png'),fullPage:true}).catch(()=>{});
   if(player)await player.screenshot({path:path.join(OUT,'player-failure.png'),fullPage:true}).catch(()=>{});

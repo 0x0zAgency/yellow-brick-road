@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {filenameTitle,baselineMetadata,normalizeFields,extractUploadMetadata,resolveUploadFields,initialUploadForm,uploadFormReducer} from '../src/upload-metadata.js';
+import {filenameTitle,baselineMetadata,normalizeFields,audioSuggestions,extractUploadMetadata,resolveUploadFields,initialUploadForm,uploadFormReducer} from '../src/upload-metadata.js';
 
 function upload(name,bytes,type='application/octet-stream'){return new File([bytes],name,{type});}
 function taggedResult(title,source='embedded audio tags'){return {fields:{title},fieldSources:{title:source}};}
@@ -59,18 +59,34 @@ test('replacements, resets and same-name stale reads never restore old inferred 
 // are synthetic tag-reader fixtures, not music or playback demonstration assets.
 function mp3(){
  const frame=(id,text)=>{const body=Buffer.concat([Buffer.from([3]),Buffer.from(text)]),header=Buffer.alloc(10);header.write(id);header.writeUInt32BE(body.length,4);return Buffer.concat([header,body]);};
- const tags=Buffer.concat([frame('TIT2','MP3 embedded title'),frame('TPE1','MP3 Artist'),frame('TALB','Album'),frame('TCOM','Composer'),frame('TCON','Electronic'),frame('TBPM','123')]);
+ const tags=Buffer.concat([frame('TIT2','MP3 embedded title'),frame('TPE1','MP3 Artist'),frame('TALB','Album'),frame('TCOM','Composer'),frame('TEXT','Lyricist'),frame('TXXX','SONGWRITER\0Custom Writer'),frame('TXXX','WRITER\0Composer'),frame('TCON','Electronic'),frame('TBPM','123')]);
  const header=Buffer.from([73,68,51,3,0,0,0,0,0,0]);let size=tags.length;for(let i=9;i>=6;i--){header[i]=size&127;size>>=7;}
  const audio=Buffer.alloc(417*8);for(let i=0;i<8;i++)Buffer.from([255,251,144,0]).copy(audio,i*417);
  return Buffer.concat([header,tags,audio]);
 }
 test('real music-metadata reads MP3 tags and a WAV INFO title',async()=>{
  const actual=await extractUploadMetadata(upload('fallback.mp3',mp3(),'audio/mpeg'),{role:'master'});
- assert.equal(actual.fields.title,'MP3 embedded title',actual.notice);assert.equal(actual.fields.artist,'MP3 Artist');assert.equal(actual.fields.songwriters,'Composer');
+ assert.equal(actual.fields.title,'MP3 embedded title',actual.notice);assert.equal(actual.fields.artist,'MP3 Artist');assert.equal(actual.fields.songwriters,'Composer, Lyricist, Custom Writer');assert.equal(actual.fields.release,'Album');
  const chunk=(id,body)=>{const head=Buffer.alloc(8);head.write(id);head.writeUInt32LE(body.length,4);return Buffer.concat([head,body,body.length%2?Buffer.alloc(1):Buffer.alloc(0)]);};
  const fmt=Buffer.alloc(16);fmt.writeUInt16LE(1);fmt.writeUInt16LE(1,2);fmt.writeUInt32LE(24000,4);fmt.writeUInt32LE(48000,8);fmt.writeUInt16LE(2,12);fmt.writeUInt16LE(16,14);
  const content=Buffer.concat([Buffer.from('WAVE'),chunk('fmt ',fmt),chunk('LIST',Buffer.concat([Buffer.from('INFO'),chunk('INAM',Buffer.from('WAV embedded title\0')),chunk('IART',Buffer.from('WAV Artist\0'))])),chunk('data',Buffer.alloc(48000))]);
  const size=Buffer.alloc(4);size.writeUInt32LE(content.length);
  const wav=await extractUploadMetadata(upload('fallback.wav',Buffer.concat([Buffer.from('RIFF'),size,content]),'audio/wav'));
  assert.equal(wav.fields.title,'WAV embedded title',wav.notice);assert.equal(wav.fields.artist,'WAV Artist');assert.equal(wav.technical.sampleRateHz,24000);
+});
+
+test('album and songwriter aliases are extracted without inventing artist-based authorship',()=>{
+ const metadata={common:{album:'Album',artist:'Performer',composer:[' Writer '],lyricist:['Lyricist'],writer:['writer']},native:{'ID3v2.4':[
+  {id:'TXXX:SONGWRITER',value:'Custom Writer'}, {id:'TXXX:Songwriters',value:['writer','Second Writer']},
+  {id:'TXXX:OWNER',value:'Do not import'}, {id:'TALB',value:'Lower-priority album'}]}};
+ assert.equal(audioSuggestions(metadata).release,'Album');
+ assert.equal(audioSuggestions(metadata).songwriters,'Writer, Lyricist, Custom Writer, Second Writer');
+ assert.equal(audioSuggestions({common:{artist:'Performer',albumartist:'Band'}}).songwriters,'');
+ assert.equal(audioSuggestions({native:{'ID3v2.3':[{id:'TALB',value:'Native album'},{id:'TCOM',value:'Composer'},{id:'TEXT',value:'Lyricist'}]}}).release,'Native album');
+});
+test('album and songwriter manual edits, including clearing, survive parsed replacements',()=>{
+ const uploads={master:{result:{fields:{release:'Tagged album',songwriters:'Tagged writer'},fieldSources:{release:'embedded audio tags',songwriters:'embedded audio tags'}}}};
+ const first=resolveUploadFields({release:'',songwriters:''},[],uploads);
+ assert.equal(first.values.release,'Tagged album');assert.equal(first.values.songwriters,'Tagged writer');
+ for(const manual of [{release:'My album',songwriters:'My writer'},{release:'',songwriters:''}])assert.deepEqual(resolveUploadFields(manual,['release','songwriters'],uploads).values,manual);
 });

@@ -68,8 +68,9 @@ A changed effective factory cancels an open mint confirmation, and ordinary
 on-chain contract/history verification still runs before signing. Do not reset
 chain storage to fix visibility.
 
-A work that was only minted, without the separate **Add release to Player** action,
-has no saved playable preview here. Its registration belongs in the IP Registry.
+A work minted without Step 3 automatic Player delivery approval has no newly
+delivered playable preview. Older registrations are not retroactively delivered.
+Their registrations remain in the IP Registry.
 Older local releases without current on-chain policy proofs remain blocked rather
 than being silently converted into unrestricted demo playback.
 
@@ -83,16 +84,21 @@ exercise pre-mint thumbnail review and ensure the saved-upload section remains
 absent across refreshes, sign-in and profile changes. The browser
 wallet is mocked; the separate integration tests use real disposable Ganache.
 
-## Player permissions are chosen in Step 2
+## Player permissions are chosen in Step 3
 
 Choose Audio Preview playback, artwork display and lyrics display alongside the
-attached files in **Step 2 / Files**. Missing or still-hashing files cannot receive
-a grant. Step 4 presents a read-only summary with **Edit permissions in Step 2**.
+rights assignments in **Step 3 / IP and licensing**. Missing or still-hashing files cannot receive
+a grant. Step 4 presents a read-only summary with **Edit permissions in Step 3**.
 The existing `deployBrickWithPolicy` mint commits each applicable permission, file
 commitment and optional permanent content lock on the Brick in the same transaction
 as registration. The mint adapter reads those fields back to verify the result.
 The local Player database stores delivery copies and references, not authority to
-override an on-chain grant. Post-mint sharing remains a separate explicit delivery
-action; it cannot make a denied preview playable or expose masters/project files.
+override an on-chain grant. Delivery follows the explicit Step 3 approval
+automatically; it cannot make a denied preview playable or expose masters/project files.
 Simulation does not write any policy to a blockchain. No contract upgrade or new
 factory deployment is introduced by this UI change.
+
+Player delivery approval is now collected in Step 3 and executed automatically after
+mint confirmation. The old Your release / Add release to Player form is removed.
+A failed delivery preserves the confirmed mint and offers Retry Player delivery.
+See `PLAYER_STUDIO_RELEASES.md` for the current workflow.

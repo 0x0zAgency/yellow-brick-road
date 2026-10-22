@@ -39,10 +39,38 @@ function apply(result,raw,parser){
  for(const key of Object.keys(fields))result.fieldSources[key]=parser;
  result.parser=parser;
 }
+function nativeAudioTexts(metadata,ids){
+ const accepted=new Set(ids),values=[];
+ for(const [type,tags] of Object.entries(metadata?.native||{}).slice(0,16)){
+  if(!/^ID3v2\.[234]$/.test(type)||!Array.isArray(tags))continue;
+  for(const tag of tags.slice(0,4096)){
+   const id=String(tag?.id||'').trim().toUpperCase();
+   if(accepted.has(id))values.push(...array(tag.value));
+  }
+ }
+ return values.filter(value=>typeof value==='string').map(value=>clean(value)).filter(Boolean);
+}
+function writerNames(values){
+ const seen=new Set(),out=[];
+ for(const raw of values.slice(0,256)){
+  if(typeof raw!=='string')continue;
+  for(const part of raw.split(/[\u0000;]+/)){
+   const value=clean(part).normalize('NFC').replace(/\s+/g,' '),key=value.toLowerCase();
+   if(value&&!seen.has(key)){seen.add(key);out.push(value);}
+  }
+ }
+ return out.slice(0,64).join(', ');
+}
 export function audioSuggestions(metadata){
  const c=metadata?.common||{};
- return {title:c.title,artist:c.artist||names(c.artists),release:c.album,
-  songwriters:[...new Set([...array(c.composer),...array(c.lyricist),...array(c.writer)])].filter(v=>typeof v==='string').join(', '),
+ const composers=array(c.composer).filter(v=>typeof v==='string'&&v.trim());
+ const lyricists=array(c.lyricist).filter(v=>typeof v==='string'&&v.trim());
+ const writers=[...(composers.length?composers:nativeAudioTexts(metadata,['TCOM','TCM'])),
+  ...(lyricists.length?lyricists:nativeAudioTexts(metadata,['TEXT','TXT'])),...array(c.writer),
+  ...nativeAudioTexts(metadata,['TXXX:WRITER','TXXX:WRITERS','TXXX:SONGWRITER','TXXX:SONGWRITERS'])];
+ return {title:c.title,artist:c.artist||names(c.artists),
+  release:clean(c.album)||nativeAudioTexts(metadata,['TALB','TAL','TXXX:ALBUM'])[0],
+  songwriters:writerNames(writers),
   genre:Array.isArray(c.genre)?c.genre.find(g=>normalizeMusicGenre(g)):c.genre,
   bpm:c.bpm,key:c.key,isrc:Array.isArray(c.isrc)?c.isrc[0]:c.isrc,
   description:Array.isArray(c.comment)?c.comment.map(v=>typeof v==='string'?v:v?.text).filter(Boolean).join('\n'):''};

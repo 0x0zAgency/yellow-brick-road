@@ -19,7 +19,7 @@ Document/DAW-specific embedded metadata parsers are not implemented in this incr
 
 Parsing runs in a disposable browser Worker with a 15-second timeout, using locally selected File objects. A malformed or unsupported tag returns a filename fallback without blocking encryption. The current 256 MiB upload cap still applies. Workers are canceled when a file is replaced, the category changes, the studio resets, or the component unmounts. Keys are not involved in metadata extraction.
 
-Raw files and extracted tags are not sent to a metadata service. As before, **Remember form fields on this device** can persist the reviewed descriptive form fields in browser localStorage; disable it for sensitive drafts. Selected per-file technical metadata travels in the registration packet labeled `unverified-file-metadata`. Public release labels only leave the browser through the existing explicit publish action.
+Raw files and extracted tags are not sent to a metadata service. As before, **Remember form fields on this device** can persist the reviewed descriptive form fields in browser localStorage; disable it for sensitive drafts. Selected per-file technical metadata travels in the registration packet labeled `unverified-file-metadata`. Public release labels leave the browser only when the creator approves automatic local Player delivery in Step 3 before mint.
 
 Embedded credits are unverified statements from the file, not evidence of copyright ownership, contributor consent, royalties, or permission. The encoder/tool tag is not guessed to be the creator's DAW. Unknown genres remain a manual choice rather than corrupting the approved genre selector.
 
@@ -32,3 +32,21 @@ The uploaded **Audio Preview** supplies playback bytes. A missing/unsupported pr
 `npm test --prefix web` covers filename normalization, field whitelists, supported format fixtures, broken tags, deterministic precedence, manual clearing and stale results. Player tests reject master/ambiguous sources and legacy master delivery. Chromium integration attaches files through the real Mint Studio, exercises worker parsing from master and preview, checks field edits, and verifies played bytes match a distinct preview rather than the master.
 
 Parser references: https://github.com/Borewit/music-metadata and https://github.com/MikeKovarik/exifr. These are reused format readers; YBR does not define a replacement media-tag standard.
+
+## MP3 album and songwriter mapping
+
+The Files summary and Step 3 form expose **Album / release** and **Songwriters /
+composers**. Standard album TALB, composer TCOM and lyricist TEXT tags are read
+through music-metadata. Missing normalized fields can fall back to those native
+ID3 frames, including their ID3v2.2 equivalents. Explicit custom TXXX Writer,
+Writers, Songwriter and Songwriters descriptions are also recognized,
+case-insensitively. Values are trimmed and duplicate names collapsed; artist and
+album-artist tags never invent songwriting credit. Missing credits stay empty.
+
+These are unverified suggestions. Manual album/writer edits and intentional
+clearing win over later file parsing, just like title edits. Album is retained in
+the recording metadata; reviewed writers feed the independent composition credits
+when that Brick is selected. Other-writer approval checks remain in force.
+
+Tests include encoded MP3 album/composer/lyricist/custom-writer frames and a real
+Chromium Worker-to-form path, not only mocked parser results.

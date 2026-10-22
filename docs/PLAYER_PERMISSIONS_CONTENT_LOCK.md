@@ -2,13 +2,13 @@
 
 ## Creator workflow
 
-Mint Studio's **Review mint** step now shows the **YBR Player permissions** and **Content locked** options before wallet confirmation. Defaults allow Audio Preview playback, cover display and lyrics display only when the corresponding uploaded file exists. Master recordings and project files are not Player targets. AI-training policy remains independent. The final confirmation repeats the selections.
+Mint Studio's **Step 3 / IP and licensing** shows the **YBR Player permissions** and **Content locked** options before wallet confirmation. Defaults allow Audio Preview playback, cover display and lyrics display only when the corresponding uploaded file exists. Master recordings and project files are not Player targets. AI-training policy remains independent. Step 4 shows a read-only summary with a return-to-Step-3 control.
 
 The settings are a proposal before signing, not already on chain. On a policy-capable factory, `deployBrickWithPolicy` registers each Brick and initializes its file commitments, Player permission bits, first revision and optional permanent lock in the **same transaction**. The normal post-mint readback verifies these values. Simulated mints are clearly labeled and do not create grants or locks on chain.
 
 A recording, cover artwork and composition remain independent Bricks. Each stores permissions only for files it actually contains: typically preview playback on the recording, artwork display on the visual work, and lyrics display on the composition. A grant on the recording does not grant permission to another creator's artwork or composition. Linked external Bricks are not automatically authorized by this profile.
 
-A separate **Add release to Player** confirmation is still required to share plaintext preview copies with the local Player. The key and master/project bytes never accompany that request. Permission and content delivery are separate actions.
+Step 3 also contains the explicit, initially unchecked **Deliver approved copies to YBR Player automatically after mint** option. Approved copies are delivered after mint confirmation with no second enablement gate. The key and master/project bytes never accompany that request. Permission remains on-chain; the local delivery job is not a new rights grant. Receipts report delivery status or offer a delivery-only retry. See `PLAYER_STUDIO_RELEASES.md`.
 
 ## Live permission checks
 
@@ -51,14 +51,14 @@ Version provenance should use W3C PROV-O's `prov:wasRevisionOf` and `prov:wasDer
 
 Existing EIP-1167 Bricks/factories are immutable deployments. Pulling code does **not** add these methods to already deployed contracts. Old method entry points remain available for compatibility, but a Brick created without policy initialization does not acquire a new permission automatically.
 
-The updated mint UI refuses an incompatible factory before the optional encrypted-IPFS upload starts. With the existing local Ganache still running, explicitly deploy the new version from the repository root:
+The Step 3 UI and delivery update requires no redeployment on an already policy-capable factory. The following deployment steps apply only to older factories that lack this policy interface. The updated mint UI refuses an incompatible factory before the optional encrypted-IPFS upload starts. With the existing local Ganache still running, explicitly deploy the new version from the repository root:
 
 ```sh
 npm run compile
 npm run ganache:deploy
 ```
 
-Restart `npm run dev`, then select the newly deployed factory in Mint Studio if a saved older address takes precedence. The deployment script archives the former factory reference; it does not delete the chain, migrate registrations, remint old works, or replace wallet tokens. Old registrations remain inspectable through their original factory.
+Restart `npm run dev`; automatic local factory selection follows the new startup address unless you explicitly selected a manual override. The deployment script archives the former factory reference; it does not delete the chain, migrate registrations, remint old works, or replace wallet tokens. Old registrations remain inspectable through their original factory.
 
 Local simulation previews retain their explicitly unverified status. Legacy stored previews with on-chain references but no policy proof are not served as if authorized under this new policy; their files are not silently deleted. New on-chain preview sharing currently verifies Ganache 1337 only. Sepolia can store the policy, but delivery through the local Player is not configured for it.
 

@@ -66,7 +66,7 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
     {!shown.length&&<div className="empty"><strong>{data.bricks.length?'No registrations match these filters.':'No confirmed registrations in this factory’s scanned range.'}</strong>
      <p>Check the chain and factory shown above against your mint receipt. A simulated receipt is not an on-chain registration.</p><button type="button" className="gold-btn" onClick={onMint}>Open Mint Studio</button></div>}
    </>}
-   <p className="lr-boundary">Registration is not proof of legal ownership or permission to stream. To hear a protected recording, use <strong>Add release to Player</strong> on its Mint Studio receipts page and approve sharing the selected preview copies. Minting alone never publishes your originals.</p>
+   <p className="lr-boundary">Registration is not proof of legal ownership or permission to stream. Choose Player permissions and approve automatic delivery in <strong>Mint Studio Step 3: IP and licensing</strong>. The permitted copies are delivered after a confirmed mint; master recordings and project files stay private.</p>
   </>}
  </section>;
 }
