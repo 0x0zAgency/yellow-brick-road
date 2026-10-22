@@ -85,11 +85,104 @@ test('NO_COLOR, reduced motion, plain, dumb, CI and hidden-secret switches work'
  for(const config of [{env:{TERM:'dumb'}},{env:{CI:'true'}},{env:{YBR_DEV_PLAIN:'1'}},{args:['--plain']}]){const h=harness({tty:true,...config});try{h.dashboard.start();assert.equal(h.dashboard.interactive,false);assert.equal(h.dashboard.showSecrets,false);}finally{h.close();}}
 });
 test('split child output is drained and secrets never reach disk',async()=>{
- const h=harness();try{const stdout=new PassThrough(),stderr=new PassThrough();h.dashboard.attach('ganache',{stdout,stderr});stdout.write('Mnem');stdout.write('onic: '+mnemonic.slice(0,20));stdout.write(mnemonic.slice(20)+'\n');stdout.end('(0) '+privateKey+'\n');stderr.end('eth_chainId\n');await new Promise(r=>setImmediate(r));assert.equal(h.dashboard.candidateMnemonic,mnemonic);const file=fs.readFileSync(h.dashboard.logFile,'utf8');assert.ok(!file.includes(mnemonic));assert.ok(!file.includes(privateKey));assert.match(file,/redacted/);assert.match(file,/eth_chainId/);assert.ok(!h.dashboard.state.logs.some(l=>l.includes('eth_chainId')));}finally{h.close();}
+ const h=harness();try{const stdout=new PassThrough(),stderr=new PassThrough();h.dashboard.addSecrets(privateKey);h.dashboard.attach('ganache',{stdout,stderr});stdout.write('Mnem');stdout.write('onic: '+mnemonic.slice(0,20));stdout.write(mnemonic.slice(20)+'\n');stdout.end('(0) '+privateKey+'\n');stderr.end('eth_chainId\nError: '+privateKey+'\n');await new Promise(r=>setImmediate(r));assert.equal(h.dashboard.candidateMnemonic,mnemonic);const file=fs.readFileSync(h.dashboard.logFile,'utf8');assert.ok(!file.includes(mnemonic));assert.ok(!file.includes(privateKey));assert.match(file,/redacted/);assert.doesNotMatch(file,/eth_chainId/);assert.ok(!h.dashboard.state.logs.some(l=>l.includes('eth_chainId')));}finally{h.close();}
 });
 test('oversized output is omitted instead of partially leaking',async()=>{
- const h=harness();try{const stdout=new PassThrough();h.dashboard.attach('test',{stdout});stdout.write('x'.repeat(9000));stdout.end('listener-fixture\nnormal\n');await new Promise(r=>setImmediate(r));const file=fs.readFileSync(h.dashboard.logFile,'utf8');assert.match(file,/oversized output line omitted/);assert.match(file,/normal/);assert.ok(!file.includes('listener-fixture'));}finally{h.close();}
+ const h=harness({args:['--verbose']});try{const stdout=new PassThrough();h.dashboard.attach('test',{stdout});stdout.write('x'.repeat(9000));stdout.end('listener-fixture\nnormal\n');await new Promise(r=>setImmediate(r));const file=fs.readFileSync(h.dashboard.logFile,'utf8');assert.match(file,/oversized output line omitted/);assert.match(file,/normal/);assert.ok(!file.includes('listener-fixture'));}finally{h.close();}
 });
 test('log ring and rotation stay bounded',()=>{
- const h=harness();try{for(let i=0;i<240;i++)h.dashboard.log('test','line '+i);assert.equal(h.dashboard.state.logs.length,200);fs.appendFileSync(h.dashboard.logFile,'x'.repeat(1024*1024));h.dashboard.logBytes=1024*1024+1;h.dashboard.log('test','rotated');assert.ok(fs.existsSync(h.dashboard.logFile+'.1'));assert.ok(fs.statSync(h.dashboard.logFile).size<1024);assert.ok(renderDashboard(h.dashboard.state,{view:'logs',columns:80,rows:24}).length<=23);}finally{h.close();}
+ const h=harness({args:['--verbose']});try{for(let i=0;i<240;i++)h.dashboard.log('test','line '+i);assert.equal(h.dashboard.state.logs.length,200);fs.appendFileSync(h.dashboard.logFile,'x'.repeat(1024*1024));h.dashboard.logBytes=1024*1024+1;h.dashboard.log('test','rotated');assert.ok(fs.existsSync(h.dashboard.logFile+'.1'));assert.ok(fs.statSync(h.dashboard.logFile).size<1024);assert.ok(renderDashboard(h.dashboard.state,{view:'logs',columns:80,rows:24}).length<=23);}finally{h.close();}
+});
+
+test('essential mode suppresses routine child output before disk, terminal and ring',async()=>{
+ const h=harness();try{
+  h.dashboard.start();const stdout=new PassThrough(),stderr=new PassThrough();h.dashboard.attach('ganache',{stdout,stderr});
+  stdout.end('eth_chainId\nnet_version\nTransaction: 0xfixture\nGas usage: 30000\nBlock number: 2\n');
+  stderr.end('eth_getCode\nError: RPC disconnected\n    at connect (rpc.js:8)\n');
+  h.dashboard.log('launcher','Services ready');
+  await new Promise(r=>setImmediate(r));
+  for(const value of [h.captured(),fs.readFileSync(h.dashboard.logFile,'utf8'),h.dashboard.state.logs.join('\n')]){
+   assert.doesNotMatch(value,/eth_chainId|eth_getCode|net_version|Gas usage|Transaction:|Block number/);
+   assert.match(value,/RPC disconnected/);assert.match(value,/at connect/);assert.match(value,/Services ready/);
+  }
+  const count=h.dashboard.state.logs.length;for(let i=0;i<100;i++)h.dashboard.log('launcher','Services ready');assert.equal(h.dashboard.state.logs.length,count);
+ }finally{h.close();}
+});
+test('home has no activity feed; l opens logs and v changes capture without altering services',()=>{
+ const h=harness({tty:true});try{
+  h.dashboard.start();h.dashboard.update(state());
+  let screen=strip(h.dashboard.lastFrame.join('\n'));assert.doesNotMatch(screen,/Ready for minting|ACTIVITY/);assert.match(screen,/\[l\] logs/);
+  const services={...h.dashboard.state.services};h.input.emit('keypress','l',{name:'l'});assert.equal(h.dashboard.view,'logs');assert.match(strip(h.dashboard.lastFrame.join('\n')),/SESSION LOG \/\/ ESSENTIAL/);
+  h.input.emit('keypress','v',{name:'v'});assert.equal(h.dashboard.verbose,true);h.dashboard.log('ganache','eth_chainId');
+  assert.match(fs.readFileSync(h.dashboard.logFile,'utf8'),/eth_chainId/);
+  h.input.emit('keypress','v',{name:'v'});assert.equal(h.dashboard.verbose,false);h.dashboard.log('ganache','eth_getBalance');
+  assert.doesNotMatch(fs.readFileSync(h.dashboard.logFile,'utf8'),/eth_getBalance/);
+  h.input.emit('keypress','',{name:'escape'});assert.equal(h.dashboard.view,'home');h.input.emit('keypress','v',{name:'v'});assert.equal(h.dashboard.verbose,false);
+  assert.deepEqual(h.dashboard.state.services,services);assert.equal(h.restarts(),0);assert.equal(h.quits(),0);
+ }finally{h.close();}
+});
+test('fresh sessions discard ONLY dev-stack.log and its rotation, never creator data',()=>{
+ const h=harness();let again;try{
+  h.dashboard.log('launcher','OLD SESSION');h.dashboard.close();
+  fs.writeFileSync(h.dashboard.logFile+'.1','OLD ROTATION');
+  const dir=path.join(h.root,'.road-local');const retained=['ganache/LOG','ganache-profiles/abc/ganache/LOG','player-releases/release.json','player-access.json','ganache-wallet.json','recovery.json','other.log','dev-stack.log.backup'];
+  for(const name of retained){const f=path.join(dir,name);fs.mkdirSync(path.dirname(f),{recursive:true});fs.writeFileSync(f,'KEEP '+name);}
+  again=new DevDashboard({root:h.root,output:h.output,input:h.input,env:{},args:[]});
+  assert.equal(fs.readFileSync(again.logFile,'utf8'),'');assert.equal(fs.existsSync(again.logFile+'.1'),false);
+  assert.deepEqual(again.state.logs,[]);assert.equal(again.state.logMode,'ESSENTIAL');again.log('launcher','NEW SESSION');assert.doesNotMatch(fs.readFileSync(again.logFile,'utf8'),/OLD/);
+  for(const name of retained)assert.equal(fs.readFileSync(path.join(dir,name),'utf8'),'KEEP '+name);
+ }finally{again?.close();h.close();}
+});
+test('cleanup refuses symlinks, hardlinks and directories before touching either old log',()=>{
+ for(const kind of ['symlink','hardlink','directory']){
+  const h=harness();try{
+   h.dashboard.close();fs.writeFileSync(h.dashboard.logFile,'KEEP OLD LOG');const other=path.join(h.root,'outside');fs.writeFileSync(other,'KEEP OUTSIDE');
+   if(kind==='symlink')fs.symlinkSync(other,h.dashboard.logFile+'.1');
+   if(kind==='hardlink')fs.linkSync(other,h.dashboard.logFile+'.1');
+   if(kind==='directory')fs.mkdirSync(h.dashboard.logFile+'.1');
+   assert.throws(()=>new DevDashboard({root:h.root,output:h.output,input:h.input,env:{},args:[]}),/Unsafe dev log/);
+   assert.equal(fs.readFileSync(other,'utf8'),'KEEP OUTSIDE');assert.equal(fs.readFileSync(h.dashboard.logFile,'utf8'),'KEEP OLD LOG');
+  }finally{h.close();}
+ }
+});
+test('replaced log paths cannot redirect captured output or rotation to another file',()=>{
+ const h=harness({args:['--verbose']});try{
+  const other=path.join(h.root,'outside');fs.writeFileSync(other,'KEEP OUTSIDE');
+  fs.unlinkSync(h.dashboard.logFile);fs.symlinkSync(other,h.dashboard.logFile);
+  h.dashboard.log('ganache','eth_chainId');assert.equal(fs.readFileSync(other,'utf8'),'KEEP OUTSIDE');
+  h.dashboard.logBytes=1024*1024;h.dashboard.log('launcher','force rotation');assert.match(h.dashboard.state.error,/Cannot write/);
+  assert.equal(fs.readFileSync(other,'utf8'),'KEEP OUTSIDE');assert.equal(h.dashboard.logFd,null);
+ }finally{h.close();}
+});
+test('verbose startup and menu remain redacted, bounded and accessible on short terminals',()=>{
+ for(const config of [{args:['--logs','--verbose']},{args:['--logs'],env:{YBR_DEV_VERBOSE:'1'}}]){
+  const h=harness({tty:true,...config});try{
+   h.dashboard.start();h.dashboard.addSecrets('private-password',mnemonic);h.dashboard.log('worker','trace private-password '+mnemonic);
+   assert.equal(h.dashboard.verbose,true);assert.equal(h.dashboard.view,'logs');
+   const file=fs.readFileSync(h.dashboard.logFile,'utf8');assert.doesNotMatch(file,/private-password|abandon/);assert.match(file,/redacted/);
+   for(const [columns,rows] of [[80,24],[120,40],[61,15],[40,10]]){
+    const lines=renderDashboard(h.dashboard.state,{columns,rows,view:'logs'});assert.ok(lines.length<rows);assert.ok(lines.every(l=>strip(l).length<columns));assert.match(lines.join('\n'),/SESSION LOG/);
+   }
+  }finally{h.close();}
+ }
+});
+test('failure restores terminal and surfaces a redacted diagnostic without dumping history',()=>{
+ const h=harness({tty:true});try{
+  h.dashboard.start();h.dashboard.addSecrets('private-password');h.dashboard.log('worker','Error: refused private-password',{stderr:true});
+  const before=h.captured().length;h.dashboard.close('Road Explorer unexpectedly exited (1)');
+  const end=h.captured().slice(before);assert.match(end,/Last diagnostic:.*refused \[redacted\]/);assert.doesNotMatch(end,/private-password/);assert.equal(h.input.isRaw,false);assert.equal(h.dashboard.logFd,null);
+ }finally{h.close();}
+});
+test('two separate launcher processes start fresh logs without persisting verbose mode',()=>{
+ const {execFileSync}=require('node:child_process');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-log-restart-'));
+ const script=`const {DevDashboard}=require(${JSON.stringify(path.join(__dirname,'dev-dashboard.cjs'))});
+ const d=new DevDashboard({root:process.argv[1],args:process.argv[2]==='first'?['--verbose']:[],env:{}});
+ d.start();d.log('ganache','eth_chainId');d.log('launcher',process.argv[2]);d.close();`;
+ try{
+  execFileSync(process.execPath,['-e',script,root,'first'],{stdio:'pipe'});
+  const file=path.join(root,'.road-local/dev-stack.log');assert.match(fs.readFileSync(file,'utf8'),/eth_chainId/);
+  fs.writeFileSync(file+'.1','old rotation');execFileSync(process.execPath,['-e',script,root,'second'],{stdio:'pipe'});
+  const current=fs.readFileSync(file,'utf8');assert.match(current,/second/);assert.doesNotMatch(current,/first|eth_chainId/);assert.equal(fs.existsSync(file+'.1'),false);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
