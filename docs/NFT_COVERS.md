@@ -33,7 +33,11 @@ there when the original Mint Studio browser session is no longer available. No
 recovery key needs to be uploaded. Failed legacy, owner, network or collection
 checks occur before publication. Wallet/account checks repeat before signing.
 The success result is based on reading each actual `tokenURI.image`, not a local
-UI flag. A submitted transaction hash stays visible if confirmation is uncertain.
+UI flag. Read-back also verifies the metadata's Brick Contract and Registration IP
+ID attributes against each selected receipt; a matching image alone is insufficient.
+Publishing a cover never authorizes publication or streaming of the underlying
+work. Player permissions remain independent.
+A submitted transaction hash stays visible if confirmation is uncertain.
 Inspect it before attempting a second update. A rejected wallet request may leave
 an already-pinned public image; the UI explicitly reports this.
 
