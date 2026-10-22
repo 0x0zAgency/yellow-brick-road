@@ -1,58 +1,95 @@
 # Mint Studio releases in YBR Player
 
-## Use the files already uploaded in your browser
+## One pre-mint setup, in Step 3
 
-Start the existing integrated app with `npm run dev` from the repository root or `web/`. Mint Studio runs on port 5173 and the separate YBR Player on port 4173.
+Run `npm run dev`. Mint Studio uses port 5173; the independent reference Player
+uses port 4173. No third-party streaming SDK is involved.
 
-1. Attach a Master Recording and a separate Audio Preview, cover artwork, and lyrics in Mint Studio. Complete the simulated mint or an actual test-chain mint.
-2. In **Mint results**, find **Your release / YBR Player**. The Player uses only the Audio Preview. A master is never a fallback.
-3. Choose whether to include the cover and lyrics. Confirm permission to share the selected copies and release/file labels with local Player users, then select **Add release to Player**.
-4. Open the release in YBR Player and sign in with the credentials printed by the integrated launcher. Its library also refreshes every five seconds while visible, without restarting playback.
+1. In **Step 2 / Files**, attach a primary work, a separate Audio Preview, and any
+   cover or lyric files. Encrypt locally as before.
+2. In **Step 3 / IP and licensing**, review credits, Player permissions and the
+   optional permanent content lock. Choose **Deliver approved copies to YBR
+   Player automatically after mint** to consent to the local transfer of permitted
+   preview/artwork/lyrics bytes and public release/file labels. This is unchecked
+   by default. File, credit or permission changes require renewed approval.
+3. Step 4 is a read-only policy/delivery summary plus network and NFT-cover review.
+   Confirm the mint. Each applicable Brick receives its policy atomically with
+   registration; the normal adapter verifies the receipt and on-chain state.
+4. The browser then delivers the approved copies automatically. Receipts show
+   **Ready in YBR Player** and an open link, not another permission/enablement panel.
+   Sign in with the credentials on the development dashboard.
 
-There is no second file-picker/upload step. Mint Studio decrypts only the selected already-attached files locally using the existing browser vault, verifies them against the reviewed source hashes, and sends the consented preview copies to the local Player. The key, recovery backup, private packet and project binaries are never sent.
+A local simulation can also deliver an explicitly approved demo preview, but it
+never creates on-chain permissions. Real automatic delivery currently supports
+Ganache 1337 only. Sepolia minting remains available without local delivery.
 
-**The browser session must still contain the uploaded files and encryption key.** Old encrypted IPFS registrations are not automatically decrypted or republished. For a closed/lost browser session, use the existing Recover files workflow to recover your originals and attach them again. No new decryption tool is added.
+## Permission authority and private files
 
-## What the Player displays
+The **Brick**, not the Player database, is the authority for a real mint's Player
+permissions. Publication, listing and media serving verify the current owning
+Brick/controller, revision, role, SHA-256 and chain history. A recording grant
+cannot authorize a separate visual or composition Brick. Revocations and changed
+controllers/revisions continue to block access.
 
-The collection includes three distinct kinds of entry: built-in synthetic demos, actual chain-authorized public Road tracks, and explicitly shared **DEMO UPLOAD** releases. A supplied mint address in a local preview is an unverified reference, not a verified playback license. This distinction remains visible in the inspector and API.
+Only the **Audio Preview** supplies audio. A master is never a fallback. The
+browser decrypts selected files using its existing ephemeral vault and checks
+exact bytes before transmission. Masters, project binaries, recovery keys and
+private packets are not sent. Associated filenames and creator-declared credits
+are disclosed only under the Step 3 delivery approval.
 
-A release cover is displayed in the library thumbnail, now-playing bar, inspector, and every associated-file card. One stored image supplies all those views. Creator-declared recording, cover and songwriting credits are shown together. Missing or unavailable cover images retain the YBR fallback.
+Approval is volatile, not a stored application rights flag. It is bound to the
+reviewed files, public labels and policy. Public NFT-thumbnail consent is separate:
+a login-protected Player cover URL is not a public ERC-721 image.
 
-Plain UTF-8 `.txt` lyrics appear as text, never interpreted HTML. Timed `.vtt` lyrics use the browser's native WebVTT metadata track, highlight the active cue, and support clicking a line to seek. We use the existing [W3C WebVTT standard](https://www.w3.org/TR/webvtt1/), not a new YBR timing format. We do not invent timestamps for plain lyrics.
+## Delivery failures do not invalidate a mint
 
-Project files and other associated originals can appear as labeled records with the same cover, but their bytes are **not** shared. Only selected audio, artwork and lyrics are copied.
+The confirmed mint is retained before delivery begins. An unavailable Player,
+changed permission, unsupported response, cancellation or timeout is reported as
+**Player delivery needs attention**, never as a reason to mint again. Use **Retry
+Player delivery** to retry the same approved copies. Identical publication is
+idempotent and does not submit another blockchain transaction.
 
-This change concerns the Player and its release/file views. It does **not** rewrite ERC-721 `tokenURI` or replace the existing registration token's on-chain default artwork. A wallet-visible token cover needs a separately authorized publicly retrievable image and an appropriate receipt-contract update; a login-protected Player URL must not be advertised as a public token image.
+The current browser vault is required. Do not refresh an active session without
+saving its recovery backup. This change does not add cross-session re-publication,
+recover old browser keys, or retroactively deliver old registrations. Recover
+original files with the existing recovery tools, but do not mint duplicate Bricks
+as a delivery repair.
 
-## Supported preview inputs
+## Formats and display
 
-- Audio: MP3, WAV, OGG/Opus, M4A/MP4 audio, FLAC, WEBM or AAC, up to **32 MiB**. Actual decoding depends on the browser; supply a browser-supported MP3/WAV Audio Preview.
-- Cover: PNG, JPEG or WebP, up to **8 MiB**. SVG and HTML are rejected, and declared media types must match the image signature.
-- Lyrics: UTF-8 TXT or WebVTT, up to **512 KiB**. DOCX, PDF and LRC are not parsed by this version. They can remain associated evidence without being shared as display lyrics.
+Audio supports browser-compatible MP3, WAV, OGG/Opus, M4A/MP4 audio, FLAC, WEBM or
+AAC up to 32 MiB. Covers support validated PNG/JPEG/WebP up to 8 MiB. Lyrics support
+UTF-8 TXT and WebVTT up to 512 KiB. Unsupported or oversized selected assets are
+rejected during delivery review before the mint. Turn off that asset permission
+or use a supported file. No format conversion or master fallback is performed.
 
-The adapter bounds the request, validates checksums and sizes, and stores at most 100 local preview releases. Repeating an identical publication reuses the same release ID. Changing selected assets or metadata creates a new preview version.
+The Player listening view contains only playable tracks, newest first. The Saved
+uploads section stays hidden. Selected cover art appears on release/file cards;
+plain lyrics are rendered as text, and WebVTT timing uses the browser's native
+track support. No lyric timestamps are invented.
 
-## Local copies, permissions and removal
+## Local transport and storage
 
-Shared copies are stored under `.road-local/player-releases/`, ignored by Git. They survive Player restarts and are **unencrypted local preview copies**. Anyone using a valid account on that local Player can view them. This is not per-artist production access control.
+Approved copies live unencrypted under `.road-local/player-releases/`, ignored by
+Git. They survive restarts but remain subject to live rights checks. Local Player
+accounts are a development access boundary, not production artist tenancy.
 
-Use **Remove local preview copies** in the Mint Studio publication panel to withdraw that preview. The original encrypted uploads, IPFS pins, mint receipts and contracts are untouched. Withdrawal denies subsequent requests and removes the entry on library refresh, but cannot retract bytes already downloaded or buffered.
+The existing same-origin loopback and CSRF-protected publishing endpoints are
+reused: GET `/api/player-publish/config`, POST `/api/player-publish/releases`, and
+DELETE `/api/player-publish/releases/:id`. The deletion API still withdraws local
+copies; the former publication/removal form is no longer mounted in receipts.
+Withdrawal cannot retract already buffered/downloaded bytes. No endpoint should
+be exposed as a production upload service.
 
-The publishing endpoints use same-origin loopback checks and an unpredictable per-process CSRF token. They are development-only and must not be exposed as a production upload service. Player artwork and lyrics require the normal Player session; audio additionally requires playback authorization. Tampered stored media fails its checksum check. No arbitrary remote URL is fetched.
+These copies do not enter the public `/road/api/music` catalog, grant commercial
+or AI-training licenses, establish copyright title, or create payments. Existing
+standards and on-chain policy checks are unchanged.
 
-The public `/road/api/music` catalog is unchanged: private local previews are **not** inserted into the chain-authorized public catalog. Decryption and local sharing do not create a public streaming license, copyright title, verified play, royalty balance, or payment.
+## Verification
 
-## API / implementation
-
-`GET /api/player-publish/config` and `POST /api/player-publish/releases` are proxied by the main web app to the Player. The latter requires `X-YBR-Publish-Token` and explicit sharing consent. `DELETE /api/player-publish/releases/:id` withdraws the selected local preview.
-
-Player discovery uses the existing authenticated `/api/bricks` endpoint. The local adapter adds `source: "studio-demo"`, a release-level artwork reference, optional plain/WebVTT lyrics and associated-file records. This is an internal demo adapter, not a replacement for YBR metadata, PROV-O, C2PA or music-industry standards.
-
-Tests cover the existing browser vault-to-preview flow, refusal without consent, source-checksum verification, safe media types, no key serialization, local-origin/CSRF protection, authenticated media access, byte-range playback, library persistence, idempotency, withdrawal, and real Chromium upload/playback with shared cover art and synchronized WebVTT lyrics. Existing Ganache and IPFS integration workflows continue separately.
-
-## Preview-only playback
-
-The Audio Preview slot is the sole playback source for uploaded releases. A supported Master Recording is never a fallback. Missing or unsupported previews leave **Add release to Player** disabled with instructions to attach an Audio Preview. The browser adapter will not read/decrypt the master for playback; the server independently rejects a non-preview source declaration or an associated-file list that shares a master. Masters and projects can still appear as unshared file labels with the release cover.
-
-Legacy local demo publications marked as playing the master are no longer listed or served; their local files are not silently deleted. Re-publish with an attached Audio Preview or explicitly remove the old record. This does not alter the separately authorized synthetic Ganache fixture, commercial licenses, or encrypted IPFS sources.
+Unit tests cover opt-in, source-bound review, unsupported inputs/networks, failed
+or mismatched mints, delivery failure/retry, byte integrity and no master/key
+publication. Real Ganache tests commit the policies, deliver automatically, retry
+without duplicate uploads or new mints, and continue through revocation checks.
+Chromium exercises Step 3 approval, automatic simulated delivery, authenticated
+playback, artwork and lyrics, plus metadata edits that invalidate delivery consent.

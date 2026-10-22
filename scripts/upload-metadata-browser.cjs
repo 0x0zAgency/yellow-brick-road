@@ -5,9 +5,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
 const ROOT=path.resolve(__dirname,'..'),OUT=path.join(ROOT,'.road-local/player-browser-results');
-function mp3(title,artist){
+function mp3(title,artist,album='Imported album',writer='Tag Writer'){
  const frame=(id,text)=>{const body=Buffer.concat([Buffer.from([3]),Buffer.from(text)]),head=Buffer.alloc(10);head.write(id);head.writeUInt32BE(body.length,4);return Buffer.concat([head,body]);};
- const tags=Buffer.concat([frame('TIT2',title),frame('TPE1',artist),frame('TALB','Imported album'),frame('TCOM','Tag Writer'),frame('TCON','Electronic'),frame('TBPM','123')]);
+ const tags=Buffer.concat([frame('TIT2',title),frame('TPE1',artist),frame('TALB',album),frame('TCOM',writer),frame('TEXT','Lyric Writer'),frame('TXXX','SONGWRITER\0Custom Writer'),frame('TCON','Electronic'),frame('TBPM','123')]);
  const head=Buffer.from([73,68,51,3,0,0,0,0,0,0]);let n=tags.length;for(let i=9;i>=6;i--){head[i]=n&127;n>>=7;}
  const frames=Buffer.alloc(417*8);for(let i=0;i<8;i++)Buffer.from([255,251,144,0]).copy(frames,i*417);
  return Buffer.concat([head,tags,frames]);
@@ -26,19 +26,28 @@ async function main(){
   await attach('Choose Master recording','same-name.mp3',mp3('Master tagged title','Master tagged artist'));
   await advance();assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'Master tagged title');
   assert.equal(await page.getByLabel('Recording artist / claimant',{exact:true}).inputValue(),'Master tagged artist');
-  assert.equal(await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).inputValue(),'Tag Writer');
+  assert.equal(await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).inputValue(),'Tag Writer, Lyric Writer, Custom Writer');
+  assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'Imported album');
+  await page.getByLabel('Album / release',{exact:true}).fill('My deliberate album');
+  await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('My credited songwriter');
   await page.getByLabel('Track title',{exact:true}).fill('My deliberate title');
   await page.getByRole('button',{name:'← Back',exact:true}).click();
   await attach('Choose Master recording','same-name.mp3',mp3('Replacement master','Replacement artist'));
-  await attach('Choose Audio preview','listener-preview.mp3',mp3('Preview title','Preview artist'));
+  await attach('Choose Audio preview','listener-preview.mp3',mp3('Preview title','Preview artist','Different preview album','Different preview writer'));
   await advance();assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'My deliberate title');
   assert.equal(await page.getByLabel('Recording artist / claimant',{exact:true}).inputValue(),'Preview artist');
+  assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'My deliberate album');
+  assert.equal(await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).inputValue(),'My credited songwriter');
   // Explicit clearing must not be undone by asynchronous imported fields.
   await page.getByLabel('Track title',{exact:true}).fill('');
+  await page.getByLabel('Album / release',{exact:true}).fill('');
+  await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('');
   await page.getByRole('button',{name:'← Back',exact:true}).click();
   await attach('Choose Audio preview','listener-preview.mp3',mp3('A later title','Later preview artist'));
   await advance();assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'');
   assert.equal(await page.getByLabel('Recording artist / claimant',{exact:true}).inputValue(),'Later preview artist');
+  assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'');
+  assert.equal(await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).inputValue(),'');
   assert.deepEqual(errors,[]);
   fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-autofill.png'),fullPage:true});
   console.log('PASS: worker MP3 extraction from master and preview, filename fallback for unknown formats, manual edits/clearing, replacement and preview metadata precedence.');

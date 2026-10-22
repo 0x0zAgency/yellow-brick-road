@@ -69,3 +69,47 @@ test('a valid preview is the only audio role read, even with a distinct supporte
  assert.equal(result.audioSourceRole,'preview');assert.ok(reads.includes('preview'));assert.ok(!reads.includes('master'));
  assert.equal(result.files.find(f=>f.role==='master').sharedAs,null);
 });
+
+test('Step 3 approval schedules delivery, with no post-mint enablement or new rights',async()=>{
+ const {reviewPlayerDelivery,deliverPlayerAfterMint}=await import('../src/player-delivery.js');
+ const options=await fixture();let calls=0;
+ const publish=async opts=>{calls++;assert.equal(opts.consent,true);const data=await buildPlayerRelease(opts);assert.equal(data.album,'Album');return {brick:{id:'STUDIO-'+'b'.repeat(64)}};};
+ assert.deepEqual(await deliverPlayerAfterMint(options,{publish}),{status:'not-requested'});assert.equal(calls,0);
+ const approval=reviewPlayerDelivery({...options,execution:'simulated'});
+ const delivery=await deliverPlayerAfterMint({...options,approval},{publish});assert.equal(delivery.status,'delivered');assert.equal(calls,1);assert.equal(delivery.simulated,true);
+});
+test('changed files, labels and permissions invalidate reviewed delivery before publishing',async()=>{
+ const {reviewPlayerDelivery,deliverPlayerAfterMint}=await import('../src/player-delivery.js');
+ for(const change of [packet=>packet.bricks[0].metadata.title='Changed',packet=>packet.bricks[0].metadata.media[0].integrity.digest='0x'+'f'.repeat(64),packet=>packet.bricks[0].metadata.rights={player:{permissions:{preview:false}}}]){
+  const opts=await fixture(),approval=reviewPlayerDelivery(opts);change(opts.packet);let calls=0;
+  const result=await deliverPlayerAfterMint({...opts,approval},{publish:async()=>{calls++;}});
+  assert.equal(result.status,'needs-attention');assert.match(result.error,/changed/);assert.equal(calls,0);
+ }
+});
+test('delivery failure preserves successful mint and can retry the same approved copies',async()=>{
+ const {reviewPlayerDelivery,deliverPlayerAfterMint}=await import('../src/player-delivery.js');
+ const opts=await fixture(),approval=reviewPlayerDelivery(opts),before=JSON.stringify(opts.mint);
+ const first=await deliverPlayerAfterMint({...opts,approval},{publish:async()=>{throw Error('Player offline');}});
+ assert.equal(first.status,'needs-attention');assert.match(first.error,/offline/);assert.equal(JSON.stringify(opts.mint),before);
+ const second=await deliverPlayerAfterMint({...opts,approval},{publish:async()=>({brick:{id:'STUDIO-'+'c'.repeat(64)}})});
+ assert.equal(second.status,'delivered');assert.equal(JSON.stringify(opts.mint),before);
+});
+test('pre-mint delivery review refuses unsupported network, unsupported files and missing preview',async()=>{
+ const {reviewPlayerDelivery}=await import('../src/player-delivery.js');const opts=await fixture();
+ assert.equal(reviewPlayerDelivery({...opts,consent:false,execution:'sepolia'}),null);
+ assert.throws(()=>reviewPlayerDelivery({...opts,execution:'sepolia',chainId:11155111}),/Ganache/);
+ opts.packet.bricks[0].metadata.media[0].role='master';assert.throws(()=>reviewPlayerDelivery(opts),/Audio Preview/);
+});
+test('unconfirmed or wrong-mode mints cannot trigger automatic delivery',async()=>{
+ const {reviewPlayerDelivery,deliverPlayerAfterMint}=await import('../src/player-delivery.js');const opts=await fixture();let calls=0;
+ const approval=reviewPlayerDelivery({...opts,execution:'ganache',chainId:1337});
+ for(const mint of [opts.mint,{status:'incomplete',chainId:1337},{status:'confirmed',chainId:11155111}]){
+  const result=await deliverPlayerAfterMint({...opts,mint,approval},{publish:async()=>{calls++;}});assert.equal(result.status,'needs-attention');
+ }
+ assert.equal(calls,0);
+});
+test('delivery timeout produces a retryable status without changing confirmed receipts',async()=>{
+ const {reviewPlayerDelivery,deliverPlayerAfterMint}=await import('../src/player-delivery.js');const opts=await fixture(),approval=reviewPlayerDelivery(opts);
+ const result=await deliverPlayerAfterMint({...opts,approval},{timeoutMs:5,publish:(_, {signal})=>new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new DOMException('timed out','AbortError')),{once:true}))});
+ assert.equal(result.status,'needs-attention');assert.match(result.error,/timed out/);assert.equal(opts.mint.simulated,true);
+});
