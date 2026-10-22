@@ -3,6 +3,7 @@
 Run `npm run dev` from the repository root or `web/` with Docker running.
 The local control screen has an ASCII YBR masthead, gold/cyan/magenta frames,
 an animated brick chase, real service health, and stationary credential panels.
+The home screen is quiet: service status and credentials, not a scrolling log feed.
 The tagline is **FOLLOW THE YELLOW BRICK ROAD**. The brick animation is decorative,
 not network activity or throughput telemetry.
 
@@ -97,7 +98,8 @@ panel in a compact view. Smaller windows show status without credentials.
 | Key | Action |
 | --- | --- |
 | d | Reference view: full credentials, account-0 key, HD path, IPFS peer and endpoints. |
-| l | Expanded recent activity, up to 200 relevant lines. |
+| l | Open/close the optional session-log view, up to 200 captured lines. |
+| v (inside logs) | Toggle verbose capture on/off for this session. |
 | s | Hide/show local credentials. |
 | p | Pause drawing for selecting/copying text; services keep running. |
 | a | Toggle animated bricks. |
@@ -117,11 +119,48 @@ The Ganache mnemonic is shown only after its derived account matches account 0
 from the launcher-owned node. Reused unknown Ganache nodes do not disclose their
 seed via RPC; no seed is guessed. **Never send real funds to local test wallets.**
 
+Each new development-dashboard launch removes **only** the previous
+`.road-local/dev-stack.log` and `.road-local/dev-stack.log.1`, then opens a fresh,
+owner-only current-session log. Copy a log elsewhere before restarting when it is
+needed for debugging. No recursive or wildcard deletion occurs: Ganache profiles,
+LevelDB logs, factory receipts, Player files, credential files, recovery material,
+other logs and Kubo volumes are not cleanup targets. Unsafe log paths (including
+symlinks, hardlinks or directories) are refused before either old file is removed.
+Stop the previous launcher before starting a new session. Restarting just the
+Player with r does not clear the ongoing launcher session.
+
+**ESSENTIAL** capture is the default: launcher milestones, warnings, errors and
+stderr diagnostics. Routine RPC methods, transaction dumps, compiler success
+output and other child chatter are discarded before both disk and the in-memory
+ring. Consecutive duplicate essential messages are collapsed. The home screen
+shows no activity feed; warnings can appear as a single status line, and startup
+failures still print their reason and the last available child diagnostic.
+
+Press **l** to open logs. Press **v** there to toggle **VERBOSE** capture, including
+RPC and ordinary child output, without restarting services or changing permissions.
+The view labels the active capture mode. l or Escape returns home without changing
+the capture mode. Verbose capture starts at the moment it is enabled; discarded
+earlier output cannot be recovered. Each launch returns to essential capture
+unless an explicit flag or environment setting requests verbose logging.
+
+```sh
+npm run dev -- --logs                 # Open directly in the log view
+npm run dev -- --logs --verbose       # Capture verbose service startup diagnostics
+npm run dev -- --plain --verbose      # Non-interactive diagnostics
+```
+
+`YBR_DEV_VERBOSE=1` is the environment equivalent of `--verbose`. Ordinary
+startup condenses successful dependency-script approvals into one progress line;
+warnings and a bounded failure tail remain visible. `npm run setup:dev` keeps its
+installation output, and dependency approval/denial behavior is unchanged.
+
 Known Player credentials, Ganache seed lines and private-key lines are redacted
-from captured child output before saving `.road-local/dev-stack.log`. One rotated
-`.1` file is retained, approximately 1 MiB per file. This remains targeted
-redaction, not a general-purpose secret detector. Player credentials are visible
-on the interactive screen unless hidden; hide them before screen sharing.
+before capture, in **both** modes. One same-session `.1` rotation is retained,
+approximately 1 MiB per file, and the ring is capped at 200 lines. Both disk logs
+are removed at the next dashboard launch. `--check-node` and setup alone do not
+clear logs. This remains targeted redaction, not a general-purpose secret detector.
+Player credentials are visible on the interactive screen unless hidden; hide them
+before screen sharing.
 
 Pipes, CI, TERM=dumb, or `npm run dev -- --plain` use plain output without printing
 credentials. Kubo and its volumes remain running when the launcher exits.
@@ -133,7 +172,8 @@ behavior changed.
 ## Tests
 
 `npm run test:dev-stack` includes Player startup postconditions, registration
-idempotency, playback integrity, and exact-tagline/layout regressions. The
+idempotency, playback integrity, exact-tagline/layout regressions, quiet and verbose
+log capture, bounded output, safe session cleanup and retained creator data. The
 existing nvm tests use controlled fixtures, not live downloads. The integrated
 GitHub job starts an older standalone Player first, then uses the default dev
 command without a restart flag. It verifies guarded automatic repair, both real

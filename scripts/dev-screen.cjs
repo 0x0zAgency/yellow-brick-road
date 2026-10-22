@@ -45,9 +45,16 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
   }
   return line;
  }
- const buttons=gold(clip('[m] mnemonic [d] info [l] logs [s] keys [p] pause [a] FX [r] player [q] quit',w));
+ const logMode=state.logMode==='VERBOSE'?'VERBOSE':'ESSENTIAL';
+ const buttons=gold(clip(view==='logs'?'[l/Esc] home [v] verbose '+(logMode==='VERBOSE'?'ON':'OFF')+' [Up/Down] scroll [p] pause [q] quit':
+  '[m] mnemonic [d] info [l] logs [s] keys [p] pause [a] FX [r] player [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip('LOCAL TEST KEYS ONLY / Never send real funds / '+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
+ if(view==='logs'&&(w<70||h<22)){
+  const logs=state.logs||[],room=Math.max(0,h-3),end=Math.max(0,logs.length-Math.max(0,offset));
+  return [gold(clip('YBR SESSION LOG // '+logMode,w)),
+   ...logs.slice(Math.max(0,end-room),end).map(line=>clip(line,w)),buttons].slice(0,h);
+ }
  if((w<70||h<22)&&w>=60&&h>=14){
   // Short windows keep the login information, not just a resize prompt.
   return [gold(clip('FOLLOW THE YELLOW BRICK ROAD',w)),cyan(clip(phase+' / Node '+(state.nodeVersion||process.version),w)),
@@ -85,7 +92,8 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
     'Kubo RPC: '+(state.kuboRpc||'http://127.0.0.1:5001'),
     'Ciphertext: http://127.0.0.1:8080/ipfs/<CID>',
     'Public music: '+URLS.web+'/road/api/music','Health: '+URLS.web+'/api/road-ipfs/health',
-    'Logs: .road-local/dev-stack.log (redacted)',
+    'Logs: '+logMode+' / [l] view / [v] toggle inside logs',
+    'File: .road-local/dev-stack.log (new session on restart)',
     'Start: npm run dev | Recovery: npm run dev -- --restart-player',
     'Kubo stop: npm run ipfs:down | NEVER down -v',
     'q stops owned processes only. Kubo and its pins remain.'])];
@@ -94,7 +102,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  if(view==='logs'){
   const room=Math.max(1,h-head.length-5),logs=state.logs||[],end=Math.max(room,logs.length-Math.max(0,offset));
-  return [...head,bricks(),...box('ACTIVITY BUS // '+(offset?'SCROLLED':'LIVE'),logs.slice(Math.max(0,end-room),end)),warning,buttons];
+  return [...head,bricks(),...box('SESSION LOG // '+logMode+' // '+(offset?'SCROLLED':'LIVE'),logs.length?logs.slice(Math.max(0,end-room),end):['No essential events yet. [v] enables verbose diagnostics.']),warning,buttons];
  }
  let panels;
  if(w>=112){
@@ -113,8 +121,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  access.push(...wrap('Mnemonic: '+mnemonic,w-4));
  const lines=[...head,bricks(),...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold),...panels];
  const room=h-lines.length-2;
- if(room>=3)lines.push(...box('ACTIVITY // [l] EXPAND',(state.logs||[]).slice(-Math.min(room-2,4)),w,pink));
- else if(room>0)lines.push(dim(clip(state.error||(state.logs||[]).at(-1)||'Bringing local services online...',w)));
+ if(room>0)lines.push(dim(clip(state.error||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
  return [...lines.slice(0,h-2),warning,buttons];
 }
 module.exports={renderDashboard,URLS,wrap};

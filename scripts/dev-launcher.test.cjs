@@ -84,3 +84,14 @@ test('explicit restart refuses a foreign service without sending a signal',async
  let kills=0;const run=async(cmd,args)=>({stdout:args.includes('-t')?'42\n':cmd==='lsof'?'p42\nn/another/checkout\n':args.includes('args=')?'node server.js':String(process.getuid?.()||0)});
  await assert.rejects(restartCheckoutPlayer('/example/ybr',{run,kill:()=>kills++,sleep:async()=>{}}),/not a Player/);assert.equal(kills,0);
 });
+
+test('ordinary dependency commands drain quiet output, show warnings, and retain failure context',async()=>{
+ const {runChild}=require('./dev.cjs');let text='';const output={write:value=>{text+=value;}};
+ const run=source=>runChild(process.execPath,['-e',source],{quiet:true,output,env:{...process.env,YBR_LISTENER_PASSWORD:'test-secret'}});
+ assert.equal(await run("console.log('Routine package output')"),0);assert.equal(text,'');
+ assert.equal(await run("console.log('noise');console.error('npm warn test-secret')"),0);assert.match(text,/Dependency warnings/);assert.match(text,/\[redacted\]/);assert.doesNotMatch(text,/noise|test-secret/);
+ text='';assert.equal(await run("for(let i=0;i<80;i++)console.log('line '+i);console.error('Error: test-secret');process.exitCode=7;"),7);
+ assert.match(text,/failure \(last 30 lines\)/);assert.doesNotMatch(text,/line 0\n|test-secret/);assert.match(text,/line 79/);assert.match(text,/Error: \[redacted\]/);
+ text='';assert.equal(await run("process.stdout.write('x'.repeat(12000)+'test-secret\\n');process.exitCode=2;"),2);
+ assert.match(text,/oversized dependency output omitted/);assert.doesNotMatch(text,/test-secret|xxx/);
+});

@@ -45,6 +45,7 @@ async function main(){
  const after=await (await get('http://127.0.0.1:4173/road/api/music')).json();
  assert.deepEqual(after.tracks.map(t=>t.id),playerCatalog.tracks.map(t=>t.id));
  const log=fs.readFileSync(path.join(root,'.road-local/dev-stack.log'),'utf8');
+ assert.doesNotMatch(log,/ganache \| (?:eth|net|web3)_[A-Za-z0-9_]+/,'Routine RPC chatter must not reach essential logs');
  assert.match(log,/TEST MUSIC VERIFIED:/,'The launcher must verify playback before starting Vite');
  if(process.env.YBR_TEST_EXPECT_LEGACY_PLAYER==='1')assert.match(log,/Repairing this checkout's Player automatically/);
  for(const [username,key] of [['listener','YBR_LISTENER_PASSWORD'],['artist','YBR_ARTIST_PASSWORD']]){
