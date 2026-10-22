@@ -31,8 +31,9 @@ function Test(){const [factory,setFactory]=useState('${current}');window.changeS
 createRoot(document.getElementById('setup-root')).render(<Test/>);
 `,{flag:'wx'});
  const browser=await chromium.launch({headless:true});
+ let page;const errors=[];
  try{
-  const page=await browser.newPage({viewport:{width:1440,height:1080}}),errors=[];
+  page=await browser.newPage({viewport:{width:1440,height:1080}});
   page.on('pageerror',e=>errors.push(e.message));
   await page.addInitScript(({old,sepolia})=>{
    localStorage.setItem('road:mint:network:v1',JSON.stringify({version:1,data:{factories:{'ganache:1337:http://127.0.0.1:8545':old,'sepolia:11155111':sepolia}}}));
@@ -51,7 +52,11 @@ createRoot(document.getElementById('setup-root')).render(<Test/>);
   await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
   await page.getByLabel('Track title',{exact:true}).fill('Step 2 policy test');
   await page.getByLabel('Recording artist / claimant',{exact:true}).fill('Creator');
+  // Preserve the existing collaborator-approval guard, then use a self-authored fixture.
   await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Writer');
+  await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByRole('alert').filter({hasText:'Another songwriter is credited.'}).waitFor();
+  await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Creator');
   await page.getByRole('button',{name:'Continue →',exact:true}).click();
   const summary=page.getByRole('region',{name:'Player permissions summary'});await summary.waitFor();
   assert.equal(await summary.locator('input').count(),0);
@@ -93,6 +98,13 @@ createRoot(document.getElementById('setup-root')).render(<Test/>);
   const out=path.join(root,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
   await page.screenshot({path:path.join(out,'step-two-permissions-auto-factory.png'),fullPage:true});
   console.log('MINT SETUP PASS: Step 2 file-scoped permissions, final summary/back navigation, automatic factory over stale settings, profile change cancels confirmation, manual override, custom RPC and Sepolia isolation. Read-only mock wallet.');
+ }catch(error){
+  const out=path.join(root,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
+  if(page){
+   await page.screenshot({path:path.join(out,'mint-setup-failure.png'),fullPage:true}).catch(()=>{});
+   console.error('Setup validation messages:',await page.locator('.ms-error').allTextContents().catch(()=>[]));
+  }
+  console.error('Setup browser errors:',errors);throw error;
  }finally{await browser.close();fs.rmSync(html,{force:true});fs.rmSync(jsx,{force:true});}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});
