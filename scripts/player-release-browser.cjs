@@ -42,11 +42,6 @@ async function main(){
   await studio.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles(path.join(tmp,'cover.png'));
   await studio.getByLabel('Choose Lyrics manuscript / writing evidence',{exact:true}).setInputFiles(path.join(tmp,'lyrics.txt'));
   await studio.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
-  await studio.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
-  await studio.getByLabel('Track title',{exact:true}).fill('Browser release test');
-  await studio.getByLabel('Recording artist / claimant',{exact:true}).fill('Synthetic Artist');
-  await studio.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Synthetic Writer');
-  await studio.getByRole('button',{name:'Continue →',exact:true}).click();
   const review=studio.getByRole('region',{name:'Pre-mint Player permissions and content lock'});
   await review.waitFor();
   assert.equal(await review.getByRole('checkbox',{name:'Play Audio Preview',exact:false}).isChecked(),true);
@@ -56,6 +51,15 @@ async function main(){
   assert.equal(await seal.isChecked(),false);await seal.check();
   assert.match(await review.textContent(),/Permanent file lock/);await seal.uncheck();
   assert.match(await review.textContent(),/Simulation only/);
+  await studio.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
+  await studio.getByLabel('Track title',{exact:true}).fill('Browser release test');
+  await studio.getByLabel('Recording artist / claimant',{exact:true}).fill('Synthetic Artist');
+  await studio.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Synthetic Writer');
+  await studio.getByRole('button',{name:'Continue →',exact:true}).click();
+  const summary=studio.getByRole('region',{name:'Player permissions summary'});
+  await summary.waitFor();
+  assert.equal(await summary.locator('input').count(),0,'Final review summarizes Step 2; it does not create another policy editor');
+  assert.equal(await summary.getByText('Allowed',{exact:true}).count(),3);
   await studio.getByRole('button',{name:'Simulate mint →',exact:true}).click();
   await studio.getByRole('button',{name:'Confirm simulation',exact:true}).click();
   await studio.getByRole('button',{name:'View receipts →',exact:true}).click({timeout:30000});
