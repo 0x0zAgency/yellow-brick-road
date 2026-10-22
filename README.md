@@ -8,6 +8,62 @@
 >
 > Platforms execute. Objects govern.
 
+## QuickStart
+
+Requires **Node 24** and a browser wallet for real local minting.
+
+```sh
+git clone https://github.com/0x0zAgency/yellow-brick-road.git
+cd yellow-brick-road
+npm run setup:dev
+npm run dev
+```
+
+Start **Docker with Compose** first, or run **IPFS Desktop** with its local Kubo API at
+`http://127.0.0.1:5001`. The launcher reuses a healthy IPFS node; otherwise it starts
+Kubo through Docker. Ganache, the factory, Explorer, IPFS bridge and Player are
+prepared automatically.
+
+Open [Road Explorer / Mint Studio](http://127.0.0.1:5173) or
+[YBR Player](http://127.0.0.1:4173). Press **s** in the startup dashboard to reveal
+the development wallet and Player login details.
+
+### Prefer desktop apps?
+
+Download [Ganache](https://github.com/trufflesuite/ganache-ui/releases) and
+[IPFS Desktop](https://github.com/ipfs/ipfs-desktop/releases), start both, then run
+the same commands above. Docker is optional when IPFS Desktop is running.
+
+- **IPFS Desktop:** local API `http://127.0.0.1:5001`. For another local API address,
+  start with `YBR_KUBO_RPC=http://127.0.0.1:PORT npm run dev`.
+- **Ganache:** RPC `http://127.0.0.1:8545`, chain ID **1337**, and the same mnemonic
+  and derivation path as YBR's selected development wallet. Network ID alone is
+  insufficient. A fresh checkout uses the public test mnemonic
+  `myth like bonus scare over problem client lizard pioneer submit female collect`,
+  with account 0 at `m/44'/60'/0'/0/0`
+  (`0x90F8bf6A479f320ead074411a4B0e7944Ea8c9C1`).
+  Configure and save a Ganache workspace with these settings before launching YBR.
+
+The desktop Ganache node replaces the managed Ganache process. It must expose
+unlocked test accounts; YBR refuses a mismatched wallet or chain.
+
+### Mint your first Brick
+
+Add the local RPC above to your browser wallet (chain **1337**, currency **ETH**)
+and import a Ganache **test** account. In Mint Studio, connect, attach files, review
+permissions, select **Local Ganache**, and approve the registration transactions.
+The dashboard shows the active factory address if needed. Without a wallet,
+Mint Studio runs a simulation.
+
+For stored uploads, enable encrypted IPFS storage and download the recovery backup.
+Publishing an NFT cover is a separate public-artwork opt-in after minting; Player
+playback permissions are separate again. Use development seeds only.
+
+[Full setup](docs/INTEGRATED_DEV_STACK.md) ·
+[Wallet profiles](docs/GANACHE_WALLETS.md) ·
+[IPFS storage and recovery](docs/IPFS_YBR_STORAGE_PILOT.md) ·
+[NFT covers and deployment](docs/NFT_COVERS.md)
+
 ## WHY: The Internet Is Missing an IP Layer
 
 The internet was built to move information, not to preserve the rights attached to it.
@@ -244,7 +300,7 @@ This is the future we intend to build.
 
 ### Wallet-signed Mint Studio on local Ganache
 
-Use Node 22.12 or newer. Install dependencies with `npm install` in the repository
+Use Node 24. Install dependencies with `npm install` in the repository
 and in `web/`. Keep Ganache running in its own terminal:
 
 ```sh
