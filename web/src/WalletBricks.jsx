@@ -1,3 +1,4 @@
+import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import WalletBrickCard from './WalletBrickCard.jsx';
 import {CollectionPager} from './BrickPresentation.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
@@ -58,7 +59,9 @@ export default function WalletBricks({wallet,onConnect}){
   }catch(e){if(id===requestId.current)setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.');}
   finally{if(id===requestId.current)setBusy(false)}
  };
- const pages=Math.max(1,Math.ceil((result?.bricks.length||0)/12)),currentPage=Math.min(page,pages-1);
+ const {items}=useBuildingRollup({rows:result?.bricks||[],client,chainId,factoryAddress:result?.verifiedFactory});
+ const pages=Math.max(1,Math.ceil(items.length/12)),currentPage=Math.min(page,pages-1);
+ const renderPart=brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)}/>;
  return <section className="wb br-collection">
   <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Read-only discovery of Bricks minted by the connected wallet. The Road checks on-chain factory events and Brick contracts, not local demo records.</p></div>
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
@@ -78,8 +81,10 @@ export default function WalletBricks({wallet,onConnect}){
     {result.limited&&<p className="wb-warning">This scan covers only recent blocks, not the complete chain history. Enter a deployment/start block to search historical registrations, or use an indexer for full history.</p>}
     {result.limitReached&&<p className="wb-warning">Only the newest 200 matching Bricks are displayed. Use a narrower block range or a dedicated indexer for more.</p>}
     {result.bricks.length===0&&<div className="wb-empty"><h3>No registrations in this range</h3><p>No Bricks minted from this wallet were found through the selected factory in the blocks searched. Simulated mints, other factories, and other networks are not included.</p></div>}
-    <div className="br-grid">{result.bricks.slice(currentPage*12,currentPage*12+12).map(brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)}/>)}</div>
-    <CollectionPager page={currentPage} pages={pages} total={result.bricks.length} onPage={setPage}/>
+    <ImportBuildingPacket rows={result.bricks} client={client} chainId={chainId} factoryAddress={result.verifiedFactory}/>
+    <p className="br-heading-count">{items.length} Buildings or standalone Bricks · parts stay together</p>
+    <div className="br-grid">{items.slice(currentPage*12,currentPage*12+12).map(item=>item.kind==='building'?<ReleaseBuildingCard key={item.id} group={item} client={client} chainId={chainId} factoryAddress={result.verifiedFactory} renderPart={renderPart}/>:renderPart(item.row))}</div>
+    <CollectionPager page={currentPage} pages={pages} total={items.length} onPage={setPage}/>
    </div>}
   </>}
   <BrickOwnerApprovals wallet={wallet} onConnect={onConnect}/>

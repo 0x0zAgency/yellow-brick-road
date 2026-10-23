@@ -1,3 +1,5 @@
+import {buildingFromPacket,rollupBuildings,exportBuildingGraph} from '../src/release-buildings.js';
+import {discoverWalletBricks} from '../src/brick-viewer-model.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -53,6 +55,13 @@ test('real signed mint initializes permissions and Player checks revocation, has
  const approval=reviewPlayerDelivery({packet,consent:true,execution:'ganache',chainId:1337});
  const mint=await mintOnChain(options);assert.equal(writes,3,'Each Brick and policy uses one atomic transaction.');
  assert.deepEqual(mint.receipts.map(r=>r.contentPolicy.permissions),[1,2,4]);
+ const building=await buildingFromPacket(packet,mint);
+ const scan=await discoverWalletBricks({client,factoryAddress,wallet:account.address});
+ const groups=rollupBuildings(scan.bricks,[building],mint);
+ assert.equal(groups.length,1);assert.equal(groups[0].kind,'building');assert.equal(groups[0].parts.length,3);
+ assert.ok(exportBuildingGraph(packet,mint).members.every(m=>m.ref.includes(factoryAddress.toLowerCase())));
+ assert.equal(writes,3,'Building rollups do not add transactions or alter member permissions');
+ console.log('BUILDING ROLLUP PASS: committed associations resolve to real Ganache identities without another mint or rights grant.');
  const encrypted=await encryptDemoBatch({items:Object.entries(data).map(([id,bytes])=>({id,file:new File([bytes],assets[id].name,{type:mime[id]}),originalSha256:hash(bytes)}))});
  const payload=await buildPlayerRelease({packet,mint,vault:{secret:encrypted.secret,encrypted:encrypted.encrypted},consent:true});
  assert.ok(payload.authorization);assert.equal(payload.authorization.genesisHash,mint.genesisHash);

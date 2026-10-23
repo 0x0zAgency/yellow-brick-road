@@ -33,3 +33,15 @@
 .br-record summary:focus-visible,.br-surface summary:focus-visible,.br-pager button:focus-visible{outline:2px solid #edcb80;outline-offset:-3px}
 @media(max-width:760px){.br-grid{grid-template-columns:1fr}.br-hero{padding:17px;gap:13px}.br-hero .br-artwork{width:80px}.br-collection .wb-controls .br-surface-body{grid-template-columns:1fr}.br-section-heading{align-items:start}.br-record-header{padding:14px}.br-artwork{width:72px}}
 @media(max-width:430px){.br-hero{align-items:start}.br-hero .br-artwork{width:65px}.br-hero h3{font-size:20px}.br-hero p{font-size:11px!important}.br-hero .br-badges{gap:5px}.br-status{font-size:9px;padding:4px 7px}.br-surface>summary{flex-wrap:wrap;padding:14px}.br-surface>summary span:first-child{flex-basis:65%}.br-pager{flex-wrap:wrap}.br-record-header{gap:10px}.br-artwork{width:62px}.br-record-copy h3,.br-record-copy h4{font-size:15px}}
+
+/* Building containers share visual language but never merge their members' rights. */
+.br-building{min-width:0;border:1px solid #877445;border-radius:16px;background:linear-gradient(135deg,#293b3b,#17262f);overflow:hidden;align-self:start;box-shadow:0 10px 30px #0002}
+.br-building-header{display:flex;gap:16px;padding:20px;align-items:center}.br-building .br-kicker{display:flex;align-items:center;gap:6px}
+.br-building-map{padding:0 20px;margin:0 0 12px;color:#edcf8c;font:12px/1.6 system-ui,sans-serif}
+.br-building-note{font:11px/1.6 system-ui,sans-serif;color:#b3c6ca;margin:10px 20px}
+.br-building>.br-warning{margin:12px 20px}.br-building-parts>summary{display:flex;align-items:center;gap:10px;padding:14px 20px;border-top:1px solid #6e633c;cursor:pointer;color:#f2dfb1;font-size:12px}.br-building-parts>summary small{margin-left:auto;color:#c0cdcc}
+.br-building-parts>summary:focus-visible{outline:2px solid #edcb80;outline-offset:-3px}.br-building-children{padding:14px;display:grid;gap:16px}.br-building-part{min-width:0}
+.br-file-chips{display:flex;gap:5px;flex-wrap:wrap;margin:8px 14px}.br-file-chips>span{border:1px solid #526767;color:#bfcece;background:#20353a;border-radius:5px;font:10px/1.5 system-ui,sans-serif;padding:3px 7px}
+.br-building-import{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:12px 0}.br-building-import small,.br-building-import p{font:11px/1.6 system-ui,sans-serif;color:#b8c5ca;margin:0}.br-building-import p{width:100%}
+.br-release-rollup .br-building-note{margin:0 0 14px}.br-release-rollup>.br-surface-body{padding:16px}.br-release-rollup .br-grid{margin:0}
+@media(max-width:430px){.br-building-header{padding:14px;gap:10px}.br-building-map{padding:0 14px}.br-building-note{margin:10px 14px}.br-building-children{padding:8px}.br-building-parts>summary{padding:14px;flex-wrap:wrap}.br-release-rollup>.br-surface-body{padding:8px}.br-building .br-badges{gap:5px}}
