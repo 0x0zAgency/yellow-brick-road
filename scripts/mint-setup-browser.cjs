@@ -105,6 +105,7 @@ createRoot(document.getElementById('setup-root')).render(<Test/>);
   assert.deepEqual(errors,[]);
   const out=path.join(root,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
   await page.screenshot({path:path.join(out,'step-three-permissions-auto-factory.png'),fullPage:true});
+  await require('./mint-step-scroll-browser.cjs').testMintStepScroll(browser);
   console.log('MINT SETUP PASS: Step 3 file-scoped permissions, final summary/back navigation, automatic factory over stale settings, profile change cancels confirmation, manual override, custom RPC and Sepolia isolation. Read-only mock wallet.');
  }catch(error){
   const out=path.join(root,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
