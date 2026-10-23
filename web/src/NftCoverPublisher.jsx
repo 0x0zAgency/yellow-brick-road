@@ -14,6 +14,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
  const [consent,setConsent]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(mint.nftCover?.error||''),[status,setStatus]=useState('');
  const [saved,setSaved]=useState(mint.nftCover?.status==='verified'?mint.nftCover:null),[txHash,setTxHash]=useState(mint.nftCover?.transactionHash||''),[pinned,setPinned]=useState(mint.nftCover?.upload||null);
  const [inspection,setInspection]=useState(null);
+ const notify=verified=>{window.dispatchEvent(new Event('ybr:nft-cover-updated'));onCoverVerified(verified);};
  const revision=useRef(0),work=useRef(null),lock=useRef(false);
  const existing=attachedCover(packet),canUseAttached=!!(existing&&vault?.secret&&vault.encrypted?.get);
  useEffect(()=>()=>{revision.current++;work.current?.abort();},[]);
@@ -47,7 +48,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
    if(id!==revision.current)return;setPinned(image);
    setStatus('Confirm the NFT artwork update in your wallet. This is a separate gas-paid transaction.');
    const result=await session.update(image.imageURI,{onTransaction:hash=>{if(id===revision.current){setTxHash(hash);setStatus('Artwork transaction submitted. Waiting for confirmation…');}}});
-   if(id===revision.current){setSaved(result);onCoverVerified(result);setStatus('Verified: the NFT tokenURI now contains your cover image.');}
+   if(id===revision.current){setSaved(result);notify(result);setStatus('Verified: the NFT tokenURI now contains your cover image.');}
   }catch(e){if(id===revision.current){setError(e.shortMessage||e.message);setStatus('');}}
   finally{if(id===revision.current){lock.current=false;setBusy(false);}}
  };
@@ -60,9 +61,9 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
    if(id!==revision.current)return;
    setInspection(data);
    if(pinned&&data.every(item=>item.image===pinned.imageURI)){
-    setSaved({imageURI:pinned.imageURI});onCoverVerified({imageURI:pinned.imageURI});setStatus('Verified: every selected NFT currently points to this public cover.');
+    setSaved({imageURI:pinned.imageURI});notify({imageURI:pinned.imageURI});setStatus('Verified: every selected NFT currently points to this public cover.');
    }else {setSaved(null);setStatus(data.every(item=>item.hasCover)?'Public cover set on-chain. If the wallet shows a square, check its image retrieval and metadata cache.':'The actual NFT metadata still contains fallback artwork. Publish a cover below; do not remint.');}
-  }catch(e){if(id===revision.current)setError(e.shortMessage||e.message);}
+  }catch(e){if(id===revision.current){setError(e.shortMessage||e.message);setStatus('');}}
   finally{if(id===revision.current){lock.current=false;setBusy(false);}}
  };
  return <section className="nft-cover" aria-label="NFT cover artwork">

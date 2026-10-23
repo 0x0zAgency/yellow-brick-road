@@ -81,3 +81,28 @@ test('public cover HTTP endpoint enforces consent, loopback origin, size and PNG
  ])assert.equal((await fetch(endpoint+path,{method:'POST',headers:{...headers,...changes},body})).status,expected,path);
  assert.equal(stored,1);
 });
+
+test('thumbnail retrieval reads only a locally pinned, bounded normalized PNG',async()=>{
+ const {retrieveNftCover}=await import('../scripts/ipfs-bridge.mjs');
+ const bytes=png();let calls=0;
+ const fetchImpl=async url=>{calls++;if(url.includes('/pin/ls?'))return Response.json({Keys:{[cid]:{Type:'recursive'}}});assert.ok(url.includes('length=524289'));return new Response(bytes);};
+ const result=await retrieveNftCover(cid,{fetchImpl});assert.deepEqual(result.bytes,bytes);assert.equal(calls,2);
+ await assert.rejects(retrieveNftCover(cid+'/private',{fetchImpl}));assert.equal(calls,2);
+ for(const invalid of [Buffer.from('0ZROAD01encrypted-work'),Buffer.from('<svg/>'),Buffer.alloc(MAX_NFT_COVER_BYTES+1)]){
+  await assert.rejects(retrieveNftCover(cid,{fetchImpl:async url=>url.includes('/pin/ls?')?Response.json({Keys:{[cid]:{Type:'recursive'}}}):new Response(invalid)}));
+ }
+ await assert.rejects(retrieveNftCover(cid,{fetchImpl:async()=>Response.json({Keys:{}})}),/pinned/);
+});
+test('thumbnail HTTP route returns PNG only and retains origin, Host and exact-path checks',async t=>{
+ let calls=0;
+ const server=createServer((req,res)=>void handleUploadRequest(req,res,{retrieveCover:async()=>{calls++;return {bytes:png()};}}));
+ server.listen(0,'127.0.0.1');await once(server,'listening');t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);}));
+ const base='http://127.0.0.1:'+server.address().port;
+ const response=await fetch(base+'/api/road-ipfs/nft-cover/'+cid);
+ assert.equal(response.status,200);assert.equal(response.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await response.arrayBuffer()),png());
+ for(const [suffix,headers,status] of [[cid,{Origin:'https://other.invalid'},403],[cid,{'Sec-Fetch-Site':'cross-site'},403],[cid+'?key=x',{},400],[cid+'/private',{},400],['%2f'+cid,{},400]])assert.equal((await fetch(base+'/api/road-ipfs/nft-cover/'+suffix,{headers})).status,status);
+ const {request}=await import('node:http');
+ const hostStatus=await new Promise((resolve,reject)=>{const req=request(base+'/api/road-ipfs/nft-cover/'+cid,{headers:{Host:'other.invalid'}},res=>{res.resume();resolve(res.statusCode);});req.on('error',reject);req.end();});
+ assert.equal(hostStatus,403);
+ assert.equal(calls,1);
+});

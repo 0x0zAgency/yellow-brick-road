@@ -8,6 +8,9 @@ on:
       - 'web/vite.config.js'
       - 'scripts/player-release-browser.cjs'
       - 'scripts/player-library-browser.cjs'
+      - 'scripts/player-autologin-browser.cjs'
+      - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/nft-cover-browser.cjs'
@@ -21,6 +24,9 @@ on:
       - 'web/vite.config.js'
       - 'scripts/player-release-browser.cjs'
       - 'scripts/player-library-browser.cjs'
+      - 'scripts/player-autologin-browser.cjs'
+      - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/nft-cover-browser.cjs'
@@ -60,6 +66,8 @@ jobs:
         run: |
           npm install --prefix /tmp/ybr-browser playwright@1.56.1 --no-audit --no-fund
           /tmp/ybr-browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Exercise local artist auto-login in Chromium
+        run: node scripts/player-autologin-browser.cjs
       - name: Exercise Mint Studio uploads and the Player in Chromium
         env:
           YBR_LISTENER_PASSWORD: browser-test-listener-only
@@ -76,6 +84,7 @@ jobs:
           node scripts/upload-metadata-browser.cjs
           node scripts/nft-cover-browser.cjs
           node scripts/player-library-browser.cjs
+          node scripts/compact-bricks-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

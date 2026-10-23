@@ -88,7 +88,7 @@ export function validateEncryptedContainer(bytes){
  const headerLength=(buffer[8]<<8)|buffer[9],end=10+headerLength;
  if(!headerLength||end+16>buffer.length)throw Error('Malformed encrypted container.');
  let header;
- try{header=JSON.parse(buffer.subarray(10,end).toString('utf8'))}catch{throw Error('Invalid encrypted-container header.')}
+ try{header=JSON.parse(buffer.subarray(10,end).toString('utf8'))}catch{throw Error('Invalid encrypted-container header.');}
  if(!header||typeof header!=='object'||Array.isArray(header)||
     Object.keys(header).some(key=>!PRIVATE_HEADER_FIELDS.has(key))||
     header.v!==1||header.alg!=='AES-256-GCM'||header.kdf!=='PBKDF2-SHA-256'||
@@ -157,6 +157,15 @@ export async function storeNftCover(bytes,{fetchImpl=fetch}={}){
  await localPin(cid,{fetchImpl});
  return {...info,cid,sha256:sha256(buffer),pinned:true,verified:true};
 }
+/** Read only locally pinned public PNG renditions. Never unwrap encrypted assets. */
+export async function retrieveNftCover(cid,{fetchImpl=fetch}={}){
+ if(!validCoverCid(cid))throw failure('A bare public-cover CID is required.',400);
+ await localPin(cid,{fetchImpl,missingStatus:404});
+ const response=await kuboCall('cat?arg='+encodeURIComponent(cid)+'&length='+(MAX_NFT_COVER_BYTES+1),{fetchImpl,timeout:12000});
+ const bytes=await readBoundedBytes(response,{max:MAX_NFT_COVER_BYTES});
+ validateNftCoverPng(bytes);
+ return {bytes,size:bytes.length};
+}
 async function bodyBytes(req,max=MAX_CIPHERTEXT_BYTES){
  if(Number(req.headers['content-length']||0)>max)throw Object.assign(Error(max===MAX_NFT_COVER_BYTES?'Public NFT cover exceeds 512 KiB limit.':'Encrypted payload exceeds 32 MiB limit.'),{status:413});
  const parts=[];let len=0;
@@ -171,7 +180,7 @@ function localHost(host){
   return loopbackNames.has(url.hostname)&&url.host===host&&url.pathname==='/'&&!url.username&&!url.password&&!url.search&&!url.hash;
  }catch{return false;}
 }
-export async function handleUploadRequest(req,res,{store=storeEncryptedBytes,retrieve=retrieveEncryptedBytes,storeCover=storeNftCover,fetchImpl=fetch}={}){
+export async function handleUploadRequest(req,res,{store=storeEncryptedBytes,retrieve=retrieveEncryptedBytes,storeCover=storeNftCover,retrieveCover=retrieveNftCover,fetchImpl=fetch}={}){
  // The Vite proxy preserves the browser Host. Accept loopback names only, on
  // any local port, so a DNS-rebinding host cannot read the local pin store.
  if(!localHost(req.headers.host)){json(res,403,{error:'A loopback Host header is required.'});return}
@@ -210,6 +219,17 @@ export async function handleUploadRequest(req,res,{store=storeEncryptedBytes,ret
    });
    res.end(content.bytes);
   }catch(error){json(res,error.status||502,{error:error.message||'Unable to retrieve encrypted content.'});}
+  return;
+ }
+ if(req.method==='GET'&&path.startsWith('/api/road-ipfs/nft-cover/')){
+  const cid=path.slice('/api/road-ipfs/nft-cover/'.length);
+  if(!validCoverCid(cid)){json(res,400,{error:'A bare public-cover CID is required.'});return;}
+  try{
+   const cover=await retrieveCover(cid,{fetchImpl});
+   validateNftCoverPng(cover.bytes);
+   res.writeHead(200,{'Content-Type':'image/png','Content-Length':cover.bytes.length,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Cross-Origin-Resource-Policy':'same-origin'});
+   res.end(cover.bytes);
+  }catch(error){json(res,error.status||404,{error:'Public NFT thumbnail unavailable on this local node.'});}
   return;
  }
  if(req.method==='POST'&&path==='/api/road-ipfs/nft-cover'){

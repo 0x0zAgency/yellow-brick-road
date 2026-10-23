@@ -50,8 +50,9 @@ or makes an unavailable track playable. The hidden Saved uploads UI stays hidden
 
 ## Tests
 
-`apps/ybr-player/test/demo-login.test.js` covers HTTP sessions, opt-out, request
-boundaries, expiration, logout/resume, listener isolation and refused media.
-`scripts/player-autologin-browser.cjs` starts the actual local Player entrypoint
-in disposable CI and exercises the flow in Chromium, including playback, restart
-and opt-out. The existing full-stack and real Ganache policy tests remain enabled.
+`apps/ybr-player/test/demo-login.test.js` covers HTTP sessions, launcher opt-out, logout/resume, listener isolation
+and normal playback authorization.
+`scripts/player-autologin-browser.cjs` exercises the real Player
+session and browser code on an isolated loopback test server, including renewal,
+manual listener sessions and expiration. The launcher selection helper is tested
+separately; full-stack and real Ganache policy tests remain enabled.
