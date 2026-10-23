@@ -2,6 +2,7 @@
 /** Pure terminal renderer. Motion is decoration, never invented telemetry. */
 const {stripVTControlCharacters:strip}=require('node:util');
 const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
+const {renderNetworkMenu}=require('./dev-network.cjs');
 const URLS={web:'http://127.0.0.1:5173',player:'http://127.0.0.1:4173',ipfs:'http://127.0.0.1:8791',ganache:'http://127.0.0.1:8545'};
 const clean=v=>strip(String(v??'')).replace(/[\t\r\n]+/g,' ').replace(/[^\x20-\x7e]/g,'?');
 const clip=(v,w)=>{const s=clean(v);return s.length<=w?s:s.slice(0,Math.max(0,w-3))+'...';};
@@ -16,6 +17,7 @@ function secret(v,visible,fallback='waiting for Player'){
  return /^[\x20-\x7e]+$/.test(v)?v:'[configured non-printable value]';
 }
 function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=false,view='home',offset=0,motion=true}={}){
+ if(state.networkMenu)return renderNetworkMenu(state,{columns,rows,color});
  if(state.mnemonicMenu)return renderMnemonicMenu(state,{columns,rows,color});
  const w=Math.max(5,Math.min(144,columns-1)),h=Math.max(3,rows-1);
  const p=(n,s)=>color?'\x1b['+n+'m'+s+'\x1b[0m':s;
@@ -47,7 +49,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logMode=state.logMode==='VERBOSE'?'VERBOSE':'ESSENTIAL';
  const buttons=gold(clip(view==='logs'?'[l/Esc] home [v] verbose '+(logMode==='VERBOSE'?'ON':'OFF')+' [Up/Down] scroll [p] pause [q] quit':
-  '[m] mnemonic [d] info [l] logs [s] keys [p] pause [a] FX [r] player [q] quit',w));
+  '[n] net [i] link [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip('LOCAL TEST KEYS ONLY / Never send real funds / '+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
  if(view==='logs'&&(w<70||h<22)){
@@ -69,7 +71,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logo=[' __   __ ____   ____  ',' \\ \\ / /| __ ) |  _ \\ ','  \\ V / |  _ \\ | |_) |','   |_|  |____/ |_| \\_\\'];
  const labels=['YELLOW BRICK ROAD // DEV CONTROL',phase+' / Node '+(state.nodeVersion||process.version)+' / '+uptime,
-  'LOCAL CHAIN 1337 / ENCRYPTED IPFS',(motion?'[ LIVE ]':'[ STILL ]')+' // FOLLOW THE YELLOW BRICK ROAD'];
+  'LOCAL 1337 / MINT '+(state.mintTarget==='sepolia'?'SEPOLIA':'GANACHE')+' / IPFS',(motion?'[ LIVE ]':'[ STILL ]')+' // FOLLOW THE YELLOW BRICK ROAD'];
  const head=logo.map((l,i)=>gold(l.padEnd(25))+(i===0?pink:p.bind(null,'38;5;51'))(clip(labels[i],w-25)));
  const unknown=g.source==='reused'?'reused node; see original terminal':'verifying local Ganache';
  const mnemonic=secret(g.mnemonic,showSecrets,unknown);
@@ -87,6 +89,8 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    'Wallet: '+(g.source||'pending')+' | Player: '+(a.source||'pending'),
    ...wrap(a.notice||'Player passwords: private .road-local/player-access.json',w-4)],w,gold),
    ...box('CONNECTION REFERENCE',[
+    'Mint target: '+(state.mintTarget||'ganache')+' / [n] select network',
+    ...wrap(state.connectionReference||'[i] cycle machine interface addresses (reference only)',w-4),
     ...wrap('Factory: '+(state.factory||'pending'),w-4),...wrap('IPFS peer: '+(state.peerId||'pending'),w-4),
     musicLine,...wrap('Test Brick: '+(music.id||'pending'),w-4),...wrap('Test playback: '+(music.mediaUrl||'pending'),w-4),
     'Kubo RPC: '+(state.kuboRpc||'http://127.0.0.1:5001'),
@@ -121,7 +125,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  access.push(...wrap('Mnemonic: '+mnemonic,w-4));
  const lines=[...head,bricks(),...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold),...panels];
  const room=h-lines.length-2;
- if(room>0)lines.push(dim(clip(state.error||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
+ if(room>0)lines.push(dim(clip(state.error||state.connectionReference||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
  return [...lines.slice(0,h-2),warning,buttons];
 }
 module.exports={renderDashboard,URLS,wrap};

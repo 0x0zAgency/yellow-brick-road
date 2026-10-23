@@ -8,6 +8,7 @@ const {StringDecoder}=require('node:string_decoder');
 const crypto=require('node:crypto');
 const {renderDashboard,URLS}=require('./dev-screen.cjs');
 const {MnemonicEditor}=require('./dev-mnemonic-menu.cjs');
+const {NetworkControl,readNetwork}=require('./dev-network.cjs');
 const LOG_LIMIT=1024*1024;
 const rpcLine=/^(?:eth|net|web3|debug|evm|miner|personal|txpool)_[A-Za-z0-9_]+$/;
 const diagnosticLine=/\b(?:error|warn(?:ing)?|fatal|exception|fail(?:ed|ure)?|unavailable|refus(?:e|ed|ing)|timed? out|timeout|revert(?:ed)?|cannot|could not)\b|^at (?:async )?/i;
@@ -45,6 +46,8 @@ class DevDashboard{
   this.color=this.interactive&&env.NO_COLOR===undefined;this.motion=env.YBR_DEV_REDUCED_MOTION!=='1';
   this.view=args.includes('--logs')?'logs':'home';this.verbose=args.includes('--verbose')||env.YBR_DEV_VERBOSE==='1';this.offset=0;this.secrets=new Set();this.closed=false;this.paused=false;this.lastFrame=[];
   this.state={startedAt:Date.now(),phase:'STARTING',nodeVersion:process.version,services:{},ganache:{},access:{},logs:[],logMode:this.verbose?'VERBOSE':'ESSENTIAL'};
+  this.networkControl=new NetworkControl({root,onApply:selection=>{this.state.mintTarget=selection.network;this.log('launcher','Mint target saved: '+selection.network+'. Run npm run dev again and reload Mint Studio; Player stays on local Ganache.');this.onQuit();},onChange:(menu,connection)=>{this.state.networkMenu=menu;this.state.connectionReference=connection?connection.name+' / '+connection.family+' / '+connection.address+' (reference only)':'No assigned network interfaces';this.draw(true);}});
+  this.state.mintTarget=readNetwork(root).network;
   this.logFile=path.join(root,'.road-local','dev-stack.log');
   const dir=path.dirname(this.logFile);
   fs.mkdirSync(dir,{recursive:true,mode:0o700});
@@ -59,6 +62,12 @@ class DevDashboard{
   this.lastEssential=null;this.lastDiagnostic=null;
   this.keyHandler=(_text,key={})=>{
    if(this.mnemonicEditor){this.mnemonicEditor.handle(_text,key);return;}
+   if(this.networkControl.menu){this.networkControl.handle(_text,key);return;}
+   if(key.name==='i'&&this.interactive){this.state.restartConfirm=false;this.networkControl.cycle();return;}
+   if(key.name==='n'&&this.interactive){
+    if(this.state.phase!=='READY'){this.state.error='Network selection is available when READY.';this.draw(true);return;}
+    try{this.state.restartConfirm=false;this.networkControl.open();}catch(e){this.state.error=e.message;this.draw(true);}return;
+   }
    if(key.name==='m'&&this.interactive){
     try{
      if(!this.mnemonicControl)throw Error('Mnemonic control is unavailable in this session.');
@@ -119,7 +128,7 @@ class DevDashboard{
   if(!this.interactive||this.closed||this.paused&&!force)return;
   this.state.now=Date.now();
   const lines=renderDashboard(this.state,{columns:this.output.columns||100,rows:this.output.rows||32,color:this.color,showSecrets:this.showSecrets,view:this.view,offset:this.offset,motion:this.motion});
-  if(this.paused&&!this.state.mnemonicMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
+  if(this.paused&&!this.state.mnemonicMenu&&!this.state.networkMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
   // Repaint only changed rows; passwords and wallet text do not flicker with FX.
   let output='';
   for(let i=0;i<Math.max(lines.length,this.lastFrame.length);i++){
