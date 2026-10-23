@@ -30,6 +30,7 @@
   previous?.remove();target.classList.remove('release-has-cover');
   if(!src)return;
   const image=make('img','release-cover-image');image.alt=(brick.title||'Release')+' cover artwork';image.src=src;image.loading='lazy';
+  image.addEventListener('load',()=>window.dispatchEvent(new CustomEvent('ybr:file-display',{detail:{brickId:brick.id,role:'artwork',sha256:brick.artwork.sha256}})));
   image.addEventListener('error',()=>{image.remove();target.classList.remove('release-has-cover');});
   target.append(image);target.classList.add('release-has-cover');
  }
@@ -63,6 +64,7 @@
    const element=document.createElement('track');track=element;element.kind='metadata';element.label='Release lyrics';element.src=url;
    element.addEventListener('load',()=>{
     if(id!==revision)return;
+    window.dispatchEvent(new CustomEvent('ybr:file-display',{detail:{brickId:brick.id,role:'lyrics',sha256:brick.lyrics.sha256}}));
     lyricsBody.replaceChildren();
     const lines=[...element.track.cues||[]].map(cue=>{
      const line=make('button','release-cue',typeof cue.getCueAsHTML==='function'?cue.getCueAsHTML().textContent:cue.text);
@@ -87,7 +89,7 @@
    if(Number(res.headers.get('content-length'))>512*1024)throw Error('Lyrics exceed the preview limit.');
    const value=await res.text();
    if(new TextEncoder().encode(value).length>512*1024)throw Error('Lyrics exceed the preview limit.');
-   if(id===revision)lyricsBody.textContent=value;
+   if(id===revision){lyricsBody.textContent=value;window.dispatchEvent(new CustomEvent('ybr:file-display',{detail:{brickId:brick.id,role:'lyrics',sha256:brick.lyrics.sha256}}));}
   }catch(e){if(id===revision&&e.name!=='AbortError')lyricsBody.textContent=e.message;}
  }
  window.addEventListener('ybr:selection',event=>{void select(event.detail.brick);});

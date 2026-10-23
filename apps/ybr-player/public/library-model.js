@@ -41,5 +41,11 @@
   function selectionFor(items, previousId, preserveSelection) {
     return (preserveSelection && items.find(brick => brick.id === previousId)) || items[0] || null;
   }
-  return {isPlayable, publicationTime, playableNewest, selectionFor};
+  function continuationQueue(items,currentId){
+    const index=items.findIndex(item=>item.id===currentId);
+    if(index<0)return [];
+    // One bounded pass. Repeat the library, not an unbounded retry loop.
+    return [...items.slice(index+1),...items.slice(0,index+1)].map(item=>item.id);
+  }
+  return {isPlayable, publicationTime, playableNewest, selectionFor,continuationQueue};
 });

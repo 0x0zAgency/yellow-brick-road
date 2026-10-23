@@ -1,0 +1,66 @@
+'use strict';
+const {test}=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),crypto=require('node:crypto');
+const {createInteractionStore,subjectFor}=require('../interactions');
+const {createApp,loadBricks}=require('../server');
+const {continuationQueue}=require('../public/library-model');
+const hash=n=>n.toString(16).padStart(64,'0'),addr=n=>'0x'+n.toString(16).padStart(40,'0');
+const subject={kind:'local-demo',id:'BRK-AUD-001',role:'audio',sha256:hash(1)};
+const event=(type='play',id=crypto.randomUUID())=>({subject,event:type,eventId:id,playbackId:'playback-example-0001',sessionSalt:'disposable-server-only-secret',positionSeconds:2});
+const temp=t=>{const dir=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-interactions-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));return path.join(dir,'events.ndjson');};
+test('continuous queue makes one ordered pass, wraps and handles singleton/unknown selections',()=>{
+ const list=[{id:'a'},{id:'b'},{id:'c'}];assert.deepEqual(continuationQueue(list,'b'),['c','a','b']);
+ assert.deepEqual(continuationQueue([list[0]],'a'),['a']);assert.deepEqual(continuationQueue(list,'missing'),[]);assert.deepEqual(continuationQueue([],'a'),[]);
+});
+test('durable journal deduplicates events, scopes runs, survives restart and exposes aggregates not identity',t=>{
+ const file=temp(t),store=createInteractionStore({file});const first=event();
+ assert.equal(store.record(first).recorded,true);assert.equal(store.record(first).duplicate,true);
+ store.record(event('pause'));store.record(event('play'));store.record(event('seek'));store.record(event('ended'));store.record(event('ended'));store.record(event('skip'));
+ store.record({...event('ended'),playbackId:'never-started-run'});
+ let snap=store.snapshot(subject);assert.equal(snap.events,8);assert.equal(snap.counters.reportedStarts,1);assert.equal(snap.counters.playEvents,2);assert.equal(snap.counters.endedReports,1);
+ assert.deepEqual(createInteractionStore({file}).snapshot(subject),snap);
+ assert.equal(createInteractionStore({file}).record(first).duplicate,true);
+ const {digest,...payload}=snap;assert.equal(digest,'0x'+crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex'));
+ assert.equal(fs.statSync(file).mode&0o077,0);
+ for(const forbidden of ['disposable-server-only-secret','playback-example-0001','username','ipAddress'])assert.ok(!fs.readFileSync(file,'utf8').includes(forbidden));
+ assert.equal(store.snapshot({...subject,sha256:hash(2)}).events,0);
+ assert.equal(JSON.stringify(snap).includes('playback'),false);
+});
+test('file roles and chain/factory/history/revision do not cross-contaminate',t=>{
+ const file=temp(t),store=createInteractionStore({file});
+ const brick={id:'STUDIO-'+hash(9),media:{sha256:hash(1)},assets:{artwork:{sha256:hash(2)}},authorization:{chainId:1337,factoryAddress:addr(2),genesisHash:'0x'+hash(3),sources:{audio:{brickAddress:addr(4),revision:'1'},artwork:{brickAddress:addr(5),revision:'2'}}}};
+ const audio=subjectFor(brick),art=subjectFor(brick,'artwork');assert.equal(art.brickAddress,addr(5));
+ store.record({...event(),subject:audio});store.record({...event('artwork-view'),subject:art});
+ assert.equal(store.snapshot(audio).events,1);assert.equal(store.snapshot(art).counters.displayReports,1);
+ for(const changed of [{genesisHash:'0x'+hash(10)},{factoryAddress:addr(10)},{revision:'3'},{brickAddress:addr(10)}])assert.equal(store.snapshot({...audio,...changed}).events,0);
+ assert.throws(()=>subjectFor(brick,'lyrics'),/checksum/);assert.throws(()=>store.record({...event(),subject:art}),/Invalid/);
+});
+test('bounds, corruption, linked files and replaced journals fail without deleting observations',t=>{
+ const file=temp(t),store=createInteractionStore({file,maxRecords:1});store.record(event());const before=fs.readFileSync(file,'utf8');
+ assert.throws(()=>store.record(event('pause')),/full/);assert.equal(fs.readFileSync(file,'utf8'),before);
+ const link=file+'.link';fs.symlinkSync(file,link);assert.throws(()=>createInteractionStore({file:link}).snapshot(subject));
+ fs.renameSync(file,file+'.old');fs.writeFileSync(file,before,{mode:0o600});assert.throws(()=>store.record(event()),/full|externally/);
+ fs.appendFileSync(file,'{partial');assert.throws(()=>createInteractionStore({file}).snapshot(subject),/incomplete/);
+ assert.throws(()=>createInteractionStore({file:file+'.other'}).record({...event(),positionSeconds:Infinity}),/Invalid/);
+});
+test('HTTP requires a real session, live permission and exact file; local artist reads persisted aggregates',async t=>{
+ const file=temp(t),roadGateway={ready:async()=>({ready:false}),list:async()=>({status:{ready:false},tracks:[]}),track:async()=>null};
+ const {server}=createApp({accounts:{artist:'artist-test',listener:'listener-test'},interactionFile:file,roadGateway,studioLibrary:{list:()=>[],get:()=>null}});
+ await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>new Promise(r=>{server.closeAllConnections();server.close(r);}));const base='http://127.0.0.1:'+server.address().port;
+ const post=(url,body,cookie,extra={})=>fetch(base+url,{method:'POST',headers:{'Content-Type':'application/json',Origin:base,...(cookie?{Cookie:cookie}:{}),...extra},body:JSON.stringify(body)});
+ const login=async user=>(await post('/api/session',{username:user,password:user+'-test'})).headers.get('set-cookie').split(';')[0];
+ const artist=await login('artist'),listener=await login('listener');
+ const audio=loadBricks().get('BRK-AUD-002'),body={brickId:audio.id,sha256:audio.media.sha256,event:'play',eventId:crypto.randomUUID(),playbackId:crypto.randomUUID(),positionSeconds:0};
+ assert.equal((await post('/api/interactions',body)).status,401);
+ assert.equal((await post('/api/interactions',body,listener)).status,403);
+ assert.equal((await post('/api/interactions',body,artist)).status,403);
+ assert.equal((await post('/api/bricks/'+audio.id+'/authorize',{},artist)).status,200);
+ assert.equal((await post('/api/interactions',{...body,sha256:hash(99)},artist)).status,409);
+ assert.equal((await post('/api/interactions',body,artist,{Origin:'http://attacker.example'})).status,403);
+ assert.equal((await post('/api/interactions',body,artist)).status,202);
+ assert.equal((await(await post('/api/interactions',body,artist)).json()).duplicate,true);
+ const read='/api/bricks/'+audio.id+'/interactions';
+ assert.equal((await fetch(base+read,{headers:{Cookie:listener}})).status,403);
+ const snap=await(await fetch(base+read,{headers:{Cookie:artist}})).json();assert.equal(snap.counters.reportedStarts,1);assert.equal(snap.proofLevel,'unverified-client-report');
+ assert.equal(fs.existsSync(file),true);assert.equal(createInteractionStore({file}).snapshot(subjectFor(audio)).events,1);
+});
