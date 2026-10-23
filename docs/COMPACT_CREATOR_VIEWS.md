@@ -6,7 +6,9 @@ The result summary shows a thumbnail, work title, batch counts and explicit
 simulation/verified/incomplete state. **Customize NFT appearance / tokenURI** sits
 above the individual receipts. The primary button opens and focuses that section.
 Artwork consent and the wallet-signed update remain separate from playback rights.
-Nothing is published merely by rendering a thumbnail.
+Nothing is published merely by rendering a thumbnail. A verified earlier artwork
+transaction does not disable choosing a replacement cover; a pending/uncertain
+transaction still blocks resubmission. Replacement artwork requires fresh consent.
 
 Receipt cards initially show the title, role, status and abbreviated identifier.
 **Copy All** still copies the full human-readable receipt. Expand **Receipt details
