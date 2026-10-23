@@ -1,3 +1,4 @@
+import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import {createPublicClient,http} from 'viem';
 import {RegistrationThumbnail,StatusPill,CollectionPager} from './BrickPresentation.jsx';
 import {localThumbnailRpc,shortId} from './brick-presentation.js';
@@ -32,12 +33,23 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
   return()=>{alive=false;clearInterval(timer);controller?.abort();document.removeEventListener('visibilitychange',focus);window.removeEventListener('focus',focus);refresh.current=()=>{};};
  },[]);
  const q=query.trim().toLowerCase();
- const shown=(data?.bricks||[]).filter(b=>{
-  const r=b.registration;
-  return (!mine||!wallet||r.originator.toLowerCase()===wallet.toLowerCase())&&
-   (!q||[b.title,b.id,r.brickAddress,r.originator,r.controller,r.transactionHash].some(v=>v.toLowerCase().includes(q)));
- });
+ const {items}=useBuildingRollup({rows:data?.bricks||[],client,chainId:data?.network?.chainId,factoryAddress:data?.network?.factoryAddress,anchor:data?.head});
+ const matches=b=>{const r=b.registration;return (!mine||!wallet||r.originator.toLowerCase()===wallet.toLowerCase())&&(!q||[b.title,b.id,r.brickAddress,r.originator,r.controller,r.transactionHash].some(v=>String(v||'').toLowerCase().includes(q)));};
+ // Filter parents after grouping so a match in a child retains all associated parts.
+ const shown=items.filter(item=>item.rows.some(matches));
  const pages=Math.max(1,Math.ceil(shown.length/12)),currentPage=Math.min(page,pages-1);
+ const renderPart=brick=>{const r=brick.registration;return <article className="br-record" key={r.chainId+':'+r.factoryAddress+':'+r.brickAddress}>
+     <div className="br-record-header"><RegistrationThumbnail client={client} anchor={data.head} title={brick.title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/>
+      <div className="br-record-copy"><span className="br-kicker">ON-CHAIN BRICK · BLOCK {r.blockNumber}</span><h3>{brick.title}</h3><StatusPill tone={brick.streamAllowed?'success':'neutral'}>{brick.streamAllowed?'Public playback available':'Registered · private media'}</StatusPill>
+       <p>{brick.source==='road-registry'?'Private metadata · title not disclosed':brick.creator}</p>
+      </div>
+     </div>
+     <div className="br-record-footer"><small title={r.brickAddress}>{shortId(r.brickAddress)}</small>{brick.streamAllowed?<a className="text-action" href="http://127.0.0.1:4173/" target="_blank" rel="noreferrer">Open YBR Player ↗</a>:<span className="br-heading-count">Registration ≠ playback permission</span>}</div>
+     <details><summary>On-chain details &amp; commitments</summary><div className="br-details">
+      <p>{brick.source==='road-registry'?'A title and work type cannot be inferred from a commitment or encrypted metadata. The contract below is the authoritative identity.':brick.description}</p>
+      <dl>{[[r.brickAddress,'Brick contract','Registered Brick contract'],[brick.id,'IP identity','Registered IP identity'],[r.originator,'Originator','Registered originator'],[r.controller,'Current controller','Registered controller'],[r.metadataURI,'Metadata reference (not automatically opened)','Registered metadata reference'],[r.metadataDigest,'Metadata commitment','Registered metadata commitment'],[r.contentHash,'Content commitment','Registered content commitment'],[r.transactionHash,'Mint transaction','Registered mint transaction']].map(([value,label,copy])=><div key={label}><dt>{label}</dt><dd><CopyField label={copy} value={value}/></dd></div>)}</dl>
+     </div></details>
+    </article>};
  return <section className="lr br-collection" aria-label="IP Registry">
   <div className="registry-bar"><div className="tabs">
    <button type="button" className={!examples?'active':''} onClick={()=>setExamples(false)}>On-chain registrations</button>
@@ -55,19 +67,9 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
     {(data.limited||data.limitReached)&&<p className="wb-warning">Partial scan: {data.matchingEvents} matching events in the scanned range; up to 200 newest registrations are shown. This is not a complete historical index.</p>}
     <div className="registry-bar"><label className="searchbox"><input aria-label="Search on-chain registrations" placeholder="Search title, Brick ID, contract or wallet" value={query} onChange={e=>{setQuery(e.target.value);setPage(0);}}/></label>
      {wallet&&<label><input type="checkbox" checked={mine} onChange={e=>{setMine(e.target.checked);setPage(0);}}/> Created by my connected wallet</label>}</div>
-    <p className="result-caption" role="status">{shown.length} on-chain registration{shown.length===1?'':'s'} in view · no simulated receipts</p>
-    <div className="br-grid">{shown.slice(currentPage*12,currentPage*12+12).map(brick=>{const r=brick.registration;return <article className="br-record" key={r.chainId+':'+r.factoryAddress+':'+r.brickAddress}>
-     <div className="br-record-header"><RegistrationThumbnail client={client} anchor={data.head} title={brick.title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/>
-      <div className="br-record-copy"><span className="br-kicker">ON-CHAIN BRICK · BLOCK {r.blockNumber}</span><h3>{brick.title}</h3><StatusPill tone={brick.streamAllowed?'success':'neutral'}>{brick.streamAllowed?'Public playback available':'Registered · private media'}</StatusPill>
-       <p>{brick.source==='road-registry'?'Private metadata · title not disclosed':brick.creator}</p>
-      </div>
-     </div>
-     <div className="br-record-footer"><small title={r.brickAddress}>{shortId(r.brickAddress)}</small>{brick.streamAllowed?<a className="text-action" href="http://127.0.0.1:4173/" target="_blank" rel="noreferrer">Open YBR Player ↗</a>:<span className="br-heading-count">Registration ≠ playback permission</span>}</div>
-     <details><summary>On-chain details &amp; commitments</summary><div className="br-details">
-      <p>{brick.source==='road-registry'?'A title and work type cannot be inferred from a commitment or encrypted metadata. The contract below is the authoritative identity.':brick.description}</p>
-      <dl>{[[r.brickAddress,'Brick contract','Registered Brick contract'],[brick.id,'IP identity','Registered IP identity'],[r.originator,'Originator','Registered originator'],[r.controller,'Current controller','Registered controller'],[r.metadataURI,'Metadata reference (not automatically opened)','Registered metadata reference'],[r.metadataDigest,'Metadata commitment','Registered metadata commitment'],[r.contentHash,'Content commitment','Registered content commitment'],[r.transactionHash,'Mint transaction','Registered mint transaction']].map(([value,label,copy])=><div key={label}><dt>{label}</dt><dd><CopyField label={copy} value={value}/></dd></div>)}</dl>
-     </div></details>
-    </article>})}</div>
+    <p className="result-caption" role="status">{shown.length} release building{shown.length===1?'':'s'} / standalone Brick entries in view · no simulated receipts</p>
+    <ImportBuildingPacket rows={data.bricks} client={client} chainId={data.network.chainId} factoryAddress={data.network.factoryAddress}/>
+    <div className="br-grid">{shown.slice(currentPage*12,currentPage*12+12).map(item=>item.kind==='building'?<ReleaseBuildingCard key={item.id} group={item} client={client} chainId={data.network.chainId} factoryAddress={data.network.factoryAddress} anchor={data.head} renderPart={renderPart}/>:renderPart(item.row))}</div>
     <CollectionPager page={currentPage} pages={pages} total={shown.length} onPage={setPage}/>
     {!shown.length&&<div className="empty"><strong>{data.bricks.length?'No registrations match these filters.':'No confirmed registrations in this factory’s scanned range.'}</strong>
      <p>Check the chain and factory shown above against your mint receipt. A simulated receipt is not an on-chain registration.</p><button type="button" className="gold-btn" onClick={onMint}>Open Mint Studio</button></div>}
