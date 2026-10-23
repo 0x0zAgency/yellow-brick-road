@@ -27,6 +27,15 @@ async function main(){
  assert.equal(updated.metadata[0].image,'ipfs://'+image.cid);assert.equal(await nft.supportsInterface('0x49064906'),true);
  const chainReceipt=await rpc.getTransactionReceipt(updated.transactionHash);
  assert.ok(chainReceipt.logs.some(log=>{try{return nft.interface.parseLog(log).name==='MetadataUpdate';}catch{return false;}}));
+ const {readRegistrationCover}=await import('../web/src/brick-presentation.js');
+ const publicReadClient={getChainId:async()=>(await rpc.getNetwork()).chainId,
+  getBlock:async options=>rpc.getBlock(options.blockNumber===undefined?'latest':Number(options.blockNumber)),
+  readContract:async p=>new ethers.Contract(p.address,p.abi,rpc)[p.functionName](...(p.args||[]),{blockTag:Number(p.blockNumber)})};
+ const displayImage=await readRegistrationCover({client:publicReadClient,chainId:1337,factoryAddress:factory.address,brickAddress:event.args.brick,ipId:id,collection,tokenId,originator:await signer.getAddress()});
+ assert.equal(displayImage,image.imageURI);
+ const thumbnail=await fetch('http://127.0.0.1:5173/api/road-ipfs/nft-cover/'+image.cid);
+ assert.equal(thumbnail.status,200);assert.equal(thumbnail.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await thumbnail.arrayBuffer()),bytes);
+ console.log('PUBLIC THUMBNAIL PASS: identity-checked NFT cover read and narrow PNG route through real Ganache, Vite and Kubo.');
  const brick=new ethers.Contract(event.args.brick,['function contentHash() view returns (bytes32)','function metadataDigest() view returns (bytes32)','function metadataURI() view returns (string)'],rpc);
  assert.equal(await brick.contentHash(),content);assert.equal(await brick.metadataDigest(),digest);assert.equal(await brick.metadataURI(),privateURI);
  // Exercise the exact new mint orchestration, not only an isolated cover setter.

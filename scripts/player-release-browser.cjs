@@ -66,6 +66,9 @@ async function main(){
   await studio.getByRole('button',{name:'Simulate mint →',exact:true}).click();
   await studio.getByRole('button',{name:'Confirm simulation',exact:true}).click();
   await studio.getByRole('button',{name:'View receipts →',exact:true}).click({timeout:30000});
+  await studio.waitForFunction(()=>document.querySelector('.br-result .br-hero img')?.naturalWidth>0);
+  assert.equal(await studio.locator('.br-grid--receipts details[open]').count(),0);
+  assert.equal(await studio.locator('#mint-nft-customization').count(),0,'Simulation cannot customize an actual NFT');
   assert.equal(await studio.getByRole('button',{name:'Add release to Player',exact:true}).count(),0,'There is no second Player-enablement step');
   const deliveryStatus=studio.getByRole('region',{name:'YBR Player delivery status'});
   assert.equal(await deliveryStatus.locator('input').count(),0,'Receipts contain no delivery consent or permission controls');

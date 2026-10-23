@@ -2,9 +2,9 @@ import NftCoverPublisher from './NftCoverPublisher.jsx';
 import './player-release.css';
 
 /** Receipts report delivery; Step 3 owns approval. No post-mint permission gate. */
-export default function PlayerReleasePublisher({delivery={status:'not-requested'},onRetry,busy=false,...props}){
+export default function PlayerReleasePublisher({delivery={status:'not-requested'},onRetry,busy=false,includeCover=true,...props}){
  const ready=delivery.status==='delivered',failed=delivery.status==='needs-attention';
- return <><NftCoverPublisher {...props}/><section className="pr-publish" aria-label="YBR Player delivery status">
+ return <>{includeCover&&<NftCoverPublisher {...props}/>}<section className="pr-publish" aria-label="YBR Player delivery status">
   <span className="eyebrow">YBR PLAYER / DELIVERY STATUS</span>
   <h3>{ready?'Ready in YBR Player':failed?(props.mint?.simulated?'Simulation complete. Player delivery needs attention.':'Mint confirmed. Player delivery needs attention.'):delivery.status==='sending'?'Delivering approved Player copies…':'Player delivery was not requested'}</h3>
   {ready?<div className="pr-success" role="status"><p>The copies approved in Step 3 were delivered automatically. The Player continues to check the Brick’s live permissions for real mints.</p>

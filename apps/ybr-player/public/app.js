@@ -11,6 +11,11 @@ let toastTimeout;
 let currentMediaBrick = null;
 let signedIn = false, refreshing = false, librarySignature = '', lastRoadState = '';
 audio.volume = .75;
+// The server issues the ordinary HttpOnly session. No password is embedded here.
+const demoArtistLogin=document.createElement('button');
+demoArtistLogin.id='demoArtistLogin';demoArtistLogin.type='button';
+demoArtistLogin.className='gold-button';
+demoArtistLogin.textContent='Continue as artist (demo)';
 
 function toast(message) {
   $('toast').textContent = message;
@@ -157,19 +162,28 @@ async function togglePlay() {
 }
 async function refreshSession() {
   const revision=sessionRevision;
-  const session=await request('/api/session');
+  let session=await request('/api/session');
   if(revision!==sessionRevision)return;
+  const demo=session.demoAutoLogin==='artist';
+  if(demo)$('loginForm').querySelector('.login-footnote').before(demoArtistLogin);
+  else demoArtistLogin.remove();
+  $('logout').textContent=demo?'Switch account ↗':'Sign out ↗';
+  if(!session.authenticated&&demo&&!session.demoAutoLoginPaused){
+    try{session={...session,...await post('/api/session/demo')};}
+    catch(error){if(revision===sessionRevision)$('loginError').textContent=error.message;}
+    if(revision!==sessionRevision)return;
+  }
   signedIn=!!session.authenticated;
   if (!signedIn) {
     stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];savedUploads=[];
-    unavailable.clear();librarySignature='';applyLibrary();$('loginOverlay').hidden=false;return;
+    unavailable.clear();librarySignature='';applyLibrary();$('signedInAs').textContent='Not connected';$('loginOverlay').hidden=false;return;
   }
   if(currentUser!==session.user){
     stopMedia();selected=null;selectionPinned=false;unavailable.clear();librarySignature='';
     currentUser=session.user;
   }
   $('loginOverlay').hidden=true;
-  $('signedInAs').textContent=`Signed in as ${session.user}`;
+  $('signedInAs').textContent=`Signed in as ${session.user}${demo?' · local demo':''}`;
   const library=await request('/api/bricks');
   if(revision!==sessionRevision)return;
   const signature=JSON.stringify([library.bricks,library.network,library.registry,library.uploads]);
@@ -191,7 +205,7 @@ async function recordEvent(event) {
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();sessionRevision++;
   const button=e.target.querySelector('button[type=submit]');
-  button.disabled=true;
+  button.disabled=true;demoArtistLogin.disabled=true;
   $('loginError').textContent='';
   try {
     await post('/api/session',{username:$('username').value.trim(),password:$('password').value});
@@ -199,7 +213,16 @@ $('loginForm').addEventListener('submit',async e=>{
     await refreshSession();
     toast('Session authorized. Select a Brick to begin.');
   } catch(err) { $('loginError').textContent=err.message; }
-  finally {button.disabled=false;}
+  finally {button.disabled=false;demoArtistLogin.disabled=false;}
+});
+demoArtistLogin.addEventListener('click',async()=>{
+  if(demoArtistLogin.disabled)return;
+  sessionRevision++;demoArtistLogin.disabled=true;
+  const button=$('loginForm').querySelector('button[type=submit]');button.disabled=true;
+  $('loginError').textContent='';
+  try{await post('/api/session/demo',{resume:true});await refreshSession();}
+  catch(error){$('loginError').textContent=error.message;}
+  finally{demoArtistLogin.disabled=false;button.disabled=false;}
 });
 $('logout').addEventListener('click',async()=>{
   sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];savedUploads=[];
