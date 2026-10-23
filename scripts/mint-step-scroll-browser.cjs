@@ -74,7 +74,7 @@ createRoot(document.getElementById('scroll-root')).render(<StrictMode>
    await page.getByLabel('Track title',{exact:true}).fill('Scroll regression');
    await page.getByLabel('Recording artist / claimant',{exact:true}).fill('Scroll Artist');
    await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Scroll Artist');
-   const beforeEdit=await count(),notes=page.getByLabel('Notes',{exact:true});
+   const beforeEdit=await count(),notes=page.getByRole('textbox',{name:/^Notes(?:\s|$)/});
    await notes.fill('Typing stays where the creator is working.');
    assert.equal(await notes.evaluate(node=>node===document.activeElement),true);
    assert.equal(await count(),beforeEdit,'Typing does not steal focus or scroll');
