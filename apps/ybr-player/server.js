@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { createStudioLibrary } = require('./studio-releases');
 const { createStudioHttp } = require('./studio-http');
 const { readPlayerCatalog } = require('./road-registry');
+const { mayUseDemoLogin } = require('./demo-login');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
@@ -18,6 +19,7 @@ const SESSION_MS = 60 * 60 * 1000;
 const GRANT_MS = 30 * 60 * 1000;
 const MAX_BODY_BYTES = 10_000;
 const COOKIE = 'ybr_session';
+const DEMO_PAUSE_COOKIE = 'ybr_demo_paused';
 const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 
 function loadBricks() {
@@ -111,12 +113,30 @@ function streamAudio(req,res,brick) {
   if(req.method==='HEAD')return res.end();
   return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
 }
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway, studioLibrary } = {}) {
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway, studioLibrary, demoAutoLogin = null } = {}) {
+  if(demoAutoLogin!==null&&(demoAutoLogin!=='artist'||!Object.hasOwn(accounts,'artist')))throw Error('Demo auto-login requires the configured artist account.');
   const studio = studioLibrary || createStudioLibrary();
   const road = roadGateway || require('./road-music').makeGateway();
   const bricks = loadBricks();
   const sessions = new Map();
   const attempts = new Map();
+  // Rotate on server restart, so an earlier deliberate sign-out does not prevent
+  // the next demo run. This cookie is only a preference, never authentication.
+  const demoPauseToken = crypto.randomBytes(24).toString('hex');
+  const demoAllowed = req => demoAutoLogin==='artist'&&mayUseDemoLogin(req,server.address());
+  const demoPaused = req => getCookie(req,DEMO_PAUSE_COOKIE)===demoPauseToken;
+  function pauseCookie(req,paused){
+    return `${DEMO_PAUSE_COOKIE}=${paused?demoPauseToken:''}; HttpOnly; SameSite=Strict; Path=/${paused?'':'; Max-Age=0'}${req.socket.encrypted?'; Secure':''}`;
+  }
+  function startSession(req,res,user,{demo=false}={}){
+    // Drop expired sessions before creating another one, including demo renewals.
+    for(const [key,value] of sessions)if(value.expires<=now())sessions.delete(key);
+    const id=crypto.randomBytes(32).toString('hex');
+    sessions.set(id,{user,expires:now()+SESSION_MS,grants:new Map()});
+    const cookies=[`${COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600${req.socket.encrypted?'; Secure':''}`];
+    if(demoAutoLogin)cookies.push(pauseCookie(req,!demo));
+    return sendJson(res,200,{authenticated:true,user},{'Set-Cookie':cookies});
+  }
 
   function sessionFrom(req) {
     const id = getCookie(req, COOKIE);
@@ -168,7 +188,16 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
 
       if (route === '/api/session' && req.method === 'GET') {
         const s = sessionFrom(req);
-        return sendJson(res, 200, {authenticated:!!s, user:s?.user || null});
+        return sendJson(res, 200, {authenticated:!!s, user:s?.user || null,
+          demoAutoLogin:demoAllowed(req)?'artist':null,demoAutoLoginPaused:demoAllowed(req)&&demoPaused(req)});
+      }
+      if (route === '/api/session/demo' && req.method === 'POST') {
+        if(!demoAllowed(req))return fail(res,403,'Automatic artist sign-in is available only in the local demo.');
+        const body=await readJson(req);
+        const existing=sessionFrom(req);
+        if(existing)return sendJson(res,200,{authenticated:true,user:existing.user});
+        if(demoPaused(req)&&body?.resume!==true)return fail(res,401,'Demo sign-in is paused. Choose Continue as artist (demo) or sign in manually.');
+        return startSession(req,res,'artist',{demo:true});
       }
       if (route === '/api/session' && req.method === 'POST') {
         const ip = req.socket.remoteAddress || 'local';
@@ -182,14 +211,13 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
           return fail(res,401,'Incorrect username or password');
         }
         attempts.delete(ip);
-        const id = crypto.randomBytes(32).toString('hex');
-        sessions.set(id, { user: username, expires: now()+SESSION_MS, grants: new Map() });
-        const secure = req.socket.encrypted ? '; Secure' : '';
-        return sendJson(res,200,{authenticated:true,user:username},{'Set-Cookie':`${COOKIE}=${id}; HttpOnly; SameSite=Strict; Path=/; Max-Age=3600${secure}`});
+        return startSession(req,res,username);
       }
       if (route === '/api/logout' && req.method === 'POST') {
         sessions.delete(getCookie(req,COOKIE));
-        return sendJson(res,200,{ok:true},{'Set-Cookie':`${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`});
+        const cookies=[`${COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0`];
+        if(demoAllowed(req))cookies.push(pauseCookie(req,true));
+        return sendJson(res,200,{ok:true},{'Set-Cookie':cookies});
       }
       // Public Road Music API for other players; no YBR Player login required.
       // Authorization is the opt-in license committed by the current Brick controller.
