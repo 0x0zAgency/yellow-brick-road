@@ -1,7 +1,7 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const audio = $('audio');
-const {playableNewest,selectionFor,isPlayable}=window.YBRLibrary;
+const {playableNewest,selectionFor,isPlayable,continuationQueue}=window.YBRLibrary;
 let bricks = [], catalogBricks = [], savedUploads = [];
 const unavailable = new Set();
 let selectionPinned = false, selectionRevision = 0, sessionRevision = 0, currentUser = null;
@@ -11,6 +11,24 @@ let toastTimeout;
 let currentMediaBrick = null;
 let signedIn = false, refreshing = false, librarySignature = '', lastRoadState = '';
 audio.volume = .75;
+let continuousPlay=true,playIntent=0,interactionRun=null,eventQueue=Promise.resolve(),pendingEvents=0;
+try{continuousPlay=localStorage.getItem('ybr:continuous-play')!=='off';}catch{}
+const continuous=document.createElement('button');continuous.id='continuousPlay';continuous.type='button';continuous.className='text-button';
+const paintContinuous=()=>{continuous.textContent='Continuous play: '+(continuousPlay?'ON':'OFF');continuous.setAttribute('aria-pressed',String(continuousPlay));};
+paintContinuous();document.querySelector('.top-actions').prepend(continuous);
+continuous.addEventListener('click',()=>{continuousPlay=!continuousPlay;playIntent++;paintContinuous();try{localStorage.setItem('ybr:continuous-play',continuousPlay?'on':'off');}catch{}});
+async function continuePlayback(){
+ if(!continuousPlay||!signedIn||!currentMediaBrick)return;
+ const intent=playIntent,queue=continuationQueue(bricks,currentMediaBrick);
+ for(const id of queue){
+  if(!continuousPlay||!signedIn||intent!==playIntent)return;
+  const brick=bricks.find(item=>item.id===id);if(!brick)continue;
+  const result=await choose(brick,true,{automatic:true});
+  if(result!=='unavailable')return;
+ }
+ toast('No further playable tracks are available.');
+}
+
 // The server issues the ordinary HttpOnly session. No password is embedded here.
 const demoArtistLogin=document.createElement('button');
 demoArtistLogin.id='demoArtistLogin';demoArtistLogin.type='button';
@@ -31,7 +49,7 @@ async function request(url, options={}) {
   if (!res.ok) throw Object.assign(new Error(body.error || `HTTP ${res.status}`),{status:res.status});
   return body;
 }
-const post=(url,body={})=>request(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+const post=(url,body={})=>request(url,{signal:AbortSignal.timeout(10000),method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
 const stamp= (sec) => {
   const v=Number.isFinite(sec)?Math.max(0,Math.floor(sec)):0;
   return `${Math.floor(v/60)}:${String(v%60).padStart(2,'0')}`;
@@ -82,7 +100,7 @@ function renderList() {
     const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road-registry'?'⌁ ON CHAIN':brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
     const duration=document.createElement('span');duration.className='track-duration';duration.textContent=brick.source==='road-registry'?'—':stamp(brick.durationSeconds);
     const play=document.createElement('button');play.className='track-action';play.type='button';play.setAttribute('aria-label',`${brick.streamAllowed?'Play':'Inspect restricted'} ${brick.title}`);play.textContent=brick.streamAllowed?'▶':'⌁';
-    const action=()=>choose(brick,true);
+    const action=()=>{if(currentMediaBrick&&currentMediaBrick!==brick.id)recordEvent('skip');void choose(brick,true);};
     play.addEventListener('click',(e)=>{e.stopPropagation();action();});
     row.addEventListener('click',action);
     row.addEventListener('keydown',(e)=>{if(e.target===row&&(e.key==='Enter'||e.key===' ')){e.preventDefault();action();}});
@@ -100,6 +118,7 @@ function renderList() {
   window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks,uploads:savedUploads}}));
 }
 function stopMedia() {
+  interactionRun=null;
   selectionRevision++;
   currentMediaBrick=null;
   audio.pause();audio.removeAttribute('src');audio.load();
@@ -113,7 +132,7 @@ function renderSelection() {
 }
 function applyLibrary() {
   bricks=playableNewest(catalogBricks,{canPlayType:mime=>audio.canPlayType(mime),unavailable});
-  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick))stopMedia();
+  if(currentMediaBrick&&!bricks.some(brick=>brick.id===currentMediaBrick)){playIntent++;stopMedia();}
   const previous=selected?.id;
   selected=selectionFor(bricks,previous,selectionPinned||!!currentMediaBrick);
   if(!selected||selected.id!==previous)selectionPinned=false;
@@ -122,11 +141,12 @@ function applyLibrary() {
 function hideUnavailable(id,message) {
   unavailable.add(id);librarySignature='';applyLibrary();toast(message);
 }
-async function choose(brick, playNow=true) {
+async function choose(brick, playNow=true, {automatic=false}={}) {
+  if(!automatic)playIntent++;
   if (!brick||!bricks.some(item=>item.id===brick.id)||!isPlayable(brick,mime=>audio.canPlayType(mime))) return;
   selectionPinned=true;
-  if (selected?.id===brick.id && currentMediaBrick===brick.id && playNow) return togglePlay();
-  stopMedia();const revision=selectionRevision;
+  if (selected?.id===brick.id && currentMediaBrick===brick.id && playNow && !automatic) return togglePlay();
+  stopMedia();const revision=selectionRevision,intent=playIntent;
   selected=brick;
   $('nowTitle').textContent=brick.title;
   $('nowArtist').textContent=brick.creator;
@@ -137,22 +157,25 @@ async function choose(brick, playNow=true) {
   if (!brick.streamAllowed) {toast(brick.source==='road-registry'?'This Brick is registered. Share a preview through Add release to Player in Mint Studio to enable local playback.':`Access denied: ${brick.title} is not licensed to this account.`);return;}
   try {
     const grant=await post(`/api/bricks/${encodeURIComponent(brick.id)}/authorize`);
-    if (revision!==selectionRevision||selected?.id!==brick.id) return;
+    if (revision!==selectionRevision||intent!==playIntent||!signedIn||selected?.id!==brick.id) return;
     if (!grant.authorized) throw Object.assign(new Error('Authorization refused'),{status:403});
     audio.src=grant.mediaUrl;
     currentMediaBrick=brick.id;
+    interactionRun={id:crypto.randomUUID(),brickId:brick.id,sha256:brick.media.sha256};
     audio.load();
     await audio.play();
+    return 'playing';
   } catch(err) {
-    if(revision!==selectionRevision||selected?.id!==brick.id)return;
+    if(revision!==selectionRevision||intent!==playIntent||!signedIn||selected?.id!==brick.id)return;
     if([403,404,409,410].includes(err.status)||err.name==='NotSupportedError'){
-      hideUnavailable(brick.id,'This track is no longer playable and has been hidden.');return;
+      hideUnavailable(brick.id,'This track is no longer playable and has been hidden.');return 'unavailable';
     }
     if(err.name==='AbortError')return;
     toast(err.name==='NotAllowedError'?'Authorized. Click Play to begin playback.':err.message);
   }
 }
 async function togglePlay() {
+  playIntent++;
   if (!selected) return choose(bricks.find(b=>b.streamAllowed),true);
   if (!currentMediaBrick || currentMediaBrick!==selected.id) return choose(selected,true);
   if (audio.paused) {
@@ -175,11 +198,11 @@ async function refreshSession() {
   }
   signedIn=!!session.authenticated;
   if (!signedIn) {
-    stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];savedUploads=[];
+    playIntent++;stopMedia();currentUser=null;selected=null;selectionPinned=false;catalogBricks=[];savedUploads=[];
     unavailable.clear();librarySignature='';applyLibrary();$('signedInAs').textContent='Not connected';$('loginOverlay').hidden=false;return;
   }
   if(currentUser!==session.user){
-    stopMedia();selected=null;selectionPinned=false;unavailable.clear();librarySignature='';
+    playIntent++;stopMedia();selected=null;selectionPinned=false;unavailable.clear();librarySignature='';
     currentUser=session.user;
   }
   $('loginOverlay').hidden=true;
@@ -196,12 +219,26 @@ async function refreshSession() {
   lastRoadState=roadState;
   applyLibrary();
 }
-async function recordEvent(event) {
-  if (!currentMediaBrick || !selected || currentMediaBrick!==selected.id) return;
-  try {
-    await post('/api/events',{event,brickId:currentMediaBrick,positionSeconds:Number(audio.currentTime)||0});
-  } catch { /* Playback remains possible if demo telemetry fails. */ }
+function sendInteraction(body){
+ const session=sessionRevision,user=currentUser;
+ // Capture each event's identity immediately, then preserve its ordering across
+ // end-to-next transitions. Failed telemetry never blocks listening.
+ if(pendingEvents>=64){window.dispatchEvent(new Event('ybr:interaction-error'));return;}
+ pendingEvents++;
+ eventQueue=eventQueue.then(()=>{if(session!==sessionRevision||user!==currentUser||!signedIn)return null;return post('/api/interactions',body);}).then(result=>{if(result)window.dispatchEvent(new Event('ybr:interaction-recorded'));}).catch(()=>window.dispatchEvent(new Event('ybr:interaction-error'))).finally(()=>{pendingEvents--;});
 }
+function recordEvent(event){
+ const run=interactionRun;
+ if(!run||!currentMediaBrick||run.brickId!==currentMediaBrick||!selected||currentMediaBrick!==selected.id)return;
+ sendInteraction({event,brickId:run.brickId,sha256:run.sha256,playbackId:run.id,eventId:crypto.randomUUID(),positionSeconds:Number(audio.currentTime)||0});
+}
+let displaySelection=null,displayed=new Set();
+window.addEventListener('ybr:selection',event=>{const id=event.detail?.brick?.id;if(id!==displaySelection){displaySelection=id;displayed.clear();}});
+window.addEventListener('ybr:file-display',event=>{
+ const value=event.detail;if(!signedIn||value?.brickId!==selected?.id||!['artwork','lyrics'].includes(value.role))return;
+ const key=value.role+':'+value.sha256;if(displayed.has(key))return;displayed.add(key);
+ sendInteraction({event:value.role+'-view',brickId:value.brickId,sha256:value.sha256,playbackId:crypto.randomUUID(),eventId:crypto.randomUUID(),positionSeconds:0});
+});
 $('loginForm').addEventListener('submit',async e=>{
   e.preventDefault();sessionRevision++;
   const button=e.target.querySelector('button[type=submit]');
@@ -225,7 +262,7 @@ demoArtistLogin.addEventListener('click',async()=>{
   finally{demoArtistLogin.disabled=false;button.disabled=false;}
 });
 $('logout').addEventListener('click',async()=>{
-  sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];savedUploads=[];
+  playIntent++;sessionRevision++;signedIn=false;librarySignature='';stopMedia();selected=null;bricks=[];catalogBricks=[];savedUploads=[];
   selectionPinned=false;currentUser=null;unavailable.clear();
   await post('/api/logout');
   $('loginOverlay').hidden=false;
@@ -235,8 +272,8 @@ $('logout').addEventListener('click',async()=>{
 });
 $('featurePlay').addEventListener('click',()=>choose(bricks[0],true));
 $('playPause').addEventListener('click',togglePlay);
-$('next').addEventListener('click',()=>{if(!bricks.length)return;choose(bricks[(selectedIndex()+1)%bricks.length],true);});
-$('previous').addEventListener('click',()=>{if(!bricks.length)return;choose(bricks[(selectedIndex()+bricks.length-1)%bricks.length],true);});
+$('next').addEventListener('click',()=>{if(!bricks.length)return;recordEvent('skip');choose(bricks[(selectedIndex()+1)%bricks.length],true);});
+$('previous').addEventListener('click',()=>{if(!bricks.length)return;recordEvent('skip');choose(bricks[(selectedIndex()+bricks.length-1)%bricks.length],true);});
 $('volume').addEventListener('input',e=>{audio.volume=Number(e.target.value)/100;});
 $('seek').addEventListener('input',e=>{
   if (Number.isFinite(audio.duration) && audio.duration>0) audio.currentTime=Number(e.target.value)/1000*audio.duration;
@@ -248,12 +285,15 @@ $('copyId').addEventListener('click',async()=>{
 $('inspectorNav').addEventListener('click',()=>{$('inspector').scrollIntoView({behavior:'smooth',block:'start'});});
 $('libraryNav').addEventListener('click',()=>{$('trackList').scrollIntoView({behavior:'smooth',block:'center'});});
 for(const event of ['timeupdate','durationchange','play','pause','ended','loadedmetadata']) audio.addEventListener(event,updatePlayback);
-for(const event of ['play','pause','ended']) audio.addEventListener(event,()=>recordEvent(event));
+for(const event of ['play','pause','ended']) audio.addEventListener(event,()=>{if(event!=='pause'||!audio.ended)recordEvent(event);});
+audio.addEventListener('seeked',()=>recordEvent('seek'));
+audio.addEventListener('ended',()=>{void continuePlayback();});
 audio.addEventListener('error',()=>{
   if(!audio.getAttribute('src')||!currentMediaBrick)return;
   const id=currentMediaBrick;
   // Decode/unsupported-source failures are definitive for this browser session.
   // Network interruptions are not: keep those tracks available for retry.
+  playIntent++;
   if([3,4].includes(audio.error?.code))hideUnavailable(id,'This audio cannot be played and has been hidden. Refresh the library to retry after fixing it.');
   else {stopMedia();toast('Playback was interrupted. Click Play to retry.');}
 });

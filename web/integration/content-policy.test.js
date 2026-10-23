@@ -6,7 +6,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
-import {createHash} from 'node:crypto';
+import crypto,{createHash} from 'node:crypto';
 import {createRequire} from 'node:module';
 import ganache from 'ganache';
 import {createWalletClient,createPublicClient,http,parseAbi} from 'viem';
@@ -68,7 +68,8 @@ test('real signed mint initializes permissions and Player checks revocation, has
  assert.ok(!JSON.stringify(payload).includes(encrypted.secret));
  const temp=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-policy-integration-'));t.after(()=>fs.rmSync(temp,{recursive:true,force:true}));
  const road=makeGateway({rpcUrl,factoryAddress}),studio=createStudioLibrary({directory:temp});
- const {server}=createApp({accounts:{listener:'test-only-password'},roadGateway:road,studioLibrary:studio});
+ const interactionFile=path.join(temp,'interactions.ndjson');
+ const {server}=createApp({interactionFile,accounts:{listener:'test-only-password'},roadGateway:road,studioLibrary:studio});
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve);}));
  const base='http://127.0.0.1:'+server.address().port;
  const {token}=await(await fetch(base+'/api/player-publish/config')).json();
@@ -88,6 +89,11 @@ test('real signed mint initializes permissions and Player checks revocation, has
  response=await fetch(base+'/api/bricks/'+id+'/authorize',{method:'POST',headers:auth});assert.equal(response.status,200);
  const stream=()=>fetch(base+'/api/bricks/'+id+'/media',{headers:{...auth,Range:'bytes=0-63'}});
  response=await stream();assert.equal(response.status,206);assert.equal(response.headers.get('X-YBR-Content-SHA256'),hash(data.preview));
+ const event={brickId:id,sha256:hash(data.preview),event:'play',eventId:crypto.randomUUID(),playbackId:crypto.randomUUID(),positionSeconds:0};
+ const report=body=>fetch(base+'/api/interactions',{method:'POST',headers:{...auth,'Content-Type':'application/json'},body:JSON.stringify(body)});
+ assert.equal((await report(event)).status,202,'Actual chain-authorized preview observations can be recorded');
+ assert.equal((await report({...event,sha256:hash(data.master)})).status,409,'Master bytes cannot impersonate the authorized preview');
+
  // Reopen the exact saved preview library against another real Ganache wallet profile.
  const otherChain=ganache.server({logging:{quiet:true},chain:{chainId:1337,time:new Date('2020-01-01')},wallet:{mnemonic:'test test test test test test test test test test test junk'}});
  await otherChain.listen(0,'127.0.0.1');t.after(()=>otherChain.close());
@@ -115,6 +121,7 @@ test('real signed mint initializes permissions and Player checks revocation, has
  let review=await readBrickPolicy(editor);
  await updateBrickPolicy({...editor,review,action:'permissions',permissions:0});
  response=await stream();assert.ok([403,404].includes(response.status));
+ assert.equal((await report({...event,eventId:crypto.randomUUID()})).status,403,'Revocation also blocks new observation submissions');
  let library=await(await fetch(base+'/api/bricks',{headers:auth})).json();assert.ok(!library.bricks.some(b=>b.id===id));
  review=await readBrickPolicy(editor);await updateBrickPolicy({...editor,review,action:'permissions',permissions:1});
  response=await stream();assert.equal(response.status,206,'Reapproval restores the same committed preview.');

@@ -1,5 +1,6 @@
 'use strict';
 const {describeSavedUpload,newestSavedUploads}=require('./studio-catalog');
+const {createInteractionHttp}=require('./interaction-http');
 // YBR Player proof 001. Local-only reference implementation: no external SDKs.
 const http = require('node:http');
 const fs = require('node:fs');
@@ -15,6 +16,7 @@ const PUBLIC = path.join(ROOT, 'public');
 const MEDIA = path.join(ROOT, 'media');
 const MANIFEST = path.join(ROOT, 'data', 'bricks.json');
 const EVENTS = path.join(ROOT, 'data', 'player-events.ndjson');
+
 const SESSION_MS = 60 * 60 * 1000;
 const GRANT_MS = 30 * 60 * 1000;
 const MAX_BODY_BYTES = 10_000;
@@ -113,7 +115,7 @@ function streamAudio(req,res,brick) {
   if(req.method==='HEAD')return res.end();
   return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
 }
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, roadGateway, studioLibrary, demoAutoLogin = null } = {}) {
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, interactionFile, roadGateway, studioLibrary, demoAutoLogin = null } = {}) {
   if(demoAutoLogin!==null&&(demoAutoLogin!=='artist'||!Object.hasOwn(accounts,'artist')))throw Error('Demo auto-login requires the configured artist account.');
   const studio = studioLibrary || createStudioLibrary();
   const road = roadGateway || require('./road-music').makeGateway();
@@ -162,6 +164,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
     return result;
   }
   const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange,checkPermission});
+  const interactionHttp=createInteractionHttp({file:interactionFile,now,requireSession,studio,bricks,road,checkPermission,canStream,sendJson,readJson,fail});
   const server = http.createServer(async (req, res) => {
     try {
       const origin = req.headers.origin;
@@ -309,6 +312,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
           return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
         }
       }
+      if(await interactionHttp.handle(req,res,route,url))return;
       if (route === '/api/events' && req.method === 'POST') {
         const s=requireSession(req,res);if (!s)return;
         const body=await readJson(req);
@@ -321,7 +325,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res,405,'Method not allowed');
       const staticPath = route==='/'?'/index.html':route;
-      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js'].includes(staticPath)) return fail(res,404,'Not found');
+      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js','/interaction-ui.js'].includes(staticPath)) return fail(res,404,'Not found');
       const filePath=path.join(PUBLIC,staticPath.slice(1));
       const body=fs.readFileSync(filePath);
       res.writeHead(200,{
