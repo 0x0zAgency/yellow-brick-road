@@ -69,6 +69,7 @@ async function main(args=process.argv.slice(2)){
   await require('./dev-install-scripts.cjs').prepareInstallScripts({root:ROOT,setup,
    run:(cmd,argv,options)=>runChild(cmd,argv,{...options,quiet}),log:quiet?()=>{}:console.log});
   if(setup)return;
+  Object.assign(process.env,require('./dev-network.cjs').startupNetworkEnv(ROOT));
   await require('./dev-stack.cjs').main();
  }catch(error){
   console.error('[YBR] '+error.message);process.exitCode=Number.isInteger(error.exitCode)&&error.exitCode>0?error.exitCode:1;

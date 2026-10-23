@@ -74,7 +74,20 @@ function getItem(store,key,max){
  try{const input=store?.getItem(key);if(!input||input.length>max)return null;return JSON.parse(input);}catch{return null;}
 }
 export function loadMintForm(store){const raw=getItem(store,MINT_FORM_KEY,MAX_FORM_BYTES);return raw?.version===1?sanitizeMintForm(raw.data):null;}
-export function loadMintNetwork(store){const raw=getItem(store,MINT_SETTINGS_KEY,MAX_SETTINGS_BYTES);return raw?.version===1?sanitizeMintNetwork(raw.data):defaultMintNetwork();}
+export function loadMintNetwork(store,startup={network:import.meta.env?.VITE_ROAD_DEFAULT_NETWORK,revision:import.meta.env?.VITE_ROAD_NETWORK_SELECTION}){
+ const raw=getItem(store,MINT_SETTINGS_KEY,MAX_SETTINGS_BYTES),saved=raw?.version===1?sanitizeMintNetwork(raw.data):defaultMintNetwork();
+ // Apply an explicit terminal choice once per saved selection, never mid-mint.
+ // Subsequent manual browser choices remain intact until Dev Control changes it.
+ if(['ganache','sepolia'].includes(startup?.network)&&/^[a-f0-9]{24}$/.test(startup?.revision||'')){
+  try{if(store?.getItem('road:dev-network-applied')!==startup.revision){
+   saved.network=startup.network;
+   if(startup.network==='ganache'){saved.rpcUrl='http://127.0.0.1:8545';saved.ganacheChainId='1337';saved.useStartupFactory=true;}
+   // Persist both values before the applied marker, preserving every other field.
+   if(saveMintNetwork(store,saved))store.setItem('road:dev-network-applied',startup.revision);
+  }}catch{/* Storage unavailability does not trigger a transaction. */}
+ }
+ return saved;
+}
 function put(store,key,value){try{store?.setItem(key,JSON.stringify({version:1,data:value}));return !!store;}catch{return false;}}
 export function saveMintForm(store,value){return put(store,MINT_FORM_KEY,sanitizeMintForm(value));}
 export function saveMintNetwork(store,value){return put(store,MINT_SETTINGS_KEY,sanitizeMintNetwork(value));}
