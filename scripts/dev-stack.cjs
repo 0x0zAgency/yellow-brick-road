@@ -31,7 +31,7 @@ const log=message=>dashboard?dashboard.log('launcher',message):console.log(messa
 function command(){return process.platform==='win32'?'npm.cmd':'npm';}
 function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio=dashboard?['ignore','pipe','pipe']:'inherit'}={}){
  if(stopping)throw Error('Startup cancelled.');
- const proc=spawn(executable,args,{cwd,env,stdio,detached:process.platform!=='win32'});
+ const proc=spawn(executable,args,{cwd,env:withoutSigningSecrets(env),stdio,detached:process.platform!=='win32'});
  dashboard?.attach(label,proc);OWNED.set(proc.pid,{label,proc});
  proc.once('exit',(code,signal)=>{
   OWNED.delete(proc.pid);

@@ -1,6 +1,6 @@
 'use strict';
-/** Mint-target selection and assigned-interface reference. Never OS Wi-Fi control,
- * remote RPC deployment, a bind-address change or a replacement for wallet consent.
+/** Active-network selection with explicit remote preparation and spending approval.
+ * Assigned interfaces remain reference-only; application listeners stay on loopback.
  */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),net=require('node:net'),crypto=require('node:crypto');
 const TARGETS=Object.freeze({ganache:{label:'Local Ganache',chainId:1337},sepolia:{label:'Sepolia testnet',chainId:11155111}});

@@ -64,7 +64,7 @@ async function prepareSepolia({root,input={},env=process.env,compile=async()=>{}
  // Refuse the selected and deterministic demo account families on a public network.
  const {readSelection}=require('./dev-ganache-profile.cjs');
  const selected=readSelection(root,ethers);
- const seeds=new Set([selected.mnemonic,'myth like bonus scare over problem client lizard pioneer submit female collect']);
+ const seeds=new Set([selected.mnemonic,'myth like bonus scare over problem client lizard pioneer submit female collect'].filter(Boolean));
  for(const seed of seeds)for(let i=0;i<10;i++)if(same(ethers.Wallet.fromMnemonic(seed,"m/44'/60'/0'/0/"+i).address,signer.address))throw Error('Use a separate Sepolia test wallet, not a Ganache demo account.');
  await compile();
  const artifact=artifactAt(root),data=artifact.bytecode,bytecodeHash=ethers.utils.keccak256(data);
