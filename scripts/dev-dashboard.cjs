@@ -39,14 +39,14 @@ function redact(text,secrets=[]){
  return clean(result);
 }
 class DevDashboard{
- constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null}){
+ constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null,networkActions={}}){
   this.output=output;this.input=input;this.env=env;this.onQuit=onQuit;this.onRestartPlayer=onRestartPlayer;this.mnemonicControl=mnemonicControl;
   this.interactive=!!(output.isTTY&&input.isTTY&&env.TERM!=='dumb'&&!env.CI&&env.YBR_DEV_PLAIN!=='1'&&!args.includes('--plain'));
   this.showSecrets=this.interactive&&env.YBR_DEV_HIDE_SECRETS!=='1';
   this.color=this.interactive&&env.NO_COLOR===undefined;this.motion=env.YBR_DEV_REDUCED_MOTION!=='1';
   this.view=args.includes('--logs')?'logs':'home';this.verbose=args.includes('--verbose')||env.YBR_DEV_VERBOSE==='1';this.offset=0;this.secrets=new Set();this.closed=false;this.paused=false;this.lastFrame=[];
   this.state={startedAt:Date.now(),phase:'STARTING',nodeVersion:process.version,services:{},ganache:{},access:{},logs:[],logMode:this.verbose?'VERBOSE':'ESSENTIAL'};
-  this.networkControl=new NetworkControl({root,onApply:selection=>{this.state.mintTarget=selection.network;this.log('launcher','Mint target saved: '+selection.network+'. Run npm run dev again and reload Mint Studio; Player stays on local Ganache.');this.onQuit();},onChange:(menu,connection)=>{this.state.networkMenu=menu;this.state.connectionReference=connection?connection.name+' / '+connection.family+' / '+connection.address+' (reference only)':'No assigned network interfaces';this.draw(true);}});
+  this.networkControl=new NetworkControl({root,...networkActions,onApply:async(...args)=>{if(args[0]?.kind==='deploy'&&(!this.interactive||(this.output.columns||80)<80||(this.output.rows||24)<24))throw Error('Resize to at least 80x24 to review and approve spending.');return networkActions.onApply?.(...args);},onSecret:value=>this.addSecrets(value),onActivated:selection=>{this.log('launcher','Active network saved: '+selection.network+'. Run npm run dev again; all services will use that network.');this.onQuit();},onChange:(menu,connection)=>{this.state.networkMenu=menu;this.state.connectionReference=connection?connection.name+' / '+connection.family+' / '+connection.address+' (reference only)':'No assigned network interfaces';this.draw(true);}});
   this.state.mintTarget=readNetwork(root).network;
   this.logFile=path.join(root,'.road-local','dev-stack.log');
   const dir=path.dirname(this.logFile);
@@ -65,7 +65,7 @@ class DevDashboard{
    if(this.networkControl.menu){this.networkControl.handle(_text,key);return;}
    if(key.name==='i'&&this.interactive){this.state.restartConfirm=false;this.networkControl.cycle();return;}
    if(key.name==='n'&&this.interactive){
-    if(this.state.phase!=='READY'){this.state.error='Network selection is available when READY.';this.draw(true);return;}
+    if(!['READY','DEGRADED','CONFIGURATION REQUIRED'].includes(this.state.phase)){this.state.error='Network selection is available when READY.';this.draw(true);return;}
     try{this.state.restartConfirm=false;this.networkControl.open();}catch(e){this.state.error=e.message;this.draw(true);}return;
    }
    if(key.name==='m'&&this.interactive){

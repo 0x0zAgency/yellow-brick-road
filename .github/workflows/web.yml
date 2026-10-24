@@ -81,3 +81,8 @@ jobs:
           node scripts/dev-stack-smoke.cjs
           node scripts/dev-registry-smoke.cjs
           node scripts/nft-cover-smoke.cjs
+
+      - name: Verify approved deployment and full single-network operation on a local Sepolia-ID node
+        env:
+          YBR_TEST_FULL_REMOTE_STACK: '1'
+        run: node --test scripts/dev-sepolia.integration.cjs

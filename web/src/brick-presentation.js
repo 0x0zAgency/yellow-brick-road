@@ -8,6 +8,7 @@ export function publicCoverSource(uri){
  return typeof uri==='string'&&uri.startsWith('ipfs://')&&validCoverCid(uri.slice(7))?'/api/road-ipfs/nft-cover/'+uri.slice(7):null;
 }
 export function localThumbnailRpc(value){
+ if(value==='/road/rpc')return (globalThis.location?.origin||'http://127.0.0.1:5173')+'/road/rpc';
  try{const url=new URL(value);return url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)&&!url.username&&!url.password&&url.pathname==='/'&&!url.search&&!url.hash?url.href:null;}catch{return null;}
 }
 export function mintOverview(mint,expectedCount=0){

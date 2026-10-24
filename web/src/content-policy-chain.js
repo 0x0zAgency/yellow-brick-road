@@ -1,11 +1,13 @@
-import {createPublicClient,createWalletClient,custom,defineChain,parseAbi,encodeFunctionData} from 'viem';
+import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
+import {createPublicClient,http,createWalletClient,custom,defineChain,parseAbi,encodeFunctionData} from 'viem';
 import {policyAbi} from './chain-mint.js';
 const stateAbi=parseAbi(['function controller() view returns (address)','function isBrick(address) view returns (bool)']);
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
 function clients(provider,chainId){
  if(!provider?.request||![1337,11155111].includes(Number(chainId)))throw Error('Select the supported Ganache or Sepolia network in your wallet.');
  const chain=defineChain({id:Number(chainId),name:'YBR test chain',nativeCurrency:{name:'Ether',symbol:'ETH',decimals:18},rpcUrls:{default:{http:[]}}});
- return {client:createPublicClient({chain,transport:custom(provider)}),wallet:createWalletClient({chain,transport:custom(provider)})};
+ requireActiveNetwork(chainId);
+ return {client:createPublicClient({chain,transport:ACTIVE_NETWORK?http(activeRpcUrl()):custom(provider)}),wallet:createWalletClient({chain,transport:custom(provider)})};
 }
 export async function readBrickPolicy({provider,chainId,factoryAddress,brickAddress}){
  const {client}=clients(provider,chainId);
@@ -26,6 +28,7 @@ export async function updateBrickPolicy(options){
  const {provider,chainId,brickAddress,walletAddress,review,action,permissions}=options;
  const {client,wallet}=clients(provider,chainId);
  const check=async()=>{
+  if(Number(await provider.request({method:'eth_chainId'}))!==Number(chainId))throw Error('Switch your wallet to the active network before signing.');
   if(await client.getChainId()!==Number(chainId))throw Error('Wallet network changed.');
   const accounts=await provider.request({method:'eth_accounts'});
   if(!accounts.some(account=>same(account,walletAddress)))throw Error('Wallet account changed.');

@@ -2,16 +2,17 @@
  * Approval is volatile, bound to reviewed public labels, exact files and policies.
  * Delivery failure never rolls back, re-mints, or reclassifies a confirmed mint.
  */
+import {ACTIVE_NETWORK} from './active-network.js';
 import {publishPlayerRelease,validatePlayerReleaseSelection} from './player-release.js';
 const scope=packet=>JSON.stringify((packet?.bricks||[]).map(brick=>({
  id:brick.localId,role:brick.role,title:brick.metadata?.title,description:brick.metadata?.description,
  creators:brick.metadata?.creators,music:brick.metadata?.music,player:brick.metadata?.rights?.player,
  files:(brick.metadata?.media||[]).map(file=>[file.role,file.name,file.byteLength,file.integrity?.digest])
 })));
-export function reviewPlayerDelivery({packet,consent=false,execution='simulated',chainId=1337}={}){
+export function reviewPlayerDelivery({packet,consent=false,execution='simulated',chainId=1337,playerChainId=ACTIVE_NETWORK?.chainId||1337}={}){
  if(consent!==true)return null;
- if(execution!=='simulated'&&(execution!=='ganache'||Number(chainId)!==1337))
-  throw Error('Automatic local Player delivery supports Ganache 1337 or the explicit simulation only. Return to Step 3 to turn delivery off for this network.');
+ if(execution!=='simulated'&&(!['ganache','sepolia'].includes(execution)||Number(chainId)!==playerChainId||! [1337,11155111].includes(playerChainId)))
+  throw Error('Player delivery must match the active network (Ganache 1337 or configured Sepolia). Change Dev Control or turn delivery off in Step 3.');
  validatePlayerReleaseSelection(packet);
  return Object.freeze({format:'ybr-local-delivery-review/1',scope:scope(packet),execution,chainId:Number(chainId)});
 }
@@ -26,7 +27,7 @@ export async function deliverPlayerAfterMint({packet,mint,vault,approval}={},opt
    throw Error('Player files, credits or permissions changed after approval. Nothing was delivered.');
   if(mint?.simulated===true){
    if(approval.execution!=='simulated')throw Error('A real mint approval cannot be used for a simulated delivery.');
-  }else if(mint?.status!=='confirmed'||approval.execution!=='ganache'||mint.chainId!==approval.chainId)
+  }else if(mint?.status!=='confirmed'||!['ganache','sepolia'].includes(approval.execution)||mint.chainId!==approval.chainId)
    throw Error('Player delivery requires the confirmed mint matching this review. Inspect transactions; do not remint.');
   const publish=options.publish||publishPlayerRelease;
   const result=await publish({packet,mint,vault,consent:true,includeArtwork:true,includeLyrics:true},{signal:controller.signal});

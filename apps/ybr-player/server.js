@@ -9,6 +9,7 @@ const crypto = require('node:crypto');
 const { createStudioLibrary } = require('./studio-releases');
 const { createStudioHttp } = require('./studio-http');
 const { readPlayerCatalog } = require('./road-registry');
+const {handleReadRpc}=require('./road-rpc');
 const { mayUseDemoLogin } = require('./demo-login');
 
 const ROOT = __dirname;
@@ -119,7 +120,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
   if(demoAutoLogin!==null&&(demoAutoLogin!=='artist'||!Object.hasOwn(accounts,'artist')))throw Error('Demo auto-login requires the configured artist account.');
   const studio = studioLibrary || createStudioLibrary();
   const road = roadGateway || require('./road-music').makeGateway();
-  const bricks = loadBricks();
+  const bricks = road.config?.chainId&&road.config.chainId!==1337?new Map():loadBricks();
   const sessions = new Map();
   const attempts = new Map();
   // Rotate on server restart, so an earlier deliberate sign-out does not prevent
@@ -172,6 +173,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       if (req.method === 'POST' && origin && origin !== expectedOrigin) return fail(res, 403, 'Cross-origin requests are not allowed');
       const url = new URL(req.url || '/', expectedOrigin);
       const route = url.pathname;
+      if(route==='/road/rpc')return await handleReadRpc(req,res,road);
       // Public playback is a deliberately open, rights-gated API.
       // Cross-origin reads are allowed only here, never on private session APIs.
       if (route.startsWith('/road/')) {
@@ -234,7 +236,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
           const catalog=await readPlayerCatalog(road);
           if(!catalog.status.ready)return sendJson(res,503,{...catalog.registry,error:catalog.status.reason||'Registry is offline.'});
           return sendJson(res,200,catalog.registry);
-        } catch { return fail(res,503,'Unable to verify the local registry. Check Ganache and the configured factory, then refresh.'); }
+        } catch { return fail(res,503,'Unable to verify the local registry. Check the selected network and factory, then refresh.'); }
       }
       if (route === '/road/api/music' && req.method === 'GET') {
         const catalog=await road.list();
@@ -262,7 +264,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         const s=requireSession(req,res); if (!s) return;
         let catalog;
         try { catalog=await readPlayerCatalog(road); }
-        catch { catalog={status:{ready:false,reason:'Registry verification failed. Check Ganache and refresh.'},bricks:[]}; }
+        catch { catalog={status:{ready:false,reason:'Registry verification failed. Check the selected network and refresh.'},bricks:[]}; }
         const stored=await Promise.all(studio.list().map(async item=>{
           const grant=await checkPermission(item);
           return {summary:describeSavedUpload(item,grant),playable:await permittedStudio(item,grant)};

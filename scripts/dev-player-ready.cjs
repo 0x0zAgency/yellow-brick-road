@@ -8,14 +8,15 @@ const DEMO_TITLE='Golden Hour — Road Release';
 const DEMO_ARTIST='The Amber Sessions';
 const IPID=/^0x[0-9a-f]{64}$/i;
 const SHA=/^[0-9a-f]{64}$/i;
-const sameFactory=(status,factory)=>status?.ready===true&&status.chainId===1337&&
+const sameFactory=(status,factory,chainId=1337,genesisHash=null)=>status?.ready===true&&status.chainId===chainId&&
+ (!genesisHash||status.genesisHash?.toLowerCase()===genesisHash.toLowerCase())&&
  typeof status.factoryAddress==='string'&&status.factoryAddress.toLowerCase()===factory.toLowerCase();
 
-async function ensurePlayerSession({factoryAddress,restart=false},{
+async function ensurePlayerSession({factoryAddress,chainId=1337,genesisHash=null,restart=false},{
  status,access,verify,restartLocal,start,onAccess=()=>{},onSecrets=()=>{},log=()=>{}
 }){
  const previous=await status();
- if(previous&&!restart&&sameFactory(previous,factoryAddress)){
+ if(previous&&!restart&&sameFactory(previous,factoryAddress,chainId,genesisHash)){
   const known=access({generate:false});
   if(known){
    onSecrets(known);
