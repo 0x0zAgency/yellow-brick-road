@@ -16,11 +16,11 @@ function subjectFor(brick,role='audio'){
  const auth=brick.authorization,source=auth?.sources?.[role],road=brick.road;
  let scope;
  if(auth){
-  if(!source||auth.chainId!==1337||!ADDRESS.test(auth.factoryAddress)||!/^0x[a-f0-9]{64}$/i.test(auth.genesisHash)||!ADDRESS.test(source.brickAddress)||!/^\d{1,20}$/.test(source.revision))throw err('Missing on-chain interaction scope.',409);
+  if(!source||![1337,11155111].includes(auth.chainId)||!ADDRESS.test(auth.factoryAddress)||!/^0x[a-f0-9]{64}$/i.test(auth.genesisHash)||!ADDRESS.test(source.brickAddress)||!/^\d{1,20}$/.test(source.revision))throw err('Missing on-chain interaction scope.',409);
   scope={kind:'on-chain',chainId:auth.chainId,genesisHash:auth.genesisHash.toLowerCase(),factoryAddress:auth.factoryAddress.toLowerCase(),brickAddress:source.brickAddress.toLowerCase(),revision:source.revision};
  }else if(road){
-  if(role!=='audio'||!ADDRESS.test(road.brickAddress)||!ADDRESS.test(road.factoryAddress)||!/^0x[a-f0-9]{64}$/i.test(road.genesisHash)||!/^0x[a-f0-9]{64}$/i.test(road.metadataDigest))throw err('Public recording history is unavailable.',409);
-  scope={kind:'on-chain-publication',chainId:1337,genesisHash:road.genesisHash.toLowerCase(),factoryAddress:road.factoryAddress.toLowerCase(),brickAddress:road.brickAddress.toLowerCase(),publicationDigest:road.metadataDigest.toLowerCase()};
+  if(role!=='audio'||![1337,11155111].includes(road.chainId)||!ADDRESS.test(road.brickAddress)||!ADDRESS.test(road.factoryAddress)||!/^0x[a-f0-9]{64}$/i.test(road.genesisHash)||!/^0x[a-f0-9]{64}$/i.test(road.metadataDigest))throw err('Public recording history is unavailable.',409);
+  scope={kind:'on-chain-publication',chainId:road.chainId,genesisHash:road.genesisHash.toLowerCase(),factoryAddress:road.factoryAddress.toLowerCase(),brickAddress:road.brickAddress.toLowerCase(),publicationDigest:road.metadataDigest.toLowerCase()};
  }else{
   if(!/^(BRK-AUD-\d+|STUDIO-[a-f0-9]{64})$/.test(brick.id||''))throw err('Unknown demo file identity.');
   scope={kind:'local-demo',id:brick.id};
@@ -30,7 +30,7 @@ function subjectFor(brick,role='audio'){
 function validSubject(value){
  if(!value||!HASH.test(value.sha256)||!Object.values(EVENTS).includes(value.role))return false;
  if(value.kind==='local-demo')return /^(BRK-AUD-\d+|STUDIO-[a-f0-9]{64})$/.test(value.id||'');
- return ['on-chain','on-chain-publication'].includes(value.kind)&&value.chainId===1337&&/^0x[a-f0-9]{64}$/.test(value.genesisHash||'')&&ADDRESS.test(value.factoryAddress||'')&&ADDRESS.test(value.brickAddress||'')&&
+ return ['on-chain','on-chain-publication'].includes(value.kind)&&[1337,11155111].includes(value.chainId)&&/^0x[a-f0-9]{64}$/.test(value.genesisHash||'')&&ADDRESS.test(value.factoryAddress||'')&&ADDRESS.test(value.brickAddress||'')&&
   (value.kind==='on-chain'?/^\d{1,20}$/.test(value.revision||''):/^0x[a-f0-9]{64}$/.test(value.publicationDigest||''));
 }
 function createInteractionStore({file,now=Date.now,maxBytes=16*1024*1024,maxRecords=20000}={}){

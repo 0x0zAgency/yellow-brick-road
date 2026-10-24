@@ -11,6 +11,7 @@ const {ethers}=require('ethers');
 const {discoverRegistry}=require('./road-registry');
 const {readSelection,profilePaths}=require('../../scripts/dev-ganache-profile.cjs');
 const {createPlayerPolicyReader}=require('./player-policy');
+const {readActiveProfile,checkedRpc}=require('../../scripts/dev-network-profile.cjs');
 
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const IPID=/^0x[0-9a-fA-F]{64}$/;
@@ -51,37 +52,45 @@ function readFactoryAddress(repoRoot,env=process.env){
  }
  return null;
 }
-function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.env.YBR_GANACHE_RPC||'http://127.0.0.1:8545',
+function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl,chainId,genesisHash,deploymentBlock,network,
  factoryAddress,publicOrigin=process.env.YBR_ROAD_PUBLIC_ORIGIN||'http://127.0.0.1:4173',
  documentDir=path.join(__dirname,'data/road-public'),mediaDir=path.join(__dirname,'media/road-public'),
  provider=null}={}){
- const rpc=loopbackUrl(rpcUrl);
+ const active=readActiveProfile(repoRoot);
+ const id=chainId??active.chainId,remote=id===11155111;
+ if(![1337,11155111].includes(id))throw Error('Unsupported Player network.');
+ const name=network||(remote?'sepolia':'ganache');
+ const rpc=checkedRpc(rpcUrl||active.rpcUrl,{network:name});
+ const expectedGenesis=genesisHash||active.genesisHash||null;
+ const firstBlock=deploymentBlock??active.deploymentBlock??0;
+ if(!Number.isSafeInteger(firstBlock)||firstBlock<0)throw Error('Invalid deployment start block.');
  const origin=loopbackUrl(publicOrigin);
- const factoryAddr=factoryAddress===undefined?readFactoryAddress(repoRoot):factoryAddress;
+ const factoryAddr=factoryAddress===undefined?(active.factoryAddress||(remote?null:readFactoryAddress(repoRoot))):factoryAddress;
  if(factoryAddr!==null&&!ADDRESS.test(factoryAddr))throw Error('Invalid factory address');
- const rpcProvider=provider||new ethers.providers.JsonRpcProvider(rpc,{name:'ganache-local',chainId:1337});
+ const rpcProvider=provider||new ethers.providers.JsonRpcProvider({url:rpc,timeout:12000},{name:remote?'sepolia':'ganache-local',chainId:id});
  const factory=factoryAddr?new ethers.Contract(factoryAddr,FACTORY_ABI,rpcProvider):null;
- const configuration={chainId:1337,kind:'ganache-local',factoryAddress:factoryAddr,publicOrigin:origin};
+ const configuration={chainId:id,kind:remote?'sepolia':'ganache-local',label:remote?'Sepolia':'Local Ganache',factoryAddress:factoryAddr,publicOrigin:origin,deploymentBlock:firstBlock,genesisHash:expectedGenesis,rpcUrl:'/road/rpc'};
  async function ready(){
-  if(!factory)return {ready:false,reason:'Factory not configured. Run npm run ganache:deploy and keep the chain running.',...configuration};
+  if(!factory)return {ready:false,reason:'Factory not configured for the active network. Review Network Control; no fallback is enabled.',...configuration};
   try{
    const chain=await rpcProvider.getNetwork();
-   if(chain.chainId!==1337)throw Error('Expected local Ganache chain ID 1337');
+   if(chain.chainId!==id)throw Error('RPC differs from the active network.');
+   if(expectedGenesis&&lower((await rpcProvider.getBlock(0))?.hash)!==lower(expectedGenesis))throw Error('RPC history differs from the selected profile.');
    if((await rpcProvider.getCode(factoryAddr))==='0x')throw Error('Configured factory has no deployed code. Has Ganache restarted?');
    const impl=await factory.implementation();
    if(!ADDRESS.test(impl)||(await rpcProvider.getCode(impl))==='0x')throw Error('Not a valid YellowBrickFactory');
    return {ready:true,...configuration};
-  }catch(error){return {ready:false,reason:error.message,...configuration};}
+  }catch(error){return {ready:false,reason:'Selected network or factory verification failed. No Ganache fallback is enabled.',...configuration};}
  }
  async function getPublished(event){
   const {ipId,brick:address,originator,contentHash}=event.args;
   if(!IPID.test(ipId)||!ADDRESS.test(address))return null;
   const contract=new ethers.Contract(address,BRICK_ABI,rpcProvider);
-  const [registered,id,controller,creator,mediaHash,metadataDigest,metadataURI]=await Promise.all([
+  const [registered,registeredId,controller,creator,mediaHash,metadataDigest,metadataURI]=await Promise.all([
    factory.isBrick(address),contract.ipId(),contract.controller(),contract.originator(),
    contract.contentHash(),contract.metadataDigest(),contract.metadataURI()
   ]);
-  if(!registered||lower(id)!==lower(ipId)||lower(mediaHash)!==lower(contentHash)||lower(creator)!==lower(originator))return null;
+  if(!registered||lower(registeredId)!==lower(ipId)||lower(mediaHash)!==lower(contentHash)||lower(creator)!==lower(originator))return null;
   const base=origin+'/road/metadata/';
   if(metadataURI!==base+lower(ipId)||!IPID.test(metadataDigest))return null;
   const manifestPath=path.join(documentDir,lower(ipId)+'.json');
@@ -90,6 +99,7 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
   if('0x'+sha(raw)!==lower(metadataDigest))return null;
   let manifest;
   try{manifest=JSON.parse(raw.toString('utf8'));}catch{return null;}
+  if(manifest?.road?.chainId!=null&&Number(manifest.road.chainId)!==id)return null;
   if(manifest?.standard!=='0x0z-road-ip'||manifest.schemaVersion!=='1.0.0'||manifest.objectType!=='sound-recording'||manifest.road?.ipId!==lower(ipId))return null;
   if(manifest.rights?.playback?.mode!=='public-stream'||manifest.rights.playback.audience!=='any-player'||
    manifest.rights.playback.authorization!=='controller-published-on-chain'||!manifest.rights.playback.terms)return null;
@@ -116,11 +126,11 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
    id:lower(ipId),type:'AudioBrick',title:manifest.title,creator:manifest.creators?.[0]?.name||'Unknown creator',
    description:manifest.description||'',durationSeconds:(manifest.music?.durationMs||0)/1000,theme:'gold',
    publishedAt,publishedAtSource:'chain-registration',
-   streamAllowed:true,source:'road',rights:{license:manifest.rights.playback.terms,notes:'On-chain controller publication (local Ganache demo). Not independent verification of legal rights.'},
-   provenance:{agent:manifest.creators?.[0]?.name||'Publisher',activity:'Published to YBR Ganache',entity:lower(ipId),
+   streamAllowed:true,source:'road',rights:{license:manifest.rights.playback.terms,notes:'On-chain controller publication (selected network). Not independent verification of legal rights.'},
+   provenance:{agent:manifest.creators?.[0]?.name||'Publisher',activity:'Published to YBR '+configuration.label,entity:lower(ipId),
     vocabulary:'https://www.w3.org/TR/prov-o/'},
    media:{mimeType:master.mediaType,sha256:sha(bytes)},
-   road:{chainId:1337,genesisHash:genesis.hash,brickAddress:address,ipId:lower(ipId),originator,controller,
+   road:{chainId:id,genesisHash:genesis.hash,brickAddress:address,ipId:lower(ipId),originator,controller,
     blockNumber:event.blockNumber,logIndex:event.logIndex,
     factoryAddress:factoryAddr,metadataURI,metadataDigest:lower(metadataDigest),contentHash:lower(mediaHash),
     licenseMode:'public-stream',terms:manifest.rights.playback.terms},
@@ -133,8 +143,11 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
   const status=await ready();
   if(!status.ready)return {status,tracks:[]};
   const latest=await rpcProvider.getBlockNumber();
-  if(latest>99999)throw Error('Ganache local catalog scan capped at 100,000 blocks; use a Road indexer.');
-  const events=await factory.queryFilter(factory.filters.BrickDeployed(),0,latest);
+  const fromBlock=Math.max(firstBlock,latest-99999),events=[];
+  for(let from=fromBlock;from<=latest;from+=2000){
+   events.push(...await factory.queryFilter(factory.filters.BrickDeployed(),from,Math.min(from+1999,latest)));
+   if(events.length>1000)throw Error('Catalog scan exceeds 1,000 events; a paginated indexer is required.');
+  }
   if(events.length>1000)throw Error('Ganache local catalog scan capped at 1,000 Bricks');
   const tracks=[];
   for(const e of events){
@@ -149,7 +162,7 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
   return tracks.find(t=>t.id===lower(ipId))||null;
  }
  async function registry(){
-  return discoverRegistry({status:{...await ready(),rpcUrl:rpc},
+  return discoverRegistry({status:await ready(),
    readHead:tag=>rpcProvider.getBlock(tag),
    readEvents:(from,to)=>factory.queryFilter(factory.filters.BrickDeployed(),from,to),
    readBrick:async(address,blockTag)=>{
@@ -163,7 +176,11 @@ function makeGateway({repoRoot=path.resolve(__dirname,'../..'),rpcUrl=process.en
    }
   });
  }
- const playerPolicy=createPlayerPolicyReader({provider:rpcProvider,factoryAddress:factoryAddr,ethers});
- return {ready,list,track,registry,playerPolicy,config:configuration};
+ const playerPolicy=createPlayerPolicyReader({provider:rpcProvider,factoryAddress:factoryAddr,chainId:id,ethers});
+ return {ready,list,track,registry,playerPolicy,config:configuration,rpc:async(method,params)=>{
+  if(Number(await rpcProvider.send('eth_chainId',[]))!==id)throw Error('RPC chain changed.');
+  if(expectedGenesis&&lower((await rpcProvider.getBlock(0))?.hash)!==lower(expectedGenesis))throw Error('RPC chain history changed.');
+  return rpcProvider.send(method,params);
+ }};
 }
 module.exports={makeGateway,readFactoryAddress,loopbackUrl};

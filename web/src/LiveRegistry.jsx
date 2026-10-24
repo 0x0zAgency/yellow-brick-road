@@ -1,3 +1,4 @@
+import {ACTIVE_NETWORK} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import {createPublicClient,http} from 'viem';
 import {RegistrationThumbnail,StatusPill,CollectionPager} from './BrickPresentation.jsx';
@@ -56,10 +57,10 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
    <button type="button" className={examples?'active':''} onClick={()=>setExamples(true)}>Local drafts &amp; examples</button>
   </div>{!examples&&<button type="button" className="quiet" disabled={busy} onClick={()=>void refresh.current()}>{busy?'Reading chain…':'Refresh registry'}</button>}</div>
   {examples?children:<>
-   <div className="notice"><p><strong>Real registrations, not sample data.</strong> This view reads the local Player’s Ganache factory. Registered works appear whether or not their files are playable. No private metadata or recovery key is uploaded to populate this list.</p></div>
-   <details className="lr-network br-surface"><summary><span>Local Ganache · chain 1337</span><StatusPill tone={data?'success':'warning'}>{data?data.bricks.length+' registrations':'Connecting'}</StatusPill></summary><div className="br-surface-body">
-    {data&&<><CopyField label="Registry factory" value={data.network.factoryAddress}/><small>RPC: {data.network.rpcUrl||'Configured local Ganache RPC'}</small><small>Blocks {data.fromBlock}–{data.head.number} · checked {checked} · refreshes every 5 seconds</small></>}
-    <p>Minted on Sepolia or through a different factory? <button type="button" className="text-action" onClick={onWallet}>Open My Bricks to select that network and factory</button>.</p>
+   <div className="notice"><p><strong>Real registrations, not sample data.</strong> This view reads the active network and factory selected in Dev Control. Registered works appear whether or not their files are playable. No private metadata or recovery key is uploaded to populate this list.</p></div>
+   <details className="lr-network br-surface"><summary><span>{data?.network?.label||ACTIVE_NETWORK?.label||'Selected network'} · chain {data?.network?.chainId||ACTIVE_NETWORK?.chainId||'connecting'}</span><StatusPill tone={data?'success':'warning'}>{data?data.bricks.length+' registrations':'Connecting'}</StatusPill></summary><div className="br-surface-body">
+    {data&&<><CopyField label="Registry factory" value={data.network.factoryAddress}/><small>RPC: {data.network.rpcUrl||'Active network through the local read-only proxy'}</small><small>Blocks {data.fromBlock}–{data.head.number} · checked {checked} · refreshes every 5 seconds</small></>}
+    <p>Use Dev Control to change the active blockchain. <button type="button" className="text-action" onClick={onWallet}>Open My Bricks for the connected creator</button>.</p>
    </div></details>
    {error&&<p className="wb-error" role="alert">{error} The registry is unavailable, not empty.</p>}
    {!data&&!error&&<p role="status">Reading confirmed factory events and Brick contracts…</p>}

@@ -80,7 +80,7 @@ function updateInspector(brick) {
   if(brick?.source==='road-registry'){
     const r=brick.registration;
     $('brickFormat').textContent='Not published';
-    $('brickProvenance').textContent=`Registered on Ganache ${r.chainId}. Contract: ${r.brickAddress}. Metadata reference: ${r.metadataURI}. Registration does not publish files or grant playback. Use Add release to Player in Mint Studio to share selected preview copies.`;
+    $('brickProvenance').textContent=`Registered on chain ${r.chainId}. Contract: ${r.brickAddress}. Metadata reference: ${r.metadataURI}. Registration does not publish files or grant playback. Use Add release to Player in Mint Studio to share selected preview copies.`;
   }
   $('inspectorCover').classList.toggle('violet',brick?.theme==='violet');
   window.dispatchEvent(new CustomEvent('ybr:selection',{detail:{brick}}));
@@ -95,7 +95,7 @@ function renderList() {
     const cover=document.createElement('span');cover.className=`track-thumbnail ${brick.theme==='violet'?'violet':'gold'}`;cover.textContent='◆';
     const info=document.createElement('div');info.className='track-info';
     const name=document.createElement('strong');name.textContent=brick.title;
-    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+((brick.source==='road'||brick.source==='road-registry')?'GANACHE · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
+    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+((brick.source==='road'||brick.source==='road-registry')?'CHAIN '+(brick.road?.chainId||brick.registration?.chainId||'?')+' · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
     info.append(name,creator);
     const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road-registry'?'⌁ ON CHAIN':brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
     const duration=document.createElement('span');duration.className='track-duration';duration.textContent=brick.source==='road-registry'?'—':stamp(brick.durationSeconds);
@@ -211,11 +211,12 @@ async function refreshSession() {
   if(revision!==sessionRevision)return;
   const signature=JSON.stringify([library.bricks,library.network,library.registry,library.uploads]);
   registryPartial=!!(library.registry?.limited||library.registry?.limitReached);
+  $('activeNetwork').textContent=(library.network?.label||'Chain '+(library.network?.chainId||'?'))+(library.network?.ready?'':' · offline');
   if(signature===librarySignature)return;
   librarySignature=signature;
   catalogBricks=library.bricks;savedUploads=Array.isArray(library.uploads)?library.uploads:[];
   const roadState=JSON.stringify(library.network);
-  if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · local demo music remains available');
+  if(library.network?.ready===false&&roadState!==lastRoadState)toast('Road offline: '+library.network.reason+' · no alternate network selected');
   lastRoadState=roadState;
   applyLibrary();
 }

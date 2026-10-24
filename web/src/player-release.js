@@ -51,7 +51,7 @@ export async function buildPlayerRelease({packet,mint,vault,consent=false,includ
  if(!vault?.secret||!vault.encrypted?.get)throw Error('This browser session no longer has the encrypted uploads. Reattach the originals in Mint Studio.');
  let authorization=null;
  if(mint.simulated!==true){
-  if(mint.chainId!==1337||!/^0x[0-9a-f]{64}$/i.test(mint.genesisHash||''))throw Error('The local Player requires Ganache policy-enabled mint receipts. Legacy mints need a policy-enabled registration; Sepolia delivery is not configured.');
+  if(![1337,11155111].includes(mint.chainId)||!/^0x[0-9a-f]{64}$/i.test(mint.genesisHash||''))throw Error('The Player requires supported-chain, policy-enabled mint receipts. Its selected chain, factory and history must match this registration.');
   const sources={};
   for(const [role,file] of Object.entries(picked)){
    const owner=packet.bricks.find(brick=>brick.metadata.media?.some(item=>item.role===file.role));

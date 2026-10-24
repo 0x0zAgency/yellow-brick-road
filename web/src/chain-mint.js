@@ -1,3 +1,4 @@
+import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {initialPolicyFor} from './content-policy.js';
 import {verifyLocalChainHistory} from './chain-history.js';
 import {sepolia} from 'viem/chains';
@@ -43,7 +44,9 @@ export async function connectChain({provider,rpcUrl,chainId,account,network='gan
  if(!provider?.request)throw Error('Install and connect an EVM browser wallet.');
  if(!['ganache','sepolia'].includes(network))throw Error('Choose Ganache or Sepolia.');
  const chain=network==='sepolia'?sepolia:localConfig(rpcUrl,chainId);
- const client=createPublicClient({chain,transport:network==='sepolia'?custom(provider):http(rpcUrl)});
+ requireActiveNetwork(chain.id);
+ const client=createPublicClient({chain,transport:ACTIVE_NETWORK?http(activeRpcUrl(),{retryCount:0,timeout:15000}):network==='sepolia'?custom(provider):http(rpcUrl)});
+ if(ACTIVE_NETWORK&&(await client.getBlock({blockNumber:0n})).hash.toLowerCase()!==ACTIVE_NETWORK.genesisHash.toLowerCase())throw Error('The active RPC history changed. No transaction will be requested.');
  if(await client.getChainId()!==chain.id)throw Error('RPC chain ID differs from the configured chain ID.');
  async function check(){
   if(Number(await provider.request({method:'eth_chainId'}))!==chain.id)throw Error('Switch your wallet to the selected mint network.');
@@ -63,6 +66,7 @@ export async function connectChain({provider,rpcUrl,chainId,account,network='gan
  await check();return {chain,client,wallet:createWalletClient({chain,transport:custom(provider)}),check};
 }
 export async function verifyFactory(client,address){
+ if(ACTIVE_NETWORK)requireActiveNetwork(await client.getChainId(),address);
  if(!isAddress(address)||!await client.getBytecode({address}))throw Error('Factory address has no contract on this chain. Deploy or enter a current factory.');
  const implementation=await client.readContract({address,abi:factoryAbi,functionName:'implementation'});
  if(!await client.getBytecode({address:implementation}))throw Error('Factory implementation is missing.');

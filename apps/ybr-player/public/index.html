@@ -26,7 +26,7 @@
     </aside>
 
     <main class="main-content">
-      <header class="topbar"><div class="breadcrumb">YBR <span>/</span> PLAYER <span>/</span> LIBRARY</div><div class="top-actions"><span class="pill"><i class="online-dot"></i> LOCAL DEMO</span><button id="logout" type="button" class="text-button">Sign out ↗</button></div></header>
+      <header class="topbar"><div class="breadcrumb">YBR <span>/</span> PLAYER <span>/</span> LIBRARY</div><div class="top-actions"><span class="pill" id="activeNetwork">Connecting network…</span><button id="logout" type="button" class="text-button">Sign out ↗</button></div></header>
       <div class="page-content">
         <div class="eyebrow"><span class="tiny-road"></span> THE ROAD STARTS HERE</div>
         <h1>Follow the <em>music.</em></h1>
@@ -39,7 +39,7 @@
         <p id="libraryEmpty" class="library-empty" hidden>No playable tracks yet. Add an Audio Preview in Mint Studio and share it with the Player. All registered Bricks remain in the IP Registry.</p>
         <!-- Reserved for future playlists/library tools. No saved-upload inventory is mounted. -->
         <div id="trackList" class="track-list" role="list" aria-label="Audio bricks"></div>
-        <div class="under-note"><span>◇</span> Road music comes from opt-in, publicly streamable Ganache Bricks. Synthetic demo tracks are separate. No third-party streaming SDK.</div>
+        <div class="under-note"><span>◇</span> Road music comes from opt-in, publicly streamable Bricks on the selected network. Synthetic demo tracks are separate. No third-party streaming SDK.</div>
       </div>
     </main>
 
@@ -56,7 +56,7 @@
       <div class="inspector-divider"></div>
       <div class="eyebrow small">PROVENANCE</div>
       <p id="brickProvenance" class="provenance-copy">Select an audio brick to inspect its source and origin.</p>
-      <div class="inspector-end"><div class="inspector-badge">◈ <span>BRICK IDENTITY &amp; PROVENANCE</span></div><p>Ganache-published tracks are verified against on-chain commitments. Controller claims are not independent proof of ownership.</p></div>
+      <div class="inspector-end"><div class="inspector-badge">◈ <span>BRICK IDENTITY &amp; PROVENANCE</span></div><p>Network-published tracks are verified against on-chain commitments. Controller claims are not independent proof of ownership.</p></div>
     </aside>
   </div>
 

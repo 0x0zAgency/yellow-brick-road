@@ -1,10 +1,12 @@
+import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {useState} from 'react';
-import {createPublicClient,createWalletClient,custom,defineChain,isAddress} from 'viem';
+import {createPublicClient,createWalletClient,custom,http,defineChain,isAddress} from 'viem';
 import {checkLinkedBrick,newLinkRequest,buildLinkResponse,verifyLinkResponse,decodeLinkPackage,typedLinkData,LINK_RELATIONS,normalizeLinkRequest} from './brick-authorization.js';
 const T={name:'Local signer',nativeCurrency:{name:'Test Ether',symbol:'ETH',decimals:18}};
 export function walletClientForLinks(provider,id){
+ requireActiveNetwork(id);
  const chain=defineChain({id,name:id===11155111?'Sepolia':'Connected EVM network',nativeCurrency:T.nativeCurrency,rpcUrls:{default:{http:['http://127.0.0.1:8545']}}});
- return {reader:createPublicClient({chain,transport:custom(provider)}),signer:createWalletClient({chain,transport:custom(provider)})};
+ return {reader:createPublicClient({chain,transport:ACTIVE_NETWORK?http(activeRpcUrl()):custom(provider)}),signer:createWalletClient({chain,transport:custom(provider)})};
 }
 export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect}){
  const [busy,setBusy]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState('');

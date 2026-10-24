@@ -17,15 +17,16 @@ const MAX_RESULTS=200;
 async function discoverRegistry({status,readHead,readEvents,readBrick}){
  const empty={format:'ybr-chain-registry/1',network:status,bricks:[],matchingEvents:0,limitReached:false};
  if(!status?.ready)return empty;
- if(status.chainId!==1337||!validAddress(status.factoryAddress))throw Error('Invalid local registry network or factory.');
+ if(![1337,11155111].includes(status.chainId)||!validAddress(status.factoryAddress))throw Error('Invalid local registry network or factory.');
  const head=await readHead('latest');
  if(!validHead(head))throw Error('Registry could not verify the current chain head.');
- const fromBlock=Math.max(0,head.number-MAX_BLOCKS+1);
+ const first=Number.isSafeInteger(status.deploymentBlock)&&status.deploymentBlock>=0?status.deploymentBlock:0;
+ const fromBlock=Math.max(first,head.number-MAX_BLOCKS+1);
  const events=[];
  // The local pilot deliberately bounds scan size. Disclose truncation, not an
  // empty/full-history claim when a chain or result set grows beyond the limit.
- for(let from=fromBlock;from<=head.number;from+=5000){
-  const page=await readEvents(from,Math.min(from+4999,head.number));
+ for(let from=fromBlock;from<=head.number;from+=2000){
+  const page=await readEvents(from,Math.min(from+1999,head.number));
   if(!Array.isArray(page)||events.length+page.length>MAX_EVENTS)throw Error('Registry scan exceeds 1,000 events; a paginated indexer is required.');
   events.push(...page);
  }
@@ -55,7 +56,7 @@ async function discoverRegistry({status,readHead,readEvents,readBrick}){
    !/^\d+$/.test(String(value.metadataVersion))||typeof value.metadataURI!=='string'||value.metadataURI.length>8192)
    throw Error('Factory event and Brick state disagree at '+expected.brick+'. Refresh the registry.');
   const id=lower(value.ipId);
-  const registration={chainId:1337,factoryAddress:status.factoryAddress,brickAddress:expected.brick,
+  const registration={chainId:status.chainId,factoryAddress:status.factoryAddress,brickAddress:expected.brick,
    ipId:id,originator:value.originator,controller:value.controller,contentHash:lower(value.contentHash),
    metadataDigest:lower(value.metadataDigest),metadataVersion:String(value.metadataVersion),metadataURI:value.metadataURI,
    transactionHash:event.transactionHash,blockNumber:String(event.blockNumber)};
@@ -64,14 +65,14 @@ async function discoverRegistry({status,readHead,readEvents,readBrick}){
    durationSeconds:0,theme:'gold',streamAllowed:false,registration,
    media:{mimeType:null,sha256:null},
    rights:{license:null,notes:'Registration is not a playback license, proof of copyright ownership, or proof that files are available.'},
-   provenance:{agent:value.originator,activity:'Registered on local Ganache',entity:id},
+   provenance:{agent:value.originator,activity:'Registered on '+(status.chainId===1337?'local Ganache':'Sepolia'),entity:id},
    road:{...registration,licenseMode:'not-published'}});
  }
  const rechecked=await readHead(head.number);
  if(!validHead(rechecked)||rechecked.number!==head.number||lower(rechecked.hash)!==lower(head.hash))
   throw Error('Chain history changed during registry discovery. Refresh to read the current chain.');
  return {...empty,bricks,head:{number:String(head.number),hash:head.hash},fromBlock:String(fromBlock),
-  limited:fromBlock>0,matchingEvents:ordered.length,limitReached:ordered.length>MAX_RESULTS};
+  limited:fromBlock>first,matchingEvents:ordered.length,limitReached:ordered.length>MAX_RESULTS};
 }
 
 /** Add labels only from the existing verified, consent-gated music catalog.

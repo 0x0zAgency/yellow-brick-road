@@ -12,6 +12,9 @@ const {DevDashboard}=require('./dev-dashboard.cjs');
 const {ensurePlayerSession,ensureDemoPublished,verifyDemoPlayback,DEMO_TITLE,DEMO_ARTIST}=require('./dev-player-ready.cjs');
 const {selectPlayerAccess,verifyPlayerAccess,restartCheckoutPlayer}=require('./dev-player-access.cjs');
 const {readSelection,profilePaths,prepareProfile,describeMnemonic,generateSelection,changeAllowed,switchSelection}=require('./dev-ganache-profile.cjs');
+const {readNetwork}=require('./dev-network.cjs');
+const {readActiveProfile,activeEnvironment,withoutSigningSecrets,rpcLabel}=require('./dev-network-profile.cjs');
+const {prepareSepolia,applySepolia,verifyDeployment,chainIdentity}=require('./dev-sepolia.cjs');
 const ROOT=path.resolve(__dirname,'..');
 const SELECTED_WALLET=readSelection(ROOT);
 const PLAYER=path.join(ROOT,'apps','ybr-player');
@@ -23,12 +26,12 @@ const WEB_URL='http://127.0.0.1:5173';
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const ABI=['function implementation() view returns (address)'];
 const OWNED=new Map();
-let stopping=false,dashboard=null,healthTimer=null,healthBusy=false,playerBusy=false,playerEnv=null;
+let stopping=false,dashboard=null,healthTimer=null,healthBusy=false,playerBusy=false,playerEnv=null,activeProfile=null;
 const log=message=>dashboard?dashboard.log('launcher',message):console.log(message);
 function command(){return process.platform==='win32'?'npm.cmd':'npm';}
 function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio=dashboard?['ignore','pipe','pipe']:'inherit'}={}){
  if(stopping)throw Error('Startup cancelled.');
- const proc=spawn(executable,args,{cwd,env,stdio,detached:process.platform!=='win32'});
+ const proc=spawn(executable,args,{cwd,env:withoutSigningSecrets(env),stdio,detached:process.platform!=='win32'});
  dashboard?.attach(label,proc);OWNED.set(proc.pid,{label,proc});
  proc.once('exit',(code,signal)=>{
   OWNED.delete(proc.pid);
@@ -118,7 +121,7 @@ async function ensureDemoTrack(factoryAddress,env){
  });
 }
 async function ensurePlayer(factoryAddress,env,{restart=false}={}){
- return ensurePlayerSession({factoryAddress,restart},{
+ return ensurePlayerSession({factoryAddress,restart,chainId:activeProfile?.chainId||1337,genesisHash:activeProfile?.genesisHash||null},{
   status:()=>fetchJson(PLAYER_URL+'/road/api/status'),
   access:options=>selectPlayerAccess(ROOT,env,options),
   verify:verifyPlayerAccess,
@@ -130,7 +133,7 @@ async function ensurePlayer(factoryAddress,env,{restart=false}={}){
    log('Starting YBR Player on '+PLAYER_URL);
    const proc=spawnOwned('YBR Player',command(),['run','start'],{cwd:PLAYER,env:childEnv});
    proc.on('error',e=>shutdown('Player startup error: '+e.message,1));
-   await waitUntil('YBR Player',async()=>{const status=await fetchJson(PLAYER_URL+'/road/api/status');return status?.ready===true&&status.chainId===1337&&status.factoryAddress?.toLowerCase()===factoryAddress.toLowerCase();},{timeoutMs:30000});
+   await waitUntil('YBR Player',async()=>{const status=await fetchJson(PLAYER_URL+'/road/api/status');return status?.ready===true&&status.chainId===(activeProfile?.chainId||1337)&&status.factoryAddress?.toLowerCase()===factoryAddress.toLowerCase();},{timeoutMs:30000});
   }
  });
 }
@@ -193,23 +196,39 @@ async function launchWeb(env){
  await waitUntil('Road Explorer Vite',async()=>{const response=await fetch(WEB_URL,{signal:AbortSignal.timeout(1000)});return response.ok;},{timeoutMs:30000});
 }
 async function refreshWallet(source){
- const provider=new ethers.providers.JsonRpcProvider({url:RPC,timeout:2500},{name:'ganache-local',chainId:1337});
- const [accounts,block]=await Promise.all([provider.listAccounts(),provider.getBlockNumber()]);const account=accounts[0];
+ const profile=activeProfile||{network:'ganache',chainId:1337,rpcUrl:RPC};
+ const provider=new ethers.providers.JsonRpcProvider({url:profile.rpcUrl,timeout:5000},{name:profile.network,chainId:profile.chainId});
+ if(Number(await provider.send('eth_chainId',[]))!==profile.chainId)throw Error('Active RPC changed networks.');
+ if(profile.genesisHash&&(await provider.getBlock(0)).hash.toLowerCase()!==profile.genesisHash.toLowerCase())throw Error('Active RPC chain history changed.');
+ const account=profile.network==='ganache'?(await provider.listAccounts())[0]:profile.deployer;
+ const block=await provider.getBlockNumber();
  const balance=account?ethers.utils.formatEther(await provider.getBalance(account)):'--';const wallet={source,account,block,balance};
  const candidate=dashboard?.candidateMnemonic;
- if(source==='owned'&&candidate&&account){
-  try{const derived=ethers.Wallet.fromMnemonic(candidate);if(derived.address.toLowerCase()===account.toLowerCase()){wallet.mnemonic=candidate;wallet.privateKey=derived.privateKey;dashboard.addSecrets(candidate,derived.privateKey);}else log('Ganache seed did not match account 0; refusing to display it.');}
-  catch{log('Could not verify Ganache wallet seed; see the node configuration.');}
+ if(profile.network==='ganache'&&source==='owned'&&candidate&&account){
+  try{const derived=ethers.Wallet.fromMnemonic(candidate);if(derived.address.toLowerCase()===account.toLowerCase()){wallet.mnemonic=candidate;wallet.privateKey=derived.privateKey;dashboard.addSecrets(candidate,derived.privateKey);}}
+  catch{log('Could not verify the local test wallet.');}
  }
  dashboard?.update({ganache:wallet});
+}
+async function probeActiveNetwork(){
+ if(!activeProfile||activeProfile.network==='ganache')return probeGanache();
+ try{const provider=new ethers.providers.JsonRpcProvider({url:activeProfile.rpcUrl,timeout:4000});return {online:(await chainIdentity(provider)).toLowerCase()===activeProfile.genesisHash.toLowerCase()};}catch{return {online:false};}
+}
+async function reviewNetworkHere(network,input){
+ if(network==='ganache')return {kind:'local',lines:['Local Ganache / chain 1337','All application components return to the selected local profile.','Existing Ganache history and IPFS pins are retained.','No public-network transaction or real ETH is used.']};
+ return prepareSepolia({root:ROOT,input,compile:()=>run('Compile deployment estimate',command(),['run','compile'],{env:withoutSigningSecrets(process.env)})});
+}
+async function applyNetworkHere(plan,approval){
+ if(plan.kind==='local')return;
+ await applySepolia(plan,{root:ROOT,approval,onProgress:log});
 }
 async function refreshHealth(){
  if(stopping||healthBusy||playerBusy)return;healthBusy=true;
  try{
-  const [ganache,player,ipfs,web]=await Promise.all([probeGanache().catch(()=>({online:false})),fetchJson(PLAYER_URL+'/road/api/status'),probeIpfs().catch(()=>({ready:false})),fetch(WEB_URL,{signal:AbortSignal.timeout(1500)}).then(r=>r.ok).catch(()=>false)]);
+  const [ganache,player,ipfs,web]=await Promise.all([probeActiveNetwork().catch(()=>({online:false})),fetchJson(PLAYER_URL+'/road/api/status'),probeIpfs().catch(()=>({ready:false})),fetch(WEB_URL,{signal:AbortSignal.timeout(1500)}).then(r=>r.ok).catch(()=>false)]);
   if(stopping)return;
   dashboard.service('ganache',ganache.online?'UP':'DOWN');
-  dashboard.service('player',player?.ready===true&&player?.factoryAddress?.toLowerCase()===dashboard.state.factory.toLowerCase()?'UP':'DOWN');
+  dashboard.service('player',player?.ready===true&&player.chainId===activeProfile.chainId&&player?.factoryAddress?.toLowerCase()===dashboard.state.factory.toLowerCase()?'UP':'DOWN');
   dashboard.service('ipfs',ipfs.ready?'UP':'DOWN');dashboard.service('web',web?'UP':'DOWN');
   if(ganache.online)await refreshWallet(dashboard.state.ganache.source);if(stopping)return;
   dashboard.update({phase:Object.values(dashboard.state.services).every(s=>s==='UP')&&dashboard.state.access.verified===true&&['VERIFIED','SKIPPED'].includes(dashboard.state.music?.state)?'READY':'DEGRADED'});
@@ -220,25 +239,47 @@ async function main(){
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
   dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard'),onRestartPlayer:restartPlayerHere,
-   mnemonicControl:{check:()=>changeAllowed(mnemonicContext()),current:()=>readSelection(ROOT),
+   networkActions:{onReview:reviewNetworkHere,onApply:applyNetworkHere},
+   mnemonicControl:{check:()=>{if(activeProfile?.network!=='ganache')throw Error('Mnemonic control is only for local Ganache. Sepolia uses a separate test signer.');changeAllowed(mnemonicContext());},current:()=>readSelection(ROOT),
     generate:generateSelection,validate:describeMnemonic,onApply:changeMnemonicHere}});
   process.once('exit',()=>dashboard.close('Launcher exited'));dashboard.start();
-  dashboard.addSecrets(process.env.YBR_LISTENER_PASSWORD,process.env.YBR_ARTIST_PASSWORD,SELECTED_WALLET.mnemonic);
+  dashboard.addSecrets(process.env.YBR_LISTENER_PASSWORD,process.env.YBR_ARTIST_PASSWORD,SELECTED_WALLET.mnemonic,process.env.SEPOLIA_PRIVATE_KEY,process.env.SEPOLIA_RPC_URL);
+  const requestedNetwork=process.env.YBR_ACTIVE_NETWORK||readNetwork(ROOT).network;
+  dashboard.update({activeNetwork:{network:requestedNetwork,label:requestedNetwork==='sepolia'?'Sepolia':'Local Ganache',chainId:requestedNetwork==='sepolia'?11155111:1337,rpcLabel:'Not activated'}});
+  try{activeProfile=readActiveProfile(ROOT);}catch(error){
+   if(!dashboard.interactive)throw error;
+   dashboard.update({phase:'CONFIGURATION REQUIRED',error:error.message});dashboard.networkControl.open();
+   await new Promise(()=>{});return;
+  }
+  dashboard.addSecrets(activeProfile.rpcUrl);
+  dashboard.update({activeNetwork:{network:activeProfile.network,label:activeProfile.name,chainId:activeProfile.chainId,rpcLabel:rpcLabel(activeProfile.rpcUrl)}});
   dashboard.update({profileId:SELECTED_WALLET.id});
   const saved=selectPlayerAccess(ROOT,process.env,{generate:false});if(saved)dashboard.addSecrets(saved.listener,saved.artist);
   ensureDependencies();dashboard.update({phase:'STARTING IPFS',kuboRpc:process.env.YBR_KUBO_RPC});dashboard.service('ipfs','START');
   const ipfs=await ensureIpfs({run,spawnOwned,command,waitUntil,log,isStopping:()=>stopping});if(stopping)return;
-  dashboard.service('ipfs','UP');dashboard.update({peerId:ipfs.peerId,phase:'STARTING GANACHE'});dashboard.service('ganache','START');
-  const source=await ensureGanache();dashboard.service('ganache','UP');await refreshWallet(source);
-  dashboard.update({phase:'VERIFYING FACTORY'});const factory=await ensureFactory();dashboard.update({factory,phase:'PREPARING DEMO MUSIC'});
-  const env={...process.env,YBR_GANACHE_FACTORY:factory,VITE_ROAD_GANACHE_FACTORY:factory};
-  const demo=await ensureDemoTrack(factory,env);dashboard.update({music:demo});
+  dashboard.service('ipfs','UP');dashboard.update({peerId:ipfs.peerId,phase:'VERIFYING '+activeProfile.name.toUpperCase()});dashboard.service('ganache','START');
+  let source,factory;
+  if(activeProfile.network==='ganache'){
+   source=await ensureGanache();factory=await ensureFactory();
+   const provider=new ethers.providers.JsonRpcProvider(RPC);
+   activeProfile={...activeProfile,factoryAddress:factory,genesisHash:(await provider.getBlock(0)).hash};
+  }else{
+   source='remote';factory=activeProfile.factoryAddress;
+   const provider=new ethers.providers.JsonRpcProvider({url:activeProfile.rpcUrl,timeout:10000});
+   if((await chainIdentity(provider)).toLowerCase()!==activeProfile.genesisHash.toLowerCase())throw Error('Sepolia history does not match the selected profile.');
+   await verifyDeployment(provider,factory,ethers);
+   log('Using Sepolia for all blockchain reads. Managed Ganache and automatic remote demo minting are disabled.');
+  }
+  dashboard.service('ganache','UP');await refreshWallet(source);
+  dashboard.update({factory,phase:'PREPARING PLAYER'});
+  const env=activeEnvironment(activeProfile,readNetwork(ROOT).revision,process.env);
+  const demo=activeProfile.network==='ganache'?await ensureDemoTrack(factory,env):{state:'SKIPPED',reason:'No automatic remote mints'};dashboard.update({music:demo});
   dashboard.update({phase:'STARTING PLAYER'});dashboard.service('player','START');playerBusy=true;
   await ensurePlayer(factory,env,{restart:process.argv.includes('--restart-player')});playerBusy=false;playerEnv=env;
   dashboard.service('player','UP');dashboard.update({phase:'VERIFYING TEST PLAYBACK'});
   const music=await verifyDemoPlayback(demo);dashboard.update({music});
   if(music.state==='VERIFIED')log('TEST MUSIC VERIFIED: Golden Hour is registered on Ganache and playable in YBR Player.');
-  dashboard.update({phase:'STARTING EXPLORER'});dashboard.service('web','START');await launchWeb(env);if(stopping)return;
+  dashboard.update({phase:'STARTING EXPLORER'});dashboard.service('web','START');await launchWeb({...env,YBR_RPC_URL:'',SEPOLIA_RPC_URL:''});if(stopping)return;
   dashboard.service('web','UP');
   const proxied=await fetchJson(WEB_URL+'/api/road-ipfs/health',{timeout:6500});
   if(proxied?.ok!==true||proxied.peerId!==ipfs.peerId)throw Error('Mint Studio IPFS proxy did not reach the expected healthy Kubo node.');
