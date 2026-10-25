@@ -35,7 +35,12 @@ export function AppearanceProvider({children}){
    return persist(theme,themes,named?'Theme saved and applied on this browser.':'Appearance saved on this browser.');
   }catch(e){setError(e.message);return false;}
  };
- const removeTheme=name=>{const current=loadAppearance(storage());persist(current.active,current.themes.filter(t=>t.name!==name),'Saved theme removed. Creator data is unchanged.');};
+ const removeTheme=name=>{
+  const current=loadAppearance(storage());
+  try{const next=saveAppearance(storage(),{active:current.active,themes:current.themes.filter(t=>t.name!==name)});
+   setSaved(next);setMessage('Saved theme removed. Your current preview and creator data are unchanged.');setError('');
+  }catch(e){setError(e.message);}
+ };
  const value={theme,preview,saved,dirty,message,error,setMessage,setError,save,removeTheme,discard:()=>{const next=loadAppearance(storage());setSaved(next);setTheme(next.active);setMessage('Saved appearance restored.');setError('');}};
  return <AppearanceContext.Provider value={value}>{children}</AppearanceContext.Provider>;
 }
