@@ -1,35 +1,24 @@
 # Dev Control network selection
 
-**n** opens Network Control when the stack is READY. **g** selects Local Ganache
-(1337), **s** selects Sepolia testnet (11155111). Enter reviews the choice; a second
-Enter saves it and stops launcher-owned services. Finish pending mints and save
-browser recovery keys before confirming. Escape cancels. Run `npm run dev` again
-and reload Mint Studio to apply the selected default.
+Press **n** for Network Control, then **g** for Local Ganache or **s** for Sepolia.
+The selected profile applies to the whole stack, including Mint Studio, My Bricks,
+the Registry, Buildings, NFT reads, Player permissions, and interaction scopes.
 
-This changes the **Mint Studio target**, not the underlying local demo backend.
-The Player, Registry, demo recording and encrypted IPFS bridge continue on local
-Ganache. No public-network deployments, transactions or account imports are run.
-Sepolia requires test ETH, an existing compatible factory and a wallet on Sepolia;
-wallet switching and signing still happen in the browser. Mainnet is not offered.
+**Sepolia uses Infura automatically.** Fresh demo setups use the existing ethers
+SDK's shared development access. No RPC URL field or **u** shortcut is shown.
+Saved endpoints and advanced environment overrides are preserved. Dedicated
+Infura access is optional through `INFURA_API_KEY`; shared access may be throttled.
+Failures never silently switch providers or fall back to Ganache.
 
-Only the choice and a revision marker are saved to the git-ignored, owner-only
-`.road-local/dev-network.json`. The launcher supplies two non-secret public Vite
-values: `VITE_ROAD_DEFAULT_NETWORK` and `VITE_ROAD_NETWORK_SELECTION`. The browser
-applies each explicit terminal selection once, retaining manual browser choices
-until the terminal selection changes again. It never changes a running mint.
-Returning to Ganache selects its normal loopback RPC and automatic factory mode.
-Existing factory addresses, chain profiles, IPFS pins, media, interaction journals
-and recovery material remain unchanged.
+Enter prepares the verification and estimate; it does not deploy. New deployment
+requires a separate test signer, an acceptable spending ceiling, and the literal
+**DEPLOY SEPOLIA** approval. Existing verified contracts are reused without a
+new deployment. After activation, restart `npm run dev` and reload the apps.
 
-**i** cycles this machine's currently assigned interface addresses, both on the
-home screen and inside Network Control. It includes loopback, Ethernet/Wi-Fi
-interface addresses and assigned VPN interfaces reported by Node. The list is
-refreshed on each press; vanished adapters are not retained as active. It does not
-scan nearby SSIDs, connect/disconnect Wi-Fi or VPNs, or alter system routing.
+The interface-address cycling feature and **i** shortcut are hidden for now.
+They are absent from the home screen, details screen and network menu. These
+controls do not change the machine's Wi-Fi, VPN, routing, or service bindings.
 
-The selected connection is a **reference display**, not an application bind
-setting or a working LAN URL. Ganache, Kubo admin APIs, the upload bridge and the
-password-free demo Player remain loopback-only. Safe authenticated LAN serving
-is a separate feature; cycling addresses does not open private services.
-
-Primary API: https://nodejs.org/api/os.html#osnetworkinterfaces
+See [One active network in Dev Control](ACTIVE_NETWORKS.md) for configuration,
+deployment estimates, signing, RPC precedence, and recovery. Existing chain
+profiles, pins, media, interaction journals and recovery material are retained.

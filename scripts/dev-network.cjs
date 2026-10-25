@@ -1,6 +1,6 @@
 'use strict';
 /** Active-network selection with explicit remote preparation and spending approval.
- * Assigned interfaces remain reference-only; application listeners stay on loopback.
+ * Interface helpers are retained but hidden in the demo; listeners stay on loopback.
  */
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),net=require('node:net'),crypto=require('node:crypto');
 const TARGETS=Object.freeze({ganache:{label:'Local Ganache',chainId:1337},sepolia:{label:'Sepolia testnet',chainId:11155111}});
@@ -52,7 +52,7 @@ class NetworkControl{
  }
  cycle(){const list=connections(this.getInterfaces),at=list.findIndex(x=>x.id===this.connection?.id);this.connection=list.length?list[(at+1)%list.length]:null;if(this.menu)this.menu.connection=this.connection;this.emit();return this.connection;}
  emit(){this.onChange(this.menu,this.connection);}
- open(){const selected=readNetwork(this.root);this.options={};this.plan=null;this.buffer='';this.generation++;this.menu={network:selected.network,revision:selected.revision,current:selected.network,connection:this.connection,mode:'select',error:''};if(!this.connection)this.cycle();else this.emit();}
+ open(){const selected=readNetwork(this.root);this.options={};this.plan=null;this.buffer='';this.generation++;this.menu={network:selected.network,revision:selected.revision,current:selected.network,connection:this.connection,mode:'select',error:''};this.emit();}
  async review(){
   const id=++this.generation,network=this.menu.network;this.plan=null;this.menu.mode='preparing';this.menu.error='';this.emit();
   try{const plan=await this.onReview(network,{...this.options});if(!this.menu||id!==this.generation)return;this.plan=plan;this.menu.mode='review';this.menu.lines=plan.lines;this.menu.deploy=plan.kind==='deploy';}
@@ -87,11 +87,10 @@ class NetworkControl{
      const field=this.menu.field,value=this.buffer.trim();
      try{
       if(field==='privateKey'&&!/^0x[0-9a-f]{64}$/i.test(value))throw Error('Enter a 0x-prefixed private key from a separate Sepolia test wallet.');
-      if(field==='rpcUrl')require('./dev-network-profile.cjs').checkedRpc(value);
       if(field==='factoryAddress'&&value&&!/^0x[0-9a-f]{40}$/i.test(value))throw Error('Enter a factory address, or leave it blank for a new deployment.');
       if(field==='deploymentBlock'&&!/^\d{1,12}$/.test(value))throw Error('Enter a nonnegative deployment block number.');
       if(field==='maxEth')require('./deployment-budget.cjs').parseEther(value);
-      this.options[field]=value;if(field==='privateKey'||field==='rpcUrl')this.onSecret(value);
+      this.options[field]=value;if(field==='privateKey')this.onSecret(value);
       this.buffer='';this.menu.mode='select';this.menu.field=null;this.menu.error='';this.plan=null;
      }catch(error){this.menu.error=error.message;this.buffer='';}
     }
@@ -99,10 +98,9 @@ class NetworkControl{
    else if(!key.ctrl&&!key.meta&&typeof text==='string'&&!/[\x00-\x1f\x7f]/.test(text)&&this.buffer.length+text.length<=2048)this.buffer+=text;
    this.menu.characters=this.buffer.length;this.emit();return true;
   }
-  if(key.name==='i'){this.cycle();return true;}
   if(this.menu.mode==='preparing')return true;
   if(key.name==='g'||key.name==='s'){this.menu.network=key.name==='g'?'ganache':'sepolia';this.menu.mode='select';this.menu.error='';this.plan=null;}
-  const fields={u:'rpcUrl',f:'factoryAddress',k:'privateKey',b:'deploymentBlock',c:'maxEth'};
+  const fields={f:'factoryAddress',k:'privateKey',b:'deploymentBlock',c:'maxEth'};
   if(this.menu.network==='sepolia'&&fields[key.name]){this.plan=null;this.buffer='';this.menu.mode='input';this.menu.field=fields[key.name];this.menu.characters=0;this.menu.error='';}
   if(key.name==='r')void this.review();
   if(key.name==='return'){
@@ -120,16 +118,19 @@ function renderNetworkMenu(state,{columns=80,rows=24,color=false}={}){
   fit('PROPOSED: '+target.label+' / chain '+target.chainId),
   fit('Current selection: '+(m.current||'ganache')+' / unchanged until approval')];
  if(m.mode==='input'){
-  const names={rpcUrl:'Sepolia RPC URL (HTTPS, kept private)',factoryAddress:'Existing factory address (blank = new)',privateKey:'Separate Sepolia TEST private key (hidden; not saved)',deploymentBlock:'Factory deployment block (0 = recent bounded scan)',maxEth:'Maximum deployment budget in Sepolia ETH'};
+  const names={factoryAddress:'Existing factory address (blank = new)',privateKey:'Separate Sepolia TEST private key (hidden; not saved)',deploymentBlock:'Factory deployment block (0 = recent bounded scan)',maxEth:'Maximum deployment budget in Sepolia ETH'};
   lines.push('',fit(names[m.field]),fit('Input hidden: '+(m.characters||0)+' characters'),fit('[Enter] accept field   [Esc] cancel entire switch'),fit('Never enter a production wallet or a Ganache demo seed.'));
  }else if(m.mode==='preparing'||m.mode==='applying')lines.push('',fit(m.mode==='preparing'?'Verifying RPC / factory and estimating cost...':'Applying approved plan. A submitted transaction cannot be undone.'),fit('No silent Ganache fallback; existing databases and pins are retained.'));
  else if(m.mode==='review'||m.mode==='approval'){
   lines.push('',...(m.lines||[]).map(fit),'',gold(fit(m.mode==='approval'?'Type DEPLOY SEPOLIA, then Enter ('+(m.characters||0)+' characters)':m.deploy?'[Enter] review spending approval   [r] refresh quote':'[Enter] activate verified network / restart required')));
- }else lines.push('',fit('[g] Local Ganache 1337   [s] Sepolia 11155111'),fit('Switches Mint Studio, Player, Registry, Buildings and analytics.'),fit('[u] RPC URL  [f] existing factory  [b] deployment block'),fit('[k] test signer (hidden)  [c] ETH ceiling (default 0.05)'),fit('[Enter] verify and estimate; no transaction yet.'),fit('Existing deployments are verified and reused without gas.'));
- if(m.connection)lines.push('',fit('[i] '+m.connection.name+' / '+m.connection.family+' / '+m.connection.address));
+ }else {
+  lines.push('',fit('[g] Local Ganache 1337   [s] Sepolia 11155111'),fit('Switches Mint Studio, Player, Registry, Buildings and analytics.'));
+  if(m.network==='sepolia')lines.push(fit('RPC: automatic / Infura default (saved overrides retained)'),fit('[f] existing factory  [b] deployment block'),fit('[k] test signer (hidden)  [c] ETH ceiling (default 0.05)'));
+  lines.push(fit('[Enter] verify and estimate; no transaction yet.'),fit('Existing deployments are verified and reused without gas.'));
+ }
  if(m.error)lines.push('',fit(m.error));
  // Keep errors and approval controls visible on small terminals.
- const footer=gold(fit(m.mode==='applying'?'Deployment state is journaled locally; do not submit again.':'[Esc] cancel  [i] interfaces  [Enter] '+(m.mode==='approval'?'approve':'continue')));
+ const footer=gold(fit(m.mode==='applying'?'Deployment state is journaled locally; do not submit again.':'[Esc] cancel  [Enter] '+(m.mode==='approval'?'approve':'continue')));
  const body=lines.slice(0,Math.max(0,h-2));if(m.error)body.push(fit(m.error));
  return [...body,footer].slice(0,h);
 }
