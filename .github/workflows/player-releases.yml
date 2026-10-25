@@ -12,6 +12,8 @@ on:
       - 'scripts/player-continuous-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/settings-browser.cjs'
+      - 'web/appearance-css.js'
       - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
@@ -30,6 +32,8 @@ on:
       - 'scripts/player-continuous-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/settings-browser.cjs'
+      - 'web/appearance-css.js'
       - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
@@ -92,6 +96,7 @@ jobs:
           node scripts/player-library-browser.cjs
           node scripts/compact-bricks-browser.cjs
           node scripts/active-network-browser.cjs
+          node scripts/settings-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

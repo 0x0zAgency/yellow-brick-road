@@ -1,3 +1,4 @@
+import {WorkspaceIcon} from './AppearanceContext.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Layers,FolderOpen} from 'lucide-react';
 import {RegistrationThumbnail,StatusPill} from './BrickPresentation.jsx';
@@ -49,7 +50,7 @@ export function ReleaseBuildingCard({group,client,chainId,factoryAddress,anchor,
  return <article className="br-building" aria-label={title} data-building-id={record.id}>
   <div className="br-building-header"><RegistrationThumbnail client={client} anchor={anchor} title={title}
    identity={{chainId,factoryAddress,brickAddress:r.brickAddress||r.address,ipId:r.ipId,originator:r.originator,collection:r.nftContractAddress,tokenId:r.tokenId}}/>
-   <div className="br-record-copy"><span className="br-kicker"><Layers size={12}/> {record.type==='music-release'?'RELEASE BUILDING':'WORK BUILDING'}</span><h3>{title}</h3>
+   <div className="br-record-copy"><span className="br-kicker"><WorkspaceIcon slot="building" size={12}/> {record.type==='music-release'?'RELEASE BUILDING':'WORK BUILDING'}</span><h3>{title}</h3>
     <div className="br-badges"><StatusPill>{record.members.length} associated Bricks</StatusPill><StatusPill>{record.members.reduce((n,m)=>n+m.files.length,0)} file roles</StatusPill></div>
    </div></div>
   <p className="br-building-map">{record.members.map(m=>PART_LABELS[m.part]).join(' · ')}</p>

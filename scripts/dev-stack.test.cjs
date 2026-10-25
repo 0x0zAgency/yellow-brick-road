@@ -29,3 +29,5 @@ test('factory receipt reader does not invent a deployment',()=>{
 require('./dev-ipfs.test.cjs');
 require('./dev-dashboard.test.cjs');
 require('./dev-player-ready.test.cjs');
+
+require('./dev-title.test.cjs');
