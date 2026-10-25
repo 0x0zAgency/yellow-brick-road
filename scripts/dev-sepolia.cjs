@@ -3,8 +3,9 @@
  * No Ganache key derivation, automatic remote music mint, or blind transaction retry.
  */
 const fs=require('node:fs'),path=require('node:path');
-const {ADDRESS,HASH,readRecord,writeRecord,safeDirectory,checkedRpc,checkedProfile,rpcLabel}=require('./dev-network-profile.cjs');
+const {ADDRESS,HASH,readRecord,writeRecord,safeDirectory,checkedProfile,rpcLabel}=require('./dev-network-profile.cjs');
 const {deploymentBudget,parseEther,formatEther}=require('./deployment-budget.cjs');
+const {resolveSepoliaRpc}=require('./dev-sepolia-rpc.cjs');
 const CHAIN=11155111,QUOTE_MS=90000;
 const FACTORY_ABI=['function implementation() view returns (address)','function receiptToken() view returns (address)','function contentPolicyVersion() view returns (uint256)'];
 const same=(a,b)=>String(a).toLowerCase()===String(b).toLowerCase();
@@ -35,7 +36,7 @@ function artifactAt(root){
 async function prepareSepolia({root,input={},env=process.env,compile=async()=>{},now=Date.now,ethersImpl,provider:providedProvider}={}){
  const ethers=ethersImpl||require('ethers').ethers,saved=readRecord(root,'sepolia');
  if(saved)checkedProfile(saved);
- const rpcUrl=checkedRpc(input.rpcUrl||env.SEPOLIA_RPC_URL||saved?.rpcUrl||'');
+ const rpcUrl=resolveSepoliaRpc({input,env,saved,ethersImpl:ethers});
  const provider=providedProvider||new ethers.providers.JsonRpcProvider({url:rpcUrl,timeout:10000},{name:'sepolia',chainId:CHAIN});
  const genesisHash=await chainIdentity(provider);
  const pending=readRecord(root,'sepolia-pending');

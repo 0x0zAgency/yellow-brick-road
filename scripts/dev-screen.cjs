@@ -51,7 +51,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logMode=state.logMode==='VERBOSE'?'VERBOSE':'ESSENTIAL';
  const buttons=gold(clip(view==='logs'?'[l/Esc] home [v] verbose '+(logMode==='VERBOSE'?'ON':'OFF')+' [Up/Down] scroll [p] pause [q] quit':
-  '[n] net [i] link [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
+  '[n] net [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip((remote?'SEPOLIA TESTNET / Signer key is never displayed / ':'LOCAL TEST KEYS ONLY / Never send real funds / ')+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
  if(view==='logs'&&(w<70||h<22)){
@@ -89,9 +89,8 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    ...(remote?['Sepolia profile: .road-local/networks/sepolia.json'] : wrap('Ganache profile: '+(state.profileId||'default')+' | [m] change mnemonic',w-4)),
    'Wallet: '+(g.source||'pending')+' | Player: '+(a.source||'pending'),
    ...wrap(a.notice||'Player passwords: private .road-local/player-access.json',w-4)],w,gold),
-   ...box('CONNECTION REFERENCE',[
+   ...box('NETWORK + SERVICES',[
     'Active network: '+active.label+' / '+active.chainId+' / [n] change',
-    ...wrap(state.connectionReference||'[i] cycle machine interface addresses (reference only)',w-4),
     ...wrap('Factory: '+(state.factory||'pending'),w-4),...wrap('IPFS peer: '+(state.peerId||'pending'),w-4),
     musicLine,...wrap('Test Brick: '+(music.id||'pending'),w-4),...wrap('Test playback: '+(music.mediaUrl||'pending'),w-4),
     'Kubo RPC: '+(state.kuboRpc||'http://127.0.0.1:5001'),
@@ -126,7 +125,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  access.push(...wrap(remote?'Sepolia signer: '+(g.account||'browser wallet')+' / private key not displayed':'Mnemonic: '+mnemonic,w-4));
  const lines=[...head,bricks(),...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold),...panels];
  const room=h-lines.length-2;
- if(room>0)lines.push(dim(clip(state.error||state.connectionReference||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
+ if(room>0)lines.push(dim(clip(state.error||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
  return [...lines.slice(0,h-2),warning,buttons];
 }
 module.exports={renderDashboard,URLS,wrap};

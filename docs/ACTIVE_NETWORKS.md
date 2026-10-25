@@ -8,7 +8,11 @@ The running apps remain on localhost. Mint Studio, My Bricks, Registry, Building
 
 Start the normal stack, press `n`, then `s`. The active configuration remains unchanged while preparing this proposal.
 
-- `u`: enter the Sepolia RPC URL. Remote endpoints require HTTPS. HTTP is permitted only on loopback for private testing. API keys in URL paths or queries remain in the owner-only local profile, not in browser code or the dashboard.
+Sepolia RPC selection is automatic. A fresh demo uses `https://sepolia.infura.io/v3/<key>` through the existing ethers SDK's shared development API key. There is no RPC URL input or `u` shortcut. The bare hostname is not used as an unauthenticated endpoint. Shared access can be throttled or unavailable; such failures stop preparation without changing networks or deploying anything.
+
+For dedicated access, optionally set `INFURA_API_KEY` (or `YBR_INFURA_API_KEY`) in the launcher environment. Do not put service keys in Vite variables or commit them. Endpoint precedence is: explicit internal/test override, `SEPOLIA_RPC_URL`, configured Infura API key, saved profile RPC, then the SDK Infura default. Existing saved endpoints are preserved; an optional API key replaces a saved shared key when preparing the next activation. An explicit `SEPOLIA_RPC_URL` remains an advanced operator setting, not a menu field. HTTPS is required remotely; HTTP loopback remains supported for isolated testing. Neither endpoint selection nor a changed key authorizes spending.
+
+The remaining menu controls are:
 - `f`: enter an existing compatible YellowBrickFactory, or leave blank for a first deployment. `b` supplies its deployment block. An existing deployment is verified, not assumed from its address.
 - `k`: enter a **separate Sepolia test-wallet private key** using hidden terminal input. It is not saved in the network profile. Do not enter a real-funds wallet or a Ganache seed. The current and standard Ganache account families are refused. `SEPOLIA_PRIVATE_KEY` is an optional process-local alternative; do not put it in shell history or commit it.
 - `c`: set the maximum deployment budget in Sepolia ETH. Default: 0.05. This is a refusal ceiling, not an instruction to spend that amount.
@@ -30,7 +34,7 @@ Selection stays in `.road-local/dev-network.json`. Completed remote configuratio
 
 Returning to Ganache reopens the existing selected wallet profile. Switching does not migrate or remint works, rewrite permissions, delete media, remove IPFS pins, or reset interaction journals. A Ganache release is not a Sepolia release. Unavailable tracks remain absent from the playable library. Public NFT thumbnails still depend on their available local pins. Private originals are not exposed to fill missing thumbnails.
 
-The existing development artist auto-login is only a convenience for this loopback application. It neither establishes rights nor bypasses on-chain file authorization. The interface shortcut `i` remains reference-only and does not change Wi-Fi, VPN or routing.
+The existing development artist auto-login is only a convenience for this loopback application. It neither establishes rights nor bypasses on-chain file authorization. Interface cycling and its `i` shortcut are hidden for this demo, including the home screen, details view and Network Control. Opening the menu does not enumerate adapters. The low-level interface helper remains available for future work; no operating-system Wi-Fi, VPN or routing changes are made.
 
 ## Contract scope
 
@@ -41,3 +45,10 @@ This change uses the contracts currently on main. It does **not** merge the sepa
 `node --test scripts/dev-network.test.cjs scripts/dev-network-profile.test.cjs scripts/deployment-budget.test.cjs apps/ybr-player/test/road-rpc.test.js` tests selection/consent, private records, fee calculations and read-only HTTP boundaries.
 
 After installing dependencies and compiling, `node --test scripts/dev-sepolia.integration.cjs` creates an isolated local Ganache node using chain ID 11155111 and disposable test accounts. It checks actual deployment with approved fees, zero-cost reuse, Registry/My Bricks discovery, preview delivery/playback, cross-chain refusal, revocation and interaction identities. It never connects to public Sepolia. CI additionally starts the complete launcher against that node and verifies that no Ganache process or automatic remote test-music mint appears. Separate Chromium checks exercise the real creator views with explicit mocked wallet/RPC responses.
+
+
+## Infura default reference
+
+The existing ethers v5 `InfuraProvider` supplies shared development access when no project key is passed: https://docs.ethers.org/v5/api/providers/api-providers/#InfuraProvider . YBR resolves the Sepolia URL locally through this API and retains its existing bounded JSON-RPC reader and explicit spending approval. The key is not copied into source, terminal output, or public browser configuration. There is no automatic fallback to another provider, chain, or endpoint after a failure.
+
+`node --test scripts/dev-sepolia-rpc.test.cjs` checks default selection, private overrides, saved profiles, redaction, and read-only preparation with an explicit provider fixture. `scripts/dev-sepolia-rpc-sdk.test.cjs` additionally checks the installed ethers implementation without making a public RPC request. Both are included in `npm run test:dev-stack`.
