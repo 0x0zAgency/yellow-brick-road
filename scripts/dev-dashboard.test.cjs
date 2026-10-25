@@ -19,7 +19,7 @@ test('80x24 keeps ASCII logo, full wallet addresses, both logins and whole mnemo
  const s=state(),lines=renderDashboard(s,{columns:80,rows:24,showSecrets:true});assert.ok(lines.length<=23);
  assert.ok(lines.every(l=>strip(l).length<=79));
  const out=lines.join('\n');
- for(const v of ['SERVICES','GANACHE',s.ganache.account,s.factory,s.access.listener,s.access.artist,'Chain 1337','Mnemonic:','about','YELLOW BRICK ROAD','|____/'])assert.ok(out.includes(v),v);
+ for(const v of ['SERVICES','GANACHE',s.ganache.account,s.factory,s.access.listener,s.access.artist,'Chain 1337','Mnemonic:','about','YELLOW BRICK ROAD','######'])assert.ok(out.includes(v),v);
 });
 test('wide dashboard shows aligned side-by-side panels; all layouts stay in bounds',()=>{
  for(const columns of [70,80,100,113,120,180])for(const rows of [24,30,40]){
@@ -73,7 +73,7 @@ test('Player restart requires two r presses and Escape cancels',async()=>{
 });
 test('motion changes only decorations, not addresses, credentials or telemetry',()=>{
  const s=state(),options={columns:120,rows:36,showSecrets:true};const a=renderDashboard(s,options);s.now+=180;const b=renderDashboard(s,options);
- assert.notDeepEqual(a,b);assert.deepEqual(a.slice(5),b.slice(5));
+ assert.notDeepEqual(a,b);const stable=lines=>lines.filter(line=>!/^ \[(?:[.#=-]{5})\]/.test(strip(line)));assert.deepEqual(stable(a),stable(b));
  const still=renderDashboard(s,{...options,motion:false});s.now+=180;assert.deepEqual(still,renderDashboard(s,{...options,motion:false}));
 });
 test('long passwords and non-printable configuration remain safe and accessible',()=>{

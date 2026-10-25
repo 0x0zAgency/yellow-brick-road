@@ -1,3 +1,4 @@
+import {WorkspaceIcon,WorkspaceGraphic} from './AppearanceContext.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {Image,Layers,ChevronLeft,ChevronRight} from 'lucide-react';
 import {publicCoverSource,readRegistrationCover} from './brick-presentation.js';
@@ -10,7 +11,7 @@ export function ArtworkTile({imageURI,localUrl,title='Registered work',caption})
  const [failed,setFailed]=useState(null);
  const available=src&&failed!==src;
  return <figure className="br-artwork" title={available?(caption||'Public NFT cover'):'No public cover is available'}>
-  {available?<img src={src} alt={title+' cover'} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(src)}/>:<div className="br-artwork-fallback" aria-label="Cover unavailable"><Layers size={28} strokeWidth={1.2}/></div>}
+  {available?<img src={src} alt={title+' cover'} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(src)}/>:<div className="br-artwork-fallback" aria-label="Cover unavailable"><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
   <figcaption>{available?(caption||'NFT cover'):src?'Cover unavailable':'No public cover'}</figcaption>
  </figure>;
 }
@@ -68,4 +69,4 @@ export function CollectionPager({page,pages,total,onPage}){
   <button type="button" disabled={page+1===pages} onClick={()=>onPage(page+1)} aria-label="Next page">Next <ChevronRight size={16}/></button>
  </div></nav>;
 }
-export function CollectionEmpty({children}){return <div className="br-empty"><Image size={28}/>{children}</div>;}
+export function CollectionEmpty({children}){return <div className="br-empty"><WorkspaceIcon slot="visual" size={28}/>{children}</div>;}
