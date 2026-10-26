@@ -3,7 +3,6 @@
 const path=require('node:path');
 const {spawn}=require('node:child_process');
 const {StringDecoder}=require('node:string_decoder');
-const {redact,essentialLog}=require('./dev-dashboard.cjs');
 const ROOT=path.resolve(__dirname,'..');
 
 function runtimeEnv(env=process.env,execPath=process.execPath){
@@ -11,6 +10,8 @@ function runtimeEnv(env=process.env,execPath=process.execPath){
   npm_node_execpath:execPath,NODE:execPath};
 }
 function runChild(executable,args,{env=process.env,cwd=ROOT,quiet=false,output=process.stdout}={}){
+ // Delay dashboard imports until the selected protocol/runtime environment is ready.
+ const {redact,essentialLog}=require('./dev-dashboard.cjs');
  return new Promise((resolve,reject)=>{
   const child=spawn(executable,args,{cwd,env,stdio:quiet?['ignore','pipe','pipe']:'inherit'});
   const tail=[],warnings=[],secrets=[env.YBR_LISTENER_PASSWORD,env.YBR_ARTIST_PASSWORD];
@@ -59,7 +60,15 @@ async function main(args=process.argv.slice(2)){
    process.exitCode=await runChild('bash',[path.join(__dirname,'use-node24.sh'),__filename,...args],{env});
    return;
   }
-  Object.assign(process.env,runtimeEnv());
+  if(args.includes('--http'))process.env.YBR_DEV_HTTP='1';
+  const httpsTools=require('./dev-https.cjs');
+  if(args.includes('--setup-https')){httpsTools.setupHttps(ROOT);return;}
+  const tlsEnv=httpsTools.prepareHttpsEnvironment(ROOT);
+  // Node loads NODE_EXTRA_CA_CERTS only at process start. Re-exec, never disable TLS checks.
+  if(tlsEnv.YBR_LOCAL_HTTPS==='1'&&(process.env.NODE_EXTRA_CA_CERTS!==tlsEnv.NODE_EXTRA_CA_CERTS||process.env.YBR_LOCAL_HTTPS!=='1')){
+   process.exitCode=await runChild(process.execPath,[__filename,...args],{env:tlsEnv});return;
+  }
+  Object.assign(process.env,tlsEnv,runtimeEnv(tlsEnv));
   if(args.includes('--check-node')){
    console.log('[YBR] Runtime ready: '+process.version+' ('+process.execPath+')');return;
   }

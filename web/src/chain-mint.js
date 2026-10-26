@@ -1,3 +1,4 @@
+import {rpcConnectionError} from './rpc-diagnostics.js';
 import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {initialPolicyFor} from './content-policy.js';
 import {verifyLocalChainHistory} from './chain-history.js';
@@ -40,7 +41,7 @@ export function mintMode(wallet,network){
  if(!['ganache','sepolia'].includes(network))throw Error('Choose Ganache or Sepolia.');
  return network;
 }
-export async function connectChain({provider,rpcUrl,chainId,account,network='ganache'}){
+async function connectChainInternal({provider,rpcUrl,chainId,account,network='ganache'}){
  if(!provider?.request)throw Error('Install and connect an EVM browser wallet.');
  if(!['ganache','sepolia'].includes(network))throw Error('Choose Ganache or Sepolia.');
  const chain=network==='sepolia'?sepolia:localConfig(rpcUrl,chainId);
@@ -64,6 +65,9 @@ export async function connectChain({provider,rpcUrl,chainId,account,network='gan
   if(!account||!accounts.some(a=>same(a,account)))throw Error('Wallet account changed or disconnected. Reconnect and review.');
  }
  await check();return {chain,client,wallet:createWalletClient({chain,transport:custom(provider)}),check};
+}
+export async function connectChain(options){
+ try{return await connectChainInternal(options);}catch(error){throw rpcConnectionError(error);}
 }
 export async function verifyFactory(client,address){
  if(ACTIVE_NETWORK)requireActiveNetwork(await client.getChainId(),address);

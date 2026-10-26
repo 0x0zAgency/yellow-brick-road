@@ -22,7 +22,8 @@
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
     "dev": "node scripts/dev.cjs",
     "setup:dev": "node scripts/dev.cjs --setup",
-    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs scripts/dev-install-scripts.test.cjs scripts/dev-mnemonic.test.cjs scripts/dev-ganache-profile.test.cjs scripts/dev-network.test.cjs scripts/dev-network-profile.test.cjs scripts/deployment-budget.test.cjs scripts/dev-sepolia-rpc.test.cjs scripts/dev-sepolia-rpc-sdk.test.cjs"
+    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs scripts/dev-install-scripts.test.cjs scripts/dev-mnemonic.test.cjs scripts/dev-ganache-profile.test.cjs scripts/dev-network.test.cjs scripts/dev-network-profile.test.cjs scripts/deployment-budget.test.cjs scripts/dev-sepolia-rpc.test.cjs scripts/dev-sepolia-rpc-sdk.test.cjs",
+    "setup:https": "node scripts/dev.cjs --setup-https"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.2.3",

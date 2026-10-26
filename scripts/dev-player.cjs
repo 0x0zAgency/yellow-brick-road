@@ -17,12 +17,13 @@ async function main(){
  const accounts=selectPlayerAccess(ROOT);
  const {createApp}=require('../apps/ybr-player/server.js');
  const demoAutoLogin=demoArtistAccount({host,port});
- const {server}=createApp({accounts,demoAutoLogin});
+ const tls=require('./dev-https.cjs').loadHttps(ROOT);
+ const {server}=createApp({accounts,demoAutoLogin,tls});
  server.once('error',()=>{console.error('[YBR] Player could not listen on its configured port.');process.exitCode=1;});
  server.listen(port,host,()=>{
   try{savePlayerAccess(ROOT,accounts);}
   catch(error){console.error('[YBR] '+error.message);server.close();process.exitCode=1;return;}
-  console.log('[YBR] Player ready on http://'+host+':'+port);
+  console.log('[YBR] Player ready on '+(tls?'https://':'http://')+host+':'+port);
   console.log('[YBR] Local credentials shared privately with the development dashboard.');
   if(demoAutoLogin)console.log('[YBR] Demo auto-login: artist (loopback only; Brick permissions still apply).');
   if(process.stdout.isTTY&&process.env.YBR_DEV_HIDE_SECRETS!=='1'&&!process.env.CI){

@@ -9,6 +9,7 @@ const {ethers}=require('ethers');
 const crypto=require('node:crypto');
 const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
 const {DevDashboard}=require('./dev-dashboard.cjs');
+const {verifyReadRpc}=require('./dev-rpc-health.cjs');
 const {ensurePlayerSession,ensureDemoPublished,verifyDemoPlayback,DEMO_TITLE,DEMO_ARTIST}=require('./dev-player-ready.cjs');
 const {selectPlayerAccess,verifyPlayerAccess,restartCheckoutPlayer}=require('./dev-player-access.cjs');
 const {readSelection,profilePaths,prepareProfile,describeMnemonic,generateSelection,changeAllowed,switchSelection}=require('./dev-ganache-profile.cjs');
@@ -21,8 +22,7 @@ const PLAYER=path.join(ROOT,'apps','ybr-player');
 const WEB=path.join(ROOT,'web');
 const FACTORY_FILE=profilePaths(ROOT,SELECTED_WALLET).factory;
 const RPC='http://127.0.0.1:8545';
-const PLAYER_URL='http://127.0.0.1:4173';
-const WEB_URL='http://127.0.0.1:5173';
+const {web:WEB_URL,player:PLAYER_URL}=require('./dev-https.cjs').localUrls();
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const ABI=['function implementation() view returns (address)'];
 const OWNED=new Map();
@@ -122,7 +122,8 @@ async function ensureDemoTrack(factoryAddress,env){
 }
 async function ensurePlayer(factoryAddress,env,{restart=false}={}){
  return ensurePlayerSession({factoryAddress,restart,chainId:activeProfile?.chainId||1337,genesisHash:activeProfile?.genesisHash||null},{
-  status:()=>fetchJson(PLAYER_URL+'/road/api/status'),
+  // Detect an older HTTP Player only to perform the existing guarded restart.
+  status:async()=>await fetchJson(PLAYER_URL+'/road/api/status')||(PLAYER_URL.startsWith('https:')?await fetchJson('http://127.0.0.1:4173/road/api/status'):null),
   access:options=>selectPlayerAccess(ROOT,env,options),
   verify:verifyPlayerAccess,
   restartLocal:()=>restartCheckoutPlayer(ROOT),
@@ -283,6 +284,7 @@ async function main(){
   dashboard.service('web','UP');
   const proxied=await fetchJson(WEB_URL+'/api/road-ipfs/health',{timeout:6500});
   if(proxied?.ok!==true||proxied.peerId!==ipfs.peerId)throw Error('Mint Studio IPFS proxy did not reach the expected healthy Kubo node.');
+  await verifyReadRpc(WEB_URL,activeProfile.chainId);
   await refreshWallet(source);dashboard.ready();healthTimer=setInterval(()=>void refreshHealth(),4000);healthTimer.unref();
   await new Promise((resolve,reject)=>{for(const {label,proc} of OWNED.values()){
    if(proc.exitCode!==null||proc.signalCode!==null){reject(Error(label+' exited during startup'));break;}

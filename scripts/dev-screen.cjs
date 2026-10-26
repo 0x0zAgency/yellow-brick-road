@@ -4,7 +4,7 @@ const {stripVTControlCharacters:strip}=require('node:util');
 const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
 const {renderNetworkMenu}=require('./dev-network.cjs');
 const {FRAMED_YBR,FRAMED_YBR_WIDTH,FRAMED_YBR_COMPACT,COMPACT}=require('./dev-title.cjs');
-const URLS={web:'http://127.0.0.1:5173',player:'http://127.0.0.1:4173',ipfs:'http://127.0.0.1:8791',ganache:'http://127.0.0.1:8545'};
+const URLS=require('./dev-https.cjs').localUrls();
 const clean=v=>strip(String(v??'')).replace(/[\t\r\n]+/g,' ').replace(/[^\x20-\x7e]/g,'?');
 const clip=(v,w)=>{const s=clean(v);return s.length<=w?s:s.slice(0,Math.max(0,w-3))+'...';};
 function wrap(v,w){

@@ -6,7 +6,7 @@ const crypto=require('node:crypto');
 const {execFile}=require('node:child_process');
 const {promisify}=require('node:util');
 const exec=promisify(execFile);
-const PLAYER_URL='http://127.0.0.1:4173';
+const PLAYER_URL=require('./dev-https.cjs').localUrls().player;
 const accessFile=root=>path.join(root,'.road-local','player-access.json');
 const valid=c=>c&&['listener','artist'].every(k=>typeof c[k]==='string'&&c[k].length>0&&Buffer.byteLength(c[k])<=1024);
 function privatePath(target,directory=false){

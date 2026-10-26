@@ -3,7 +3,7 @@
  * Dependencies are injected so every branch can be tested without a wallet.
  */
 const {createHash}=require('node:crypto');
-const PLAYER_URL='http://127.0.0.1:4173';
+const PLAYER_URL=require('./dev-https.cjs').localUrls().player;
 const DEMO_TITLE='Golden Hour — Road Release';
 const DEMO_ARTIST='The Amber Sessions';
 const IPID=/^0x[0-9a-f]{64}$/i;

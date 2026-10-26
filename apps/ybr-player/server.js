@@ -3,6 +3,7 @@ const {describeSavedUpload,newestSavedUploads}=require('./studio-catalog');
 const {createInteractionHttp}=require('./interaction-http');
 // YBR Player proof 001. Local-only reference implementation: no external SDKs.
 const http = require('node:http');
+const https = require('node:https');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
@@ -116,7 +117,7 @@ function streamAudio(req,res,brick) {
   if(req.method==='HEAD')return res.end();
   return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
 }
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, interactionFile, roadGateway, studioLibrary, demoAutoLogin = null } = {}) {
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, interactionFile, roadGateway, studioLibrary, demoAutoLogin = null, tls = null } = {}) {
   if(demoAutoLogin!==null&&(demoAutoLogin!=='artist'||!Object.hasOwn(accounts,'artist')))throw Error('Demo auto-login requires the configured artist account.');
   const studio = studioLibrary || createStudioLibrary();
   const road = roadGateway || require('./road-music').makeGateway();
@@ -166,10 +167,11 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
   }
   const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange,checkPermission});
   const interactionHttp=createInteractionHttp({file:interactionFile,now,requireSession,studio,bricks,road,checkPermission,canStream,sendJson,readJson,fail});
-  const server = http.createServer(async (req, res) => {
+  const serve = tls ? handler => https.createServer(tls,handler) : handler => http.createServer(handler);
+  const server = serve(async (req, res) => {
     try {
       const origin = req.headers.origin;
-      const expectedOrigin = `http://${req.headers.host}`;
+      const expectedOrigin = `${req.socket.encrypted?'https':'http'}://${req.headers.host}`;
       if (req.method === 'POST' && origin && origin !== expectedOrigin) return fail(res, 403, 'Cross-origin requests are not allowed');
       const url = new URL(req.url || '/', expectedOrigin);
       const route = url.pathname;
