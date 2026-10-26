@@ -1,4 +1,4 @@
-import {prepareNftCover} from './nft-cover-source.js';
+import {prepareNftCover} from './raster-display.js';
 import {validateGraphic} from './appearance.js';
 /** Reuse the bounded rasterizer, without pinning, uploading or reading any creator vault. */
 export async function prepareWorkspaceGraphic(file,{signal}={}){

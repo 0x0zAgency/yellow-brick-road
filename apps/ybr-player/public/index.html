@@ -12,22 +12,25 @@
   <script src="/library-model.js" defer></script>
   <script src="/interaction-ui.js" defer></script>
   <script src="/app.js" defer></script>
+  <link rel="stylesheet" href="/settings.css">
+  <script type="module" src="/settings.mjs"></script>
 </head>
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <div class="brand-mark"><div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></div><div><strong>yellow brick road</strong><small>PLAYER / ALPHA 0.1</small></div></div>
+      <div class="brand-mark road-brand" aria-label="0x Yellow Brick Road"><span class="brand-graphic"><span class="brand-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="brand-text">0x<span>🟨</span> Road<small>THE YELLOW BRICK ROAD</small></span></div>
       <div class="section-label">YOUR SPACE</div>
-      <button class="nav-item selected" type="button" id="libraryNav"><span class="nav-icon">♫</span> Library <span class="mini-dot"></span></button>
-      <button class="nav-item" type="button" id="inspectorNav"><span class="nav-icon">▦</span> Brick inspector</button>
+      <button class="nav-item selected" type="button" id="libraryNav"><span class="nav-icon" data-appearance-icon="player">♫</span> Library <span class="mini-dot"></span></button>
+      <button class="nav-item" type="button" id="inspectorNav"><span class="nav-icon" data-appearance-icon="bricks">▦</span> Brick inspector</button>
+      <button class="nav-item" type="button" id="settingsNav" aria-controls="playerSettings"><span class="nav-icon" data-appearance-icon="settings">⚙</span> Settings</button>
       <div class="sidebar-spacer"></div>
       <div class="side-proof"><span class="proof-light"></span><span>Proof of connection</span><p>Media flows through rights-aware YBR bricks. No external streaming SDK.</p></div>
       <div class="side-footer"><span class="online-dot"></span><span id="signedInAs">Not connected</span></div>
     </aside>
 
     <main class="main-content">
-      <header class="topbar"><div class="breadcrumb">YBR <span>/</span> PLAYER <span>/</span> LIBRARY</div><div class="top-actions"><span class="pill" id="activeNetwork">Connecting network…</span><button id="logout" type="button" class="text-button">Sign out ↗</button></div></header>
-      <div class="page-content">
+      <header class="topbar"><span class="player-context" id="playerContext">Listening room</span><div class="top-actions"><button id="settingsShortcut" type="button" class="text-button" aria-controls="playerSettings" title="Player settings"><span data-appearance-icon="settings" aria-hidden="true">⚙</span> Settings</button><span class="pill" id="activeNetwork">Connecting network…</span><button id="logout" type="button" class="text-button">Sign out ↗</button></div></header>
+      <div class="page-content" id="libraryPage">
         <div class="eyebrow"><span class="tiny-road"></span> THE ROAD STARTS HERE</div>
         <h1>Follow the <em>music.</em></h1>
         <p class="lead">A player built on provenance. Every sound has a source. Every source has a brick.</p>
@@ -41,6 +44,7 @@
         <div id="trackList" class="track-list" role="list" aria-label="Audio bricks"></div>
         <div class="under-note"><span>◇</span> Road music comes from opt-in, publicly streamable Bricks on the selected network. Synthetic demo tracks are separate. No third-party streaming SDK.</div>
       </div>
+      <section id="playerSettings" class="player-settings" aria-labelledby="playerSettingsTitle" hidden></section>
     </main>
 
     <aside class="inspector" id="inspector" aria-label="Brick details">
@@ -67,7 +71,7 @@
   </footer>
 
   <div id="loginOverlay" class="login-overlay" hidden>
-    <form id="loginForm" class="login-card"><div class="brand-mark"><div class="brand-symbol" aria-hidden="true"><span></span><span></span><span></span></div><div><strong>yellow brick road</strong><small>PLAYER / ALPHA 0.1</small></div></div>
+    <form id="loginForm" class="login-card"><div class="brand-mark road-brand" aria-label="0x Yellow Brick Road"><span class="brand-graphic"><span class="brand-grid" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i></span></span><span class="brand-text">0x<span>🟨</span> Road<small>THE YELLOW BRICK ROAD</small></span></div>
       <span class="eyebrow">AUTHORIZATION GATE</span><h2>Your passport<br>to the <em>road.</em></h2><p>Sign in with an account displayed in the server terminal. Streaming access is enforced for each brick.</p>
       <label for="username">ACCOUNT</label><input id="username" name="username" type="text" autocomplete="username" value="listener" required>
       <label for="password">PASSWORD</label><input id="password" name="password" type="password" autocomplete="current-password" placeholder="From the server terminal" required>

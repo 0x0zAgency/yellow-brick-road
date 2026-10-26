@@ -10,6 +10,7 @@ on:
       - 'scripts/player-library-browser.cjs'
       - 'scripts/player-autologin-browser.cjs'
       - 'scripts/player-continuous-browser.cjs'
+      - 'scripts/player-settings-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
       - 'scripts/settings-browser.cjs'
@@ -30,6 +31,7 @@ on:
       - 'scripts/player-library-browser.cjs'
       - 'scripts/player-autologin-browser.cjs'
       - 'scripts/player-continuous-browser.cjs'
+      - 'scripts/player-settings-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
       - 'scripts/settings-browser.cjs'
@@ -76,6 +78,8 @@ jobs:
           /tmp/ybr-browser/node_modules/.bin/playwright install --with-deps chromium
       - name: Exercise continuous playback and durable interactions
         run: node scripts/player-continuous-browser.cjs
+      - name: Exercise Player themes, branding and uninterrupted playback
+        run: node scripts/player-settings-browser.cjs
       - name: Exercise local artist auto-login in Chromium
         run: node scripts/player-autologin-browser.cjs
       - name: Exercise Mint Studio uploads and the Player in Chromium
