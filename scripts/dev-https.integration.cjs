@@ -29,15 +29,35 @@ async function worker(){
  try{
   const context=await browser.newContext({ignoreHTTPSErrors:true});const page=await context.newPage();
   const httpRequests=[];page.on('request',request=>{if(request.url().startsWith('http:'))httpRequests.push(request.url());});
-  const allowed=new Set(['eth_chainId','eth_accounts','eth_getBlockByNumber','eth_getBlockByHash','eth_sendTransaction','eth_estimateGas','eth_getTransactionCount','eth_gasPrice','eth_maxPriorityFeePerGas']);
-  await page.exposeFunction('testWalletRpc',async({method,params})=>{assert.ok(allowed.has(method),'unexpected wallet method '+method);return rpc(method,params||[]);});
+  let walletWrites=0;
+  const allowed=new Set(['eth_requestAccounts','eth_call','eth_getCode','eth_getLogs','eth_getTransactionReceipt','eth_getTransactionByHash','eth_blockNumber','eth_chainId','eth_accounts','eth_getBlockByNumber','eth_getBlockByHash','eth_sendTransaction','eth_estimateGas','eth_getTransactionCount','eth_gasPrice','eth_maxPriorityFeePerGas']);
+  await page.exposeFunction('testWalletRpc',async({method,params})=>{assert.ok(allowed.has(method),'unexpected wallet method '+method);if(method==='eth_sendTransaction')walletWrites++;return rpc(method==='eth_requestAccounts'?'eth_accounts':method,params||[]);});
+  await page.addInitScript(()=>{window.ethereum={request:args=>window.testWalletRpc(args),on(){},removeListener(){}};});
   await page.goto(WEB);assert.equal(await page.evaluate(()=>isSecureContext),true);
   const result=await page.evaluate(async({account,factoryAddress})=>{
-   const {mintOnChain}=await import('/src/chain-mint.js');
-   return mintOnChain({provider:{request:window.testWalletRpc},account,network:'ganache',chainId:1337,rpcUrl:'http://127.0.0.1:8545',factoryAddress,
-    packet:{packetType:'LOCAL_PREVIEW_NOT_MINTED',account:{address:account},bricks:[{localId:'https-fixture',role:'Sound recording',metadata:{title:'Original HTTPS regression fixture',media:[]}}]}});
+   const {mintWithReviewedCover}=await import('/src/nft-cover-mint.js');
+   const {makeRegistrationPacket}=await import('/src/mint-model.js');
+   const {DEFAULT_CONTENT_POLICY}=await import('/src/content-policy.js');
+   const bytes=Uint8Array.from(atob('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIUlEQVR4nGP8f9kpxjeSgYGBgYGBMVphNgMMMDEgARQOAMDRBDMbPbpyAAAAAElFTkSuQmCC'),c=>c.charCodeAt(0));
+   const coverHash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
+   const packet=makeRegistrationPacket({metadata:{title:'HTTPS atomic release',artist:'Original test creator',songwriters:'Original test writer'},
+    assets:{master:{name:'original.wav',type:'audio/wav',size:4,hash:'ab'.repeat(32)},artwork:{name:'cover.png',type:'image/png',size:bytes.length,hash:coverHash}},
+    identity:{mode:'external',connected:true,address:account},composition:true,royalties:{creatorBps:10000},training:'not-authorized',storage:'demo-encrypted-in-browser',contentPolicy:DEFAULT_CONTENT_POLICY});
+   return mintWithReviewedCover({provider:window.ethereum,network:'ganache',chainId:1337,rpcUrl:'http://127.0.0.1:8545',factoryAddress,packet,nftCover:{bytes,sourceDigest:'0x'+coverHash,consent:true}});
   },{account,factoryAddress:status.factoryAddress});
-  assert.equal(result.status,'confirmed');assert.equal(result.receipts[0].status,'verified');assert.equal(BigInt(await rpc('eth_getTransactionCount',[account,'latest'])),BigInt(nonce)+1n);
+  assert.equal(result.status,'confirmed');assert.equal(result.atomic,true);assert.equal(result.receipts.length,3);assert.equal(walletWrites,1);
+  assert.ok(result.receipts.every(r=>r.status==='verified'&&r.transactionHash===result.transactionHash));assert.equal(result.nftCover.status,'verified');
+  assert.equal(BigInt(await rpc('eth_getTransactionCount',[account,'latest'])),BigInt(nonce)+1n);
+  // These are the actual collection views against the just-mined contracts and
+  // pinned PNG, not a mock thumbnail resolver or a local-preview substitute.
+  await page.locator('button.wallet').click();
+  const cid=result.nftCover.imageURI.slice(7);
+  for(const view of ['My Bricks','IP Registry']){
+   await page.getByRole('button',{name:view,exact:true}).click();
+   if(view==='My Bricks')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
+   await page.waitForFunction(cid=>Array.from(document.querySelectorAll('.br-record img')).filter(img=>img.src.endsWith('/'+cid)&&img.naturalWidth>0).length>=3,cid,{timeout:45000});
+  }
+  assert.equal(walletWrites,1,'Viewing NFTs never asks for another artwork or mint transaction');
   assert.deepEqual(httpRequests,[],'Browser traffic must not downgrade to HTTP');
   const link=page.locator('a.aside-link').filter({hasText:'YBR Player'});assert.equal(await link.evaluate(el=>el.href),PLAYER+'/');
   await page.goto(PLAYER);await page.waitForFunction(()=>document.body.innerText.includes('artist'));
@@ -54,7 +74,7 @@ async function worker(){
   assert.deepEqual(httpRequests,[],'Player settings and workspace links must not downgrade HTTPS');
   await context.close();
  }finally{await browser.close();}
- console.log('HTTPS MINT PASS: actual browser mint -> verified receipt through TLS RPC; trusted Node CA, Secure artist session, same-origin preview/bridge, no mixed HTTP, blocked key files and signing proxy. Synthetic CA; not live MetaMask.');
+ console.log('HTTPS ATOMIC MINT PASS: three Bricks and initial covers in one transaction; actual Registry/My Bricks PNGs; trusted Node CA, Secure artist session, same-origin preview/bridge, no mixed HTTP, blocked key files and signing proxy. Synthetic CA; not live MetaMask.');
 }
 async function main(){
  if(process.env.CI!=='true'&&process.env.CI!=='1')throw Error('This isolated stack test is CI-only.');

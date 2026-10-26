@@ -6,13 +6,15 @@ import {prepareNftCover,readAttachedCover} from './nft-cover-source.js';
 import './brick-presentation.css';
 
 export function StatusPill({tone='neutral',children}){return <span className={'br-status br-status--'+tone}>{children}</span>;}
-export function ArtworkTile({imageURI,localUrl,title='Registered work',caption}){
+export function ArtworkTile({imageURI,localUrl,title='Registered work',caption,status='ready',onRetry,retryKey=0}){
  const src=publicCoverSource(imageURI)||localUrl||null;
- const [failed,setFailed]=useState(null);
- const available=src&&failed!==src;
- return <figure className="br-artwork" title={available?(caption||'Public NFT cover'):'No public cover is available'}>
-  {available?<img src={src} alt={title+' cover'} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(src)}/>:<div className="br-artwork-fallback" aria-label="Cover unavailable"><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
-  <figcaption>{available?(caption||'NFT cover'):src?'Cover unavailable':'No public cover'}</figcaption>
+ const [failed,setFailed]=useState(null),loadKey=JSON.stringify([src,retryKey]);
+ const available=src&&failed!==loadKey;
+ const label=status==='loading'?'Reading NFT cover…':status==='error'?'NFT read unavailable':available?(caption||'NFT cover'):src?'Cover unavailable':'No public cover';
+ return <figure className="br-artwork" title={label}>
+  {available?<img key={loadKey} src={src} alt={title+' cover'} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(loadKey)}/>:<div className="br-artwork-fallback" aria-label="Cover unavailable"><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
+  <figcaption>{label}</figcaption>
+  {onRetry&&(status==='error'||failed===loadKey)&&<button type="button" className="text-action br-cover-retry" onClick={onRetry} aria-label={'Retry cover for '+title}>Retry cover</button>}
  </figure>;
 }
 // One local-only display copy for a completed mint. Never uploaded by this hook.
@@ -40,7 +42,8 @@ function queued(task){return new Promise((resolve,reject)=>{pending.push(async()
 /** Lazy, bounded, read-only NFT inspection. Visible cards never fetch private metadata. */
 export function RegistrationThumbnail({client,identity,anchor,title}){
  const node=useRef(null),[visible,setVisible]=useState(false),[revision,setRevision]=useState(0),[state,setState]=useState(null);
- const key=JSON.stringify([identity,anchor,revision]);
+ const key=JSON.stringify(identity),latest=useRef({identity,anchor}),attempt=useRef(null);
+ latest.current={identity,anchor};
  useEffect(()=>{
   if(!globalThis.IntersectionObserver){setVisible(true);return;}
   const observer=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting)){setVisible(true);observer.disconnect();}},{rootMargin:'120px'});
@@ -53,14 +56,26 @@ export function RegistrationThumbnail({client,identity,anchor,title}){
   return()=>window.removeEventListener('ybr:nft-cover-updated',update);
  },[]);
  useEffect(()=>{
-  let alive=true,timer;
-  if(visible&&client)void queued(async()=>{
-   if(!alive)return;
-   return Promise.race([readRegistrationCover({client,...identity,anchor}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Thumbnail read timed out.')),12000);})]);
-  }).then(image=>{if(alive)setState({key,image});}).catch(()=>{if(alive)setState({key,image:null});}).finally(()=>clearTimeout(timer));
-  return()=>{alive=false;};
+  let alive=true,inFlight=false,timer;
+  const run=()=>{
+   if(!alive||!visible||!client||inFlight)return;
+   inFlight=true;
+   void queued(async()=>{
+    if(!alive)return;
+    const selected=latest.current;
+    return Promise.race([readRegistrationCover({client,...selected.identity,anchor:selected.anchor}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Thumbnail read timed out.')),12000);})]);
+   }).then(image=>{if(alive)setState({key,image,status:'ready'});})
+    .catch(()=>{if(alive)setState({key,image:null,status:'error'});})
+    .finally(()=>{clearTimeout(timer);inFlight=false;});
+  };
+  attempt.current=run;run();
+  return()=>{alive=false;if(attempt.current===run)attempt.current=null;};
  },[client,key,visible]);
- return <div ref={node}><ArtworkTile imageURI={state?.key===key?state.image:null} title={title}/></div>;
+ // Registry polling must not cancel a still-running valid read or blank a cover
+ // every five seconds. Requests are serialized per tile and snapshot-verified.
+ useEffect(()=>{attempt.current?.();},[anchor?.number,anchor?.hash,revision]);
+ const current=state?.key===key?state:null;
+ return <div ref={node}><ArtworkTile imageURI={current?.image} status={!client?'error':current?.status||'loading'} title={title} retryKey={revision} onRetry={()=>setRevision(x=>x+1)}/></div>;
 }
 export function CollectionPager({page,pages,total,onPage}){
  if(pages<=1)return null;

@@ -19,7 +19,8 @@ test('thumbnail URLs allow only bare public cover CIDs through the narrow local 
 test('registry thumbnail transport does not accept external or credentialed RPC addresses',()=>{
  assert.equal(localThumbnailRpc('http://127.0.0.1:8545'),'http://127.0.0.1:8545/');
  assert.ok(localThumbnailRpc('http://[::1]:8545/'));
- for(const bad of ['https://127.0.0.1:8545','http://example.com','http://user:pass@localhost:8545','http://localhost:8545/private','http://127.0.0.1:8545/?key=secret','http://127.0.0.1:8545/#key'])assert.equal(localThumbnailRpc(bad),null);
+ assert.equal(localThumbnailRpc('https://127.0.0.1:8545'),'https://127.0.0.1:8545/');
+ for(const bad of ['http://example.com','http://user:pass@localhost:8545','http://localhost:8545/private','http://127.0.0.1:8545/?key=secret','http://127.0.0.1:8545/#key'])assert.equal(localThumbnailRpc(bad),null);
 });
 test('mint rollup never promotes simulation, partial batches or unverified receipts to success',()=>{
  const confirmed={status:'confirmed',receipts:[{status:'verified'},{status:'verified'}]};
@@ -51,3 +52,12 @@ test('wrong networks, tokens, factories, holders, bindings and reorgs cannot sup
  }
  const h=setup();await assert.rejects(readRegistrationCover({...h.options,tokenId:'1'}),/Token/);assert.equal(h.state.reads.length,0);
 });
+
+ test('absolute HTTPS thumbnail gateway is same-origin only and never downgrades',()=>{
+  const descriptor=Object.getOwnPropertyDescriptor(globalThis,'location');
+  Object.defineProperty(globalThis,'location',{value:{origin:'https://127.0.0.1:5173'},configurable:true});
+  try{
+   for(const value of ['/road/rpc','https://127.0.0.1:5173/road/rpc'])assert.equal(localThumbnailRpc(value),'https://127.0.0.1:5173/road/rpc');
+   for(const bad of ['http://127.0.0.1:8545','http://127.0.0.1:5173/road/rpc','https://localhost:5173/road/rpc','https://127.0.0.1:4173/road/rpc','https://127.0.0.1:5173/road/rpc?key=secret'])assert.equal(localThumbnailRpc(bad),null);
+  }finally{if(descriptor)Object.defineProperty(globalThis,'location',descriptor);else delete globalThis.location;}
+ });

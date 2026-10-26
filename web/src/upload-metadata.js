@@ -50,6 +50,27 @@ function nativeAudioTexts(metadata,ids){
  }
  return values.filter(value=>typeof value==='string').map(value=>clean(value)).filter(Boolean);
 }
+/** Album title only, never album artist, grouping, sort title or a filename guess.
+ * Standard/native tags backfill empty common tags; explicit custom album labels
+ * are a last resort. Keep the existing parser responsible for byte decoding.
+ */
+export function audioAlbum(metadata){
+ const first=values=>values.map(value=>clean(value)).find(Boolean)||'';
+ const common=first(array(metadata?.common?.album));if(common)return common;
+ const standard=[],custom=[],legacy=[];
+ for(const [type,tags] of Object.entries(metadata?.native||{}).slice(0,16)){
+  if(!Array.isArray(tags))continue;
+  for(const tag of tags.slice(0,4096)){
+   const id=String(tag?.id||'').trim().toUpperCase();
+   const values=array(tag?.value).slice(0,64);
+   if(/^ID3v2\.[234]$/.test(type)){
+    if(id==='TALB'||id==='TAL')standard.push(...values);
+    else if(/^TXXX:ALBUM(?:[ _-]?(?:TITLE|NAME))?$/.test(id))custom.push(...values);
+   }else if(/^(?:ID3v1|APEv2)$/i.test(type)&&id==='ALBUM')legacy.push(...values);
+  }
+ }
+ return first(standard)||first(custom)||first(legacy);
+}
 function writerNames(values){
  const seen=new Set(),out=[];
  for(const raw of values.slice(0,256)){
@@ -69,7 +90,7 @@ export function audioSuggestions(metadata){
   ...(lyricists.length?lyricists:nativeAudioTexts(metadata,['TEXT','TXT'])),...array(c.writer),
   ...nativeAudioTexts(metadata,['TXXX:WRITER','TXXX:WRITERS','TXXX:SONGWRITER','TXXX:SONGWRITERS'])];
  return {title:c.title,artist:c.artist||names(c.artists),
-  release:clean(c.album)||nativeAudioTexts(metadata,['TALB','TAL','TXXX:ALBUM'])[0],
+  release:audioAlbum(metadata),
   songwriters:writerNames(writers),
   genre:Array.isArray(c.genre)?c.genre.find(g=>normalizeMusicGenre(g)):c.genre,
   bpm:c.bpm,key:c.key,isrc:Array.isArray(c.isrc)?c.isrc[0]:c.isrc,
@@ -89,7 +110,7 @@ function sidecarFields(text){
  }
  return fields;
 }
-export async function extractUploadMetadata(file,{role='',parseAudio,parseImage}={}){
+export async function extractUploadMetadata(file,{role='',parseAudio,parseImage,onProgress=()=>{}}={}){
  const result=baselineMetadata(file);
  if(!file||typeof file.arrayBuffer!=='function'||!Number.isSafeInteger(file.size)||file.size>MAX_UPLOAD_BYTES){
   result.notice='Embedded metadata skipped: file exceeds the 256 MiB demo limit.';return result;
@@ -97,8 +118,32 @@ export async function extractUploadMetadata(file,{role='',parseAudio,parseImage}
  try{
   if(AUDIO.test(file.name)||/^(audio|video)\//.test(file.type||'')){
    const read=parseAudio||((await import('music-metadata')).parseBlob);
-   const metadata=await read(file,{duration:false,skipCovers:true});
-   apply(result,audioSuggestions(metadata),'embedded audio tags');
+   // Preserve successfully decoded tags even if later audio/frame parsing fails.
+   // Progress snapshots also survive a worker timeout. Never emit raw tags/bytes.
+   let observed=null,lastFields='',updates=0;
+   const capture=metadata=>{
+    if(!metadata)return;
+    apply(result,audioSuggestions(metadata),'embedded audio tags');
+    const fields=JSON.stringify(result.fields);
+    if(fields!==lastFields&&updates<64){
+     lastFields=fields;updates++;
+     onProgress({...result,fields:{...result.fields},fieldSources:{...result.fieldSources},technical:{...result.technical}});
+    }
+   };
+   let metadata;
+   try{
+    metadata=await read(file,{duration:false,skipCovers:true,skipPostHeaders:false,
+     observer:update=>{observed=update.metadata;capture(observed);}});
+   }catch{
+    // The parser may have read TALB before rejecting an unrelated frame/stream.
+    capture(observed);
+    if(Object.values(result.fieldSources).includes('embedded audio tags')){
+     result.notice='Some audio metadata could not be read. Extracted tags were kept; review them before minting.';
+     return result;
+    }
+    throw Error('Audio metadata unavailable');
+   }
+   capture(metadata);
    const f=metadata?.format||{};
    for(const [key,value] of Object.entries({durationSeconds:f.duration,sampleRateHz:f.sampleRate,channels:f.numberOfChannels,bitDepth:f.bitsPerSample,bitrate:f.bitrate})){
     if(Number.isFinite(value)&&value>0)result.technical[key]=value;

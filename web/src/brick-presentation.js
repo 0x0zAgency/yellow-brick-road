@@ -8,8 +8,15 @@ export function publicCoverSource(uri){
  return typeof uri==='string'&&uri.startsWith('ipfs://')&&validCoverCid(uri.slice(7))?'/api/road-ipfs/nft-cover/'+uri.slice(7):null;
 }
 export function localThumbnailRpc(value){
- if(value==='/road/rpc')return (globalThis.location?.origin||'http://127.0.0.1:5173')+'/road/rpc';
- try{const url=new URL(value);return url.protocol==='http:'&&['localhost','127.0.0.1','[::1]'].includes(url.hostname)&&!url.username&&!url.password&&url.pathname==='/'&&!url.search&&!url.hash?url.href:null;}catch{return null;}
+ const origin=globalThis.location?.origin||'http://127.0.0.1:5173';
+ try{
+  const url=new URL(value,origin);
+  if(!['http:','https:'].includes(url.protocol)||!['localhost','127.0.0.1','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash)return null;
+  if(url.pathname==='/road/rpc')return url.origin===origin?url.href:null;
+  // Preserve standalone loopback RPCs, without granting arbitrary path access.
+  // Under TLS use the same-origin gateway rather than mixed-content reads.
+  return url.pathname==='/'&&!(origin.startsWith('https:')&&url.protocol!=='https:')?url.href:null;
+ }catch{return null;}
 }
 export function mintOverview(mint,expectedCount=0){
  const receipts=Array.isArray(mint?.receipts)?mint.receipts:[];

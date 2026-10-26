@@ -10,7 +10,17 @@ import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 contract YellowBrickReceipt is ERC721 {
     address public immutable factory;
     mapping(uint256 => address) public brickForToken;
-    mapping(uint256 => string) public coverURI;
+    // Deduplicate a shared release cover while keeping each token independently editable.
+    mapping(uint256 => bytes32) private _coverId;
+    mapping(bytes32 => string) private _covers;
+    function coverURI(uint256 tokenId) public view returns (string memory) {
+        return _covers[_coverId[tokenId]];
+    }
+    function _storeCover(string calldata imageURI) private returns (bytes32 id) {
+        if (bytes(imageURI).length == 0) return bytes32(0);
+        id = keccak256(bytes(imageURI));
+        if (bytes(_covers[id]).length == 0) _covers[id] = imageURI;
+    }
 
     // ERC-4906 metadata-update extension. Artwork does not change Brick commitments.
     event MetadataUpdate(uint256 _tokenId);
@@ -28,6 +38,21 @@ contract YellowBrickReceipt is ERC721 {
         _mint(holder, tokenId);
     }
 
+    /// @notice Factory-only initial image assignment, in the registration transaction.
+    /// @dev ERC-721 Transfer events are retained for every NFT; no post-mint update needed.
+    function mintBatch(address holder, uint256[] calldata tokenIds, address[] calldata bricks, string calldata imageURI) external {
+        require(msg.sender == factory, "Receipt: only factory");
+        require(tokenIds.length > 0 && tokenIds.length <= 32 && tokenIds.length == bricks.length, "Receipt: batch limit");
+        require(_validCoverURI(bytes(imageURI)), "Receipt: invalid cover URI");
+        bytes32 imageId = _storeCover(imageURI);
+        for (uint256 i; i < tokenIds.length; ++i) {
+            require(bricks[i] != address(0), "Receipt: bad brick");
+            brickForToken[tokenIds[i]] = bricks[i];
+            if (imageId != bytes32(0)) _coverId[tokenIds[i]] = imageId;
+            _mint(holder, tokenIds[i]);
+        }
+    }
+
     function artworkVersion() external pure returns (uint256) { return 1; }
 
     function supportsInterface(bytes4 interfaceId) public view override returns (bool) {
@@ -41,12 +66,12 @@ contract YellowBrickReceipt is ERC721 {
     function setCovers(uint256[] calldata tokenIds, string calldata imageURI) external {
         require(tokenIds.length > 0 && tokenIds.length <= 32, "Receipt: cover batch limit");
         require(_validCoverURI(bytes(imageURI)), "Receipt: invalid cover URI");
-        bytes32 digest = keccak256(bytes(imageURI));
+        bytes32 digest = _storeCover(imageURI);
         for (uint256 i; i < tokenIds.length; ++i) {
             uint256 id = tokenIds[i];
             require(_requireOwned(id) == msg.sender, "Receipt: only holder");
-            if (keccak256(bytes(coverURI[id])) != digest) {
-                coverURI[id] = imageURI;
+            if (_coverId[id] != digest) {
+                _coverId[id] = digest;
                 emit MetadataUpdate(id);
             }
         }
@@ -82,7 +107,7 @@ contract YellowBrickReceipt is ERC721 {
     /// @notice ERC-721 metadata. Its image points to the public cover, never encrypted sources.
     function tokenURI(uint256 tokenId) public view override returns (string memory) {
         _requireOwned(tokenId);
-        string memory image = coverURI[tokenId];
+        string memory image = coverURI(tokenId);
         bool hasCover = bytes(image).length != 0;
         return string.concat(
             "data:application/json;base64,",

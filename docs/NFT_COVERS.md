@@ -1,3 +1,8 @@
+> **Initial artwork update:** New Mint Studio batches use `mintBatchVersion() == 1`
+> to register all Bricks and their approved NFT images in one transaction. The
+> post-mint controls documented below remain for **optional later replacements**
+> and older artwork-capable receipts. See [Atomic minting](ATOMIC_MINTING.md).
+
 # Actual registration NFT covers
 
 The receipt contract previously returned `defaultImage()` unconditionally. A cover

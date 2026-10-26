@@ -15,7 +15,7 @@ function safeDirectory(root){
  return dir;
 }
 function profilePath(root,name){
- if(!['sepolia','sepolia-pending'].includes(name))throw Error('Unsupported network record.');
+ if(!['sepolia','sepolia-pending'].includes(name)&&!/^sepolia-history-[a-f0-9]{40}-[a-f0-9]{64}$/.test(name))throw Error('Unsupported network record.');
  return path.join(root,'.road-local','networks',name+'.json');
 }
 function readRecord(root,name){

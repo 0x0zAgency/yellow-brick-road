@@ -8,6 +8,8 @@ export const factoryAbi=parseAbi([
  'function implementation() view returns (address)',
  'function receiptToken() view returns (address)',
  'function contentPolicyVersion() view returns (uint8)',
+ 'function mintBatchVersion() view returns (uint8)',
+ 'function deployBricksWithPolicy((bytes32 contentHash,string uri,bytes32 metadataDigest,bytes32 nonce,bool withPolicy,((bytes32 manifestDigest,bytes32 previewHash,bytes32 artworkHash,bytes32 lyricsHash) files,uint8 permissions,bool locked) policy)[] registrations,string imageURI) returns (address[])',
  'function deployBrickWithPolicy(bytes32,string,bytes32,bytes32,((bytes32 manifestDigest,bytes32 previewHash,bytes32 artworkHash,bytes32 lyricsHash) files,uint8 permissions,bool locked) policy) returns (address)',
  'function isBrick(address) view returns (bool)',
  'function brickById(bytes32) view returns (address)',
@@ -64,7 +66,7 @@ async function connectChainInternal({provider,rpcUrl,chainId,account,network='ga
   const accounts=await provider.request({method:'eth_accounts'});
   if(!account||!accounts.some(a=>same(a,account)))throw Error('Wallet account changed or disconnected. Reconnect and review.');
  }
- await check();return {chain,client,wallet:createWalletClient({chain,transport:custom(provider)}),check};
+ await check();return {chain,client,wallet:createWalletClient({chain,transport:custom(provider,{retryCount:0})}),check};
 }
 export async function connectChain(options){
  try{return await connectChainInternal(options);}catch(error){throw rpcConnectionError(error);}
@@ -85,13 +87,24 @@ export async function requirePolicyFactory(client,factoryAddress){
  try{version=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'contentPolicyVersion'});}catch{}
  if(Number(version)!==1)throw Error('This factory cannot record Player permissions or content locks. Explicitly deploy the updated factory; existing Bricks are not upgraded or replaced.');
 }
+export async function requireBatchFactory(client,factoryAddress){
+ let version;
+ try{version=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'mintBatchVersion'});}catch{}
+ if(Number(version)!==1)throw Error('This factory predates one-transaction minting with initial artwork. On local Ganache, deploy the updated factory once with npm run ganache:deploy while Ganache is running, then restart the dev stack. Existing Bricks and pins are not upgraded or deleted. For Sepolia, select a deployed batch-capable factory. Minting was stopped before submitting this batch.');
+}
 export async function preflightPolicyMint(options){
- if(!options.packet?.bricks?.some(b=>b.metadata.extensions?.contentPolicy))return;
+ if(!options.packet?.bricks?.length||options.packet.bricks.some(b=>!b.metadata?.extensions?.contentPolicy))throw Error('Review a file policy for every Brick before atomic minting.');
  const {client}=await connectChain({...options,account:options.packet.account.address});
  await verifyFactory(client,options.factoryAddress);
  await requirePolicyFactory(client,options.factoryAddress);
+ await requireBatchFactory(client,options.factoryAddress);
 }
-export async function mintOnChain({packet,provider,rpcUrl,chainId,factoryAddress,network='ganache',receiptTimeoutMs=120000,onUpdate=()=>{},result={simulated:false,status:'pending',receipts:[]}}){
+export async function mintOnChain(options){
+ const {mintBatchOnChain}=await import('./batch-mint.js');
+ return mintBatchOnChain(options);
+}
+// Explicit compatibility API only. Never selected by Mint Studio or by fallback.
+export async function mintLegacyOnChain({packet,provider,rpcUrl,chainId,factoryAddress,network='ganache',receiptTimeoutMs=120000,onUpdate=()=>{},result={simulated:false,status:'pending',receipts:[]}}){
  const account=packet?.account?.address;
  if(result.receipts.length)throw Error('Use a fresh batch only after reviewing all prior transaction hashes.');
  if(packet?.packetType!=='LOCAL_PREVIEW_NOT_MINTED'||!packet.bricks?.length)throw Error('Invalid registration packet.');

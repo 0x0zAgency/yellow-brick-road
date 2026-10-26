@@ -1,4 +1,4 @@
-import {ACTIVE_NETWORK} from './active-network.js';
+import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import {createPublicClient,http} from 'viem';
 import {RegistrationThumbnail,StatusPill,CollectionPager} from './BrickPresentation.jsx';
@@ -12,7 +12,7 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
  const [examples,setExamples]=useState(false),[data,setData]=useState(null),[error,setError]=useState('');
  const [busy,setBusy]=useState(false),[query,setQuery]=useState(''),[mine,setMine]=useState(false),[checked,setChecked]=useState('');
  const [page,setPage]=useState(0);
- const rpc=localThumbnailRpc(data?.network?.rpcUrl);
+ const rpc=localThumbnailRpc(ACTIVE_NETWORK?activeRpcUrl():data?.network?.rpcUrl);
  const client=useMemo(()=>rpc?createPublicClient({transport:http(rpc,{timeout:5000,retryCount:0})}):null,[rpc]);
  const refresh=useRef(()=>{});
  useEffect(()=>{

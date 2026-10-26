@@ -11,6 +11,7 @@ import ganache from 'ganache';
 import {createPublicClient,createWalletClient,http} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 import {connectChain,mintOnChain,localConfig} from '../src/chain-mint.js';
+import {DEFAULT_CONTENT_POLICY} from '../src/content-policy.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
 const root=fileURLToPath(new URL('../../',import.meta.url));
 const require=createRequire(import.meta.url);
@@ -55,7 +56,7 @@ test('a recreated local chain can mint despite a previous generation numbered-bl
  const actual=await client.getBlock();
  assert.notEqual((await provider.request({method:'eth_getBlockByNumber',params:['0x'+actual.number.toString(16),false]})).hash,actual.hash);
  await connectChain(config);
- const packet=makeRegistrationPacket({metadata:{artist:'History regression',title:'Original test work'},assets:{master:{name:'work.bin',hash:'ab'.repeat(32),size:4}},identity:{mode:'external',connected:true,address:account.address},royalties:{creatorBps:10000},training:'separate-license',composition:false,storage:'demo-encrypted-in-browser'});
+ const packet=makeRegistrationPacket({metadata:{artist:'History regression',title:'Original test work'},assets:{master:{name:'work.bin',hash:'ab'.repeat(32),size:4}},identity:{mode:'external',connected:true,address:account.address},royalties:{creatorBps:10000},training:'separate-license',composition:false,contentPolicy:DEFAULT_CONTENT_POLICY,storage:'demo-encrypted-in-browser'});
  const result=await mintOnChain({...config,packet,factoryAddress});
  assert.equal(result.status,'confirmed');assert.ok(result.receipts.length>0);
  assert.ok(result.receipts.every(r=>r.status==='verified'));assert.ok(sends>0);assert.ok(freshHeadReads>0);

@@ -90,3 +90,30 @@ test('album and songwriter manual edits, including clearing, survive parsed repl
  assert.equal(first.values.release,'Tagged album');assert.equal(first.values.songwriters,'Tagged writer');
  for(const manual of [{release:'My album',songwriters:'My writer'},{release:'',songwriters:''}])assert.deepEqual(resolveUploadFields(manual,['release','songwriters'],uploads).values,manual);
 });
+
+function synchsafe(n){return Buffer.from([(n>>>21)&127,(n>>>14)&127,(n>>>7)&127,n&127]);}
+function taggedAlbumMp3(version,album,encoding=0,custom=false){
+ const id=custom?'TXXX':version===2?'TAL':'TALB';
+ const text=(custom?'ALBUM TITLE\0':'')+album;
+ const bytes=encoding===1?Buffer.concat([Buffer.from([255,254]),Buffer.from(text,'utf16le')]):Buffer.from(text,encoding===3?'utf8':'latin1');
+ const body=Buffer.concat([Buffer.from([encoding]),bytes]);
+ const frame=Buffer.alloc(version===2?6:10);frame.write(id);
+ if(version===2)frame.writeUIntBE(body.length,3,3);
+ else if(version===4)synchsafe(body.length).copy(frame,4);
+ else frame.writeUInt32BE(body.length,4);
+ const tags=Buffer.concat([frame,body]),head=Buffer.concat([Buffer.from([73,68,51,version,0,0]),synchsafe(tags.length)]);
+ const audio=Buffer.alloc(417*8);for(let i=0;i<8;i++)Buffer.from([255,251,144,0]).copy(audio,i*417);
+ return Buffer.concat([head,tags,audio]);
+}
+test('installed parser extracts ID3v2.2/v2.3 UTF16/v2.4 UTF8 and custom album titles',async()=>{
+ for(const [version,album,encoding,custom] of [[2,'Old album',0,false],[3,'Mañana Album',1,false],[4,'東京 Nights',3,false],[4,'Custom collection',3,true]]){
+  const out=await extractUploadMetadata(upload('album-test.mp3',taggedAlbumMp3(version,album,encoding,custom),'audio/mpeg'));
+  assert.equal(out.fields.release,album,out.notice);
+ }
+});
+test('installed parser reads the ID3v1 album at the end of an MP3',async()=>{
+ const audio=Buffer.alloc(417*8);for(let i=0;i<8;i++)Buffer.from([255,251,144,0]).copy(audio,i*417);
+ const tail=Buffer.alloc(128);tail.write('TAG');tail.write('Legacy title',3);tail.write('Legacy artist',33);tail.write('Legacy album',63);tail[127]=12;
+ const out=await extractUploadMetadata(upload('legacy.mp3',Buffer.concat([audio,tail]),'audio/mpeg'));
+ assert.equal(out.fields.release,'Legacy album',out.notice);
+});
