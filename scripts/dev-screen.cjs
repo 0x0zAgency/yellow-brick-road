@@ -3,7 +3,7 @@
 const {stripVTControlCharacters:strip}=require('node:util');
 const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
 const {renderNetworkMenu}=require('./dev-network.cjs');
-const {blockTitle,COMPACT}=require('./dev-title.cjs');
+const {FRAMED_YBR,FRAMED_YBR_WIDTH,FRAMED_YBR_COMPACT,COMPACT}=require('./dev-title.cjs');
 const URLS={web:'http://127.0.0.1:5173',player:'http://127.0.0.1:4173',ipfs:'http://127.0.0.1:8791',ganache:'http://127.0.0.1:8545'};
 const clean=v=>strip(String(v??'')).replace(/[\t\r\n]+/g,' ').replace(/[^\x20-\x7e]/g,'?');
 const clip=(v,w)=>{const s=clean(v);return s.length<=w?s:s.slice(0,Math.max(0,w-3))+'...';};
@@ -72,17 +72,10 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    ...Object.entries(URLS).map(([key,url])=>clip((key==='ganache'?active.network:key)+' '+status(key)+(key==='ganache'?rpc:url),w)),
    dim(clip('Resize to 80x24 for access + wallet panels.',w)),buttons].slice(0,h);
  }
- // A full-word masthead on roomy terminals; compact solid lettering preserves
- // the complete access panels at 80x24 instead of pushing credentials off-screen.
+ // Compact reference layout for narrow terminals and diagnostic views.
  const labels=['YELLOW BRICK ROAD // DEV CONTROL',phase+' / Node '+(state.nodeVersion||process.version)+' / '+uptime,
   'ACTIVE '+active.network.toUpperCase()+' / CHAIN '+active.chainId+' / IPFS',(motion?'[ LIVE ]':'[ STILL ]')+' // FOLLOW THE YELLOW BRICK ROAD'];
- const large=blockTitle(),full=view==='home'&&w>=Math.max(...large.map(l=>l.length))&&h>=29;
- const head=full?[
-  ...large.map(line=>gold(line.padStart(Math.floor((w+line.length)/2)))),
-  pink(clip('YELLOW BRICK ROAD // DEVELOPMENT CONTROL',w)),
-  cyan(clip('CREATOR TOOLS / IP PROTOCOL // '+labels[1],w)),
-  cyan(clip(labels[2]+' // FOLLOW THE YELLOW BRICK ROAD',w))
- ]:COMPACT.map((line,i)=>gold(line.padEnd(25))+(i===0?pink:cyan)(clip(labels[i],w-25)));
+ const head=COMPACT.map((line,i)=>gold(line.padEnd(25))+(i===0?pink:cyan)(clip(labels[i],w-25)));
  const unknown=g.source==='reused'?'reused node; see original terminal':'verifying local Ganache';
  const mnemonic=secret(g.mnemonic,showSecrets,unknown);
  const services=['Explorer '+status('web')+URLS.web,'Player   '+status('player')+URLS.player,'IPFS     '+status('ipfs')+URLS.ipfs];
@@ -129,9 +122,30 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    (remote?'Signer ':'A0 ')+(g.account||'not configured')+' | '+(g.balance||'--')+' ETH',
    'Factory '+(state.factory||'waiting for deployment'),musicLine],w,cyan);
  }
- const access=[...logins];
- access.push(...wrap(remote?'Sepolia signer: '+(g.account||'browser wallet')+' / private key not displayed':'Mnemonic: '+mnemonic,w-4));
- const lines=[...head,bricks(),...box('YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN'),access,w,gold),...panels];
+ const accessTitle='YBR PLAYER LOGIN // '+(a.verified?'VERIFIED':'STARTING')+' // '+(showSecrets?'VISIBLE':'HIDDEN');
+ const walletLine=remote?'Sepolia signer: '+(g.account||'browser wallet')+' / private key not displayed':'Mnemonic: '+mnemonic;
+ const notice=dim(clip(state.error||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w));
+ // Never shrink or crop the supplied artwork to squeeze in a panel. Wrap the
+ // right-hand values, measure the whole frame, and fall back before losing data.
+ const gap=2,rightWidth=w-FRAMED_YBR_WIDTH-gap;
+ if(rightWidth>=60){
+  const top=[pink(clip('YELLOW BRICK ROAD // DEVELOPMENT CONTROL',w)),
+   cyan(clip('CREATOR TOOLS / IP PROTOCOL // '+labels[1],w)),
+   cyan(clip(labels[2]+' // FOLLOW THE YELLOW BRICK ROAD',w))];
+  const accessBox=box(accessTitle,[...logins.flatMap(line=>wrap(line,rightWidth-4)),...wrap(walletLine,rightWidth-4)],rightWidth,gold);
+  const beside=(art,right)=>Array.from({length:Math.max(art.length,right.length)},(_,i)=>
+   gold(art[i]||' '.repeat(FRAMED_YBR_WIDTH))+' '.repeat(gap)+(right[i]||''));
+  const rightChain=[status('ganache')+' RPC '+rpc,'Chain '+active.chainId+' | Block '+(g.block??'--'),
+   chain[1],'Balance   '+(g.balance||'--')+' ETH',chain[3],musicLine];
+  const right=[...accessBox,'',...box('SERVICES',services,rightWidth,cyan),'',
+   ...box(active.label.toUpperCase()+' // '+(g.source||'BOOT'),rightChain.flatMap(line=>wrap(line,rightWidth-4)),rightWidth,pink)];
+  const full=[...top,...beside(FRAMED_YBR,right),bricks(),notice,warning,buttons];
+  if(full.length<=h)return full;
+  const compact=[...top,...beside(FRAMED_YBR_COMPACT,accessBox),bricks(),...panels,notice,warning,buttons];
+  if(compact.length<=h)return compact;
+ }
+ const access=[...logins,...wrap(walletLine,w-4)];
+ const lines=[...head,bricks(),...box(accessTitle,access,w,gold),...panels];
  const room=h-lines.length-2;
  if(room>0)lines.push(dim(clip(state.error||state.logNotice||'QUIET DASHBOARD // [l] session logs / '+logMode+' capture',w)));
  return [...lines.slice(0,h-2),warning,buttons];
