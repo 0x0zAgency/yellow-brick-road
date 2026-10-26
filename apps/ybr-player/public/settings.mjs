@@ -1,7 +1,7 @@
 import {BASE_COLORS,COLOR_FIELDS,ICON_OPTIONS,PRESETS,MAX_IMPORT_BYTES,defaultTheme,validateTheme,decodeTheme,encodeTheme,saveNamedTheme,contrastRatio} from './appearance/appearance.js';
 import {normalizeImportedGraphics,prepareWorkspaceGraphic} from './appearance/appearance-graphics.js';
 import {PLAYER_APPEARANCE_KEY,PLAYER_ICON_FIELDS,loadPlayerAppearance,savePlayerAppearance,playerThemeVariables,workspaceUrl} from './appearance/player-appearance.js';
-import {playerIcon} from './settings-icons.mjs';
+import {playerIcon,applyPlaceholderIcon} from './settings-icons.mjs';
 
 /** Presentation only. Never opens a vault, changes rights, signs, uploads or starts audio. */
 function start(){
@@ -57,6 +57,7 @@ function start(){
   document.querySelector('meta[name="theme-color"]').content=theme.colors.background;
   for(const box of document.querySelectorAll('.brand-graphic'))showGraphic(box,theme.graphics.logo,'Road logo');
   for(const el of document.querySelectorAll('[data-appearance-icon]'))el.replaceChildren(playerIcon(theme.icons[el.dataset.appearanceIcon],theme.iconWeight));
+  applyPlaceholderIcon(theme.icons.placeholder,theme.iconWeight);
   $('previewArtworkIcon').replaceChildren(playerIcon(theme.icons.placeholder,theme.iconWeight));
   $('previewArtwork').style.backgroundImage=theme.graphics.placeholder?'url("'+theme.graphics.placeholder+'")':'none';
   $('previewArtwork').classList.toggle('ps-custom-art',Boolean(theme.graphics.placeholder));

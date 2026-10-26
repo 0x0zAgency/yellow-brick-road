@@ -25,3 +25,20 @@ export function playerIcon(name,weight=1.75){
  for(const d of PATHS[name]||PATHS.bricks){const p=document.createElementNS(ns,'path');p.setAttribute('d',d);svg.append(p);}
  return svg;
 }
+
+// Replace only installed fallback glyphs. Authorized image children are never removed.
+let placeholder={name:'image',weight:1.75};
+function refreshPlaceholderIcons(){
+ const {name,weight}=placeholder,key=name+':'+weight;
+ for(const host of document.querySelectorAll('.track-thumbnail,.mini-cover,.inspector-cover .cover-emblem')){
+  let glyph=host.querySelector(':scope > .player-placeholder-icon');
+  if(!glyph){
+   for(const child of [...host.childNodes])if(child.nodeType===Node.TEXT_NODE)child.remove();
+   if(host.classList.contains('mini-cover')||host.classList.contains('cover-emblem'))for(const child of [...host.children])if(child.tagName==='SPAN'&&!child.classList.contains('release-cover-image'))child.remove();
+   glyph=document.createElement('span');glyph.className='player-placeholder-icon';glyph.setAttribute('aria-hidden','true');host.prepend(glyph);
+  }
+  if(glyph.dataset.icon!==key){glyph.replaceChildren(playerIcon(name,weight));glyph.dataset.icon=key;}
+ }
+}
+export function applyPlaceholderIcon(name,weight){placeholder={name,weight};refreshPlaceholderIcons();}
+for(const event of ['ybr:library','ybr:selection'])window.addEventListener(event,()=>queueMicrotask(refreshPlaceholderIcons));

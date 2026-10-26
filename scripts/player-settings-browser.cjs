@@ -27,11 +27,13 @@ async function main(){
   await page.getByLabel('Primary accent hex',{exact:true}).fill('#00ccff');await page.getByLabel('Player theme name',{exact:true}).fill('Artist Night');
   assert.equal(await page.locator('#audio').getAttribute('src'),src);assert.equal(await page.locator('#audio').evaluate(a=>a.paused),false,'Editing appearance preserves playback');
   assert.equal(await page.evaluate(()=>getComputedStyle(document.body).backgroundColor),'rgb(9, 8, 22)');
+  fs.mkdirSync(output,{recursive:true});await page.evaluate(()=>scrollTo(0,0));await page.screenshot({path:path.join(output,'player-settings-road-brand-desktop.png')});
   await page.getByRole('button',{name:'Save named theme',exact:true}).click();
   const stored=()=>page.evaluate(()=>JSON.parse(localStorage.getItem('ybr:player:appearance:v1')));
   assert.equal((await stored()).themes.length,1);assert.equal((await stored()).active.colors.accent,'#00ccff');
   await page.locator('#playPause').click();
   await page.getByRole('tab',{name:'Icons & graphics'}).click();await page.getByLabel('Library icon',{exact:true}).selectOption('disc');
+  await page.getByLabel('Missing artwork icon',{exact:true}).selectOption('headphones');assert.equal(await page.locator('.track-thumbnail .player-placeholder-icon').first().getAttribute('data-icon'),'headphones:1.75');
   const png=await page.evaluate(()=>{const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');x.fillStyle='#edcb80';x.fillRect(0,0,128,128);x.fillStyle='#102029';for(let i=0;i<3;i++)for(let j=0;j<2;j++)x.fillRect(17+i*33,33+j*33,28,28);return c.toDataURL('image/png').split(',')[1];});
   for(const label of ['Player logo','Ambient background','Missing-artwork placeholder']){await page.getByLabel(label+' file',{exact:true}).setInputFiles({name:'synthetic-display.png',mimeType:'image/png',buffer:Buffer.from(png,'base64')});await page.getByAltText(label,{exact:true}).waitFor();}
   await page.locator('.sidebar .brand-graphic img').waitFor();assert.match(await page.evaluate(()=>getComputedStyle(document.querySelector('.app-shell'),'::before').backgroundImage),/^url\(/);
