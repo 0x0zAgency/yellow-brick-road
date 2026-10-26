@@ -3,7 +3,6 @@
 const path=require('node:path');
 const {spawn}=require('node:child_process');
 const {StringDecoder}=require('node:string_decoder');
-const {redact,essentialLog}=require('./dev-dashboard.cjs');
 const ROOT=path.resolve(__dirname,'..');
 
 function runtimeEnv(env=process.env,execPath=process.execPath){
@@ -11,6 +10,8 @@ function runtimeEnv(env=process.env,execPath=process.execPath){
   npm_node_execpath:execPath,NODE:execPath};
 }
 function runChild(executable,args,{env=process.env,cwd=ROOT,quiet=false,output=process.stdout}={}){
+ // Delay dashboard imports until the selected protocol/runtime environment is ready.
+ const {redact,essentialLog}=require('./dev-dashboard.cjs');
  return new Promise((resolve,reject)=>{
   const child=spawn(executable,args,{cwd,env,stdio:quiet?['ignore','pipe','pipe']:'inherit'});
   const tail=[],warnings=[],secrets=[env.YBR_LISTENER_PASSWORD,env.YBR_ARTIST_PASSWORD];

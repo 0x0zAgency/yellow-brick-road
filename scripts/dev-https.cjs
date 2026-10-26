@@ -38,7 +38,7 @@ function loadHttps(root,env=process.env){
  }catch{throw Error('Local HTTPS certificates are incomplete, unsafe, expired or mismatched. Restore them or renew with mkcert; no HTTP fallback was started. Use --http only to recover the previous local browser origin.');}
 }
 function localUrls(env=process.env){
- const protocol=env.YBR_LOCAL_HTTPS==='1'?'https:':'http:';
+ const protocol=env.YBR_DEV_HTTP!=='1'&&env.YBR_LOCAL_HTTPS==='1'?'https:':'http:';
  return {web:protocol+'//127.0.0.1:5173',player:protocol+'//127.0.0.1:4173',ipfs:'http://127.0.0.1:8791',ganache:'http://127.0.0.1:8545'};
 }
 function prepareHttpsEnvironment(root,env=process.env){

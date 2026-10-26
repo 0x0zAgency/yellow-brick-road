@@ -11,13 +11,17 @@ test('HTTPS is opt-in via certificates; partial or unsafe configuration never si
  fs.mkdirSync(path.join(root,'.road-local'),{mode:0o755});assert.equal(loadHttps(root,{}),null);fs.chmodSync(path.join(root,'.road-local'),0o700);fs.mkdirSync(path.join(root,'.road-local/tls'),{mode:0o700});assert.throws(()=>loadHttps(root,{}),/incomplete/);
  assert.equal(loadHttps(root,{YBR_DEV_HTTP:'1'}),null);
  assert.equal(localUrls({YBR_LOCAL_HTTPS:'1'}).web,'https://127.0.0.1:5173');assert.equal(localUrls({}).player,'http://127.0.0.1:4173');
+ assert.equal(localUrls({YBR_LOCAL_HTTPS:'1',YBR_DEV_HTTP:'1'}).web,'http://127.0.0.1:5173');
  let calls=0;assert.throws(()=>setupHttps(root,{run:()=>{calls++;return {status:1};}}),/Install mkcert/);assert.equal(calls,1);
 });
 test('valid certificates produce bounded private trust bundle; symlinks and mismatched keys are refused',t=>{
  const root=temp(t),dir=createTestTls(root),tls=loadHttps(root,{});assert.ok(tls.key);assert.ok(tls.ca);
  const env=prepareHttpsEnvironment(root,{});assert.equal(env.YBR_LOCAL_HTTPS,'1');assert.equal(fs.statSync(env.NODE_EXTRA_CA_CERTS).mode&0o777,0o600);assert.ok(fs.readFileSync(env.NODE_EXTRA_CA_CERTS).includes(tls.ca));
  assert.deepEqual(prepareHttpsEnvironment(root,env),env);
- const key=path.join(dir,'key.pem');fs.chmodSync(key,0o644);assert.throws(()=>loadHttps(root,{}),/unsafe/);fs.chmodSync(key,0o600);
+ const key=path.join(dir,'key.pem'),originalKey=fs.readFileSync(key);
+ const otherRoot=temp(t),otherDir=createTestTls(otherRoot);
+ fs.writeFileSync(key,fs.readFileSync(path.join(otherDir,'key.pem')));assert.throws(()=>loadHttps(root,{}),/mismatched/);fs.writeFileSync(key,originalKey);
+ fs.chmodSync(key,0o644);assert.throws(()=>loadHttps(root,{}),/unsafe/);fs.chmodSync(key,0o600);
  fs.renameSync(key,key+'.saved');fs.symlinkSync(key+'.saved',key);assert.throws(()=>loadHttps(root,{}),/unsafe/);
 });
 test('real verified HTTPS serves browser-shaped RPC reads; untrusted certificates and foreign origins fail',async t=>{
@@ -35,4 +39,19 @@ test('startup readiness goes through browser proxy and omits params; errors neve
  assert.equal(Object.hasOwn(sent,'params'),false);
  await assert.rejects(()=>verifyReadRpc('https://127.0.0.1:5173',1337,{fetchImpl:async()=>({ok:false,status:400})}),/HTTP 400/);
  await assert.rejects(()=>verifyReadRpc('https://127.0.0.1:5173',1337,{fetchImpl:async()=>{throw Error('PRIVATE_RPC_KEY');}}),e=>!e.message.includes('PRIVATE_RPC_KEY'));
+});
+
+test('bootstrap imports protocol-sensitive dashboard only after preparing its environment',()=>{
+ const source=fs.readFileSync(path.join(__dirname,'dev.cjs'),'utf8');
+ assert.ok(source.indexOf("require('./dev-dashboard.cjs')")>source.indexOf('function runChild('));
+ const child=require('node:child_process');
+ const output=child.execFileSync(process.execPath,['-e',`
+  process.env.YBR_LOCAL_HTTPS='1';
+  require(${JSON.stringify(path.join(__dirname,'dev.cjs'))});
+  if(require.cache[require.resolve(${JSON.stringify(path.join(__dirname,'dev-screen.cjs'))})])throw Error('Dashboard imported too early');
+  process.env.YBR_LOCAL_HTTPS='0';
+  const {URLS}=require(${JSON.stringify(path.join(__dirname,'dev-screen.cjs'))});
+  console.log(URLS.web);
+ `],{encoding:'utf8'});
+ assert.equal(output.trim(),'http://127.0.0.1:5173');
 });
