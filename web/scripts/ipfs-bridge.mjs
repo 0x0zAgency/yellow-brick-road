@@ -10,7 +10,7 @@ import {MAX_NFT_COVER_BYTES,PUBLIC_COVER_CONSENT,validCoverCid,validateNftCoverP
 const MiB=1024*1024;
 export const MAX_CIPHERTEXT_BYTES=32*MiB;
 const MAX_RPC_REPLY_BYTES=64*1024;
-const allowedOrigins=new Set(['http://localhost:5173','http://127.0.0.1:5173']);
+const allowedOrigins=new Set(['http://localhost:5173','http://127.0.0.1:5173','https://localhost:5173','https://127.0.0.1:5173']);
 const loopbackNames=new Set(['127.0.0.1','localhost','[::1]']);
 const CID_RE=/^(?:bafy|bafk|baga|Qm)[a-zA-Z0-9]{20,120}$/;
 const validCid=cid=>typeof cid==='string'&&cid===cid.trim()&&CID_RE.test(cid);

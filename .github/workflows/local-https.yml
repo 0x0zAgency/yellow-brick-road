@@ -1,0 +1,28 @@
+name: Local HTTPS mint
+on:
+  pull_request:
+    paths:
+      - 'scripts/dev*'
+      - 'apps/ybr-player/**'
+      - 'web/**'
+      - 'package.json'
+      - '.github/workflows/local-https.yml'
+jobs:
+  https-mint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm run setup:dev
+      - name: Test certificate checks and browser-shaped RPC requests
+        run: node --test scripts/dev-https.test.cjs apps/ybr-player/test/road-rpc.test.js web/tests/rpc-diagnostics.test.js
+      - name: Prepare isolated Chromium
+        run: |
+          npm install --prefix /tmp/ybr-https-browser playwright@1.56.1 --no-audit --no-fund
+          /tmp/ybr-https-browser/node_modules/.bin/playwright install --with-deps chromium
+      - run: docker compose -f infra/ipfs/compose.yaml pull kubo
+      - name: Mint through the real HTTPS workspace and Player
+        run: node scripts/dev-https.integration.cjs

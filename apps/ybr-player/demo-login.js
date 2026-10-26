@@ -10,8 +10,8 @@ function mayUseDemoLogin(req,boundAddress){
  // A reverse proxy or a wildcard-bound server must never inherit this shortcut.
  if(!boundAddress||!loopback(boundAddress.address)||!trustedLocalRequest(req))return false;
  if(Object.keys(req.headers).some(key=>key==='forwarded'||key.startsWith('x-forwarded-')))return false;
- const host=new URL('http://'+req.headers.host);
- if(Number(host.port||80)!==boundAddress.port)return false;
+ const host=new URL((req.socket.encrypted?'https://':'http://')+req.headers.host);
+ if(Number(host.port||(req.socket.encrypted?443:80))!==boundAddress.port)return false;
  // Browser POSTs must originate from this exact Player origin, not Mint Studio
  // or another local site. GET only advertises the mode and never creates a session.
  return req.method!=='POST'||req.headers.origin===host.origin;

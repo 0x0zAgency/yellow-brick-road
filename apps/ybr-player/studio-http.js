@@ -8,7 +8,7 @@ function trustedLocalRequest(req){
  const ip=req.socket.remoteAddress;
  if(!['127.0.0.1','::1','::ffff:127.0.0.1'].includes(ip))return false;
  let host;
- try{host=new URL('http://'+req.headers.host);}catch{return false;}
+ try{host=new URL((req.socket.encrypted?'https://':'http://')+req.headers.host);}catch{return false;}
  if(!['127.0.0.1','localhost','[::1]'].includes(host.hostname)||host.pathname!=='/'||host.username||host.password||host.search||host.hash)return false;
  if(req.headers.origin&&req.headers.origin!==host.origin)return false;
  return !['cross-site','none'].includes(req.headers['sec-fetch-site']);
