@@ -15,6 +15,7 @@ const { mayUseDemoLogin } = require('./demo-login');
 
 const ROOT = __dirname;
 const PUBLIC = path.join(ROOT, 'public');
+const {appearanceAsset}=require('./appearance-assets');
 const MEDIA = path.join(ROOT, 'media');
 const MANIFEST = path.join(ROOT, 'data', 'bricks.json');
 const EVENTS = path.join(ROOT, 'data', 'player-events.ndjson');
@@ -24,7 +25,7 @@ const GRANT_MS = 30 * 60 * 1000;
 const MAX_BODY_BYTES = 10_000;
 const COOKIE = 'ybr_session';
 const DEMO_PAUSE_COOKIE = 'ybr_demo_paused';
-const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 
 function loadBricks() {
   const payload = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
@@ -329,13 +330,14 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       }
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res,405,'Method not allowed');
       const staticPath = route==='/'?'/index.html':route;
-      if (!['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js','/interaction-ui.js'].includes(staticPath)) return fail(res,404,'Not found');
-      const filePath=path.join(PUBLIC,staticPath.slice(1));
+      const sharedAppearance=appearanceAsset(staticPath);
+      if (!sharedAppearance && !['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js','/interaction-ui.js','/settings.mjs','/settings-icons.mjs','/settings.css'].includes(staticPath)) return fail(res,404,'Not found');
+      const filePath=sharedAppearance || path.join(PUBLIC,staticPath.slice(1));
       const body=fs.readFileSync(filePath);
       res.writeHead(200,{
         'Content-Type':TYPES[path.extname(filePath)]||'application/octet-stream',
         'Content-Length':body.length, 'Cache-Control':'no-store',
-        'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; media-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+        'Content-Security-Policy':"default-src 'none'; script-src 'self'; style-src 'self'; media-src 'self'; connect-src 'self'; img-src 'self' data: blob:; font-src 'self'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
       });
       if(req.method==='HEAD')return res.end();
       return res.end(body);

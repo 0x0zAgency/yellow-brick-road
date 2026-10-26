@@ -4,11 +4,19 @@ on:
   push:
     paths:
       - 'apps/ybr-player/**'
+      - 'web/src/appearance*'
+      - 'web/src/player-appearance.js'
+      - 'web/src/raster-display.js'
+      - 'web/src/nft-cover-format.js'
       - 'schemas/brick-metadata-v1.schema.json'
       - '.github/workflows/ybr-player.yml'
   pull_request:
     paths:
       - 'apps/ybr-player/**'
+      - 'web/src/appearance*'
+      - 'web/src/player-appearance.js'
+      - 'web/src/raster-display.js'
+      - 'web/src/nft-cover-format.js'
       - 'schemas/brick-metadata-v1.schema.json'
       - '.github/workflows/ybr-player.yml'
 

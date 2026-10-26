@@ -42,6 +42,16 @@ async function worker(){
   const link=page.locator('a.aside-link').filter({hasText:'YBR Player'});assert.equal(await link.evaluate(el=>el.href),PLAYER+'/');
   await page.goto(PLAYER);await page.waitForFunction(()=>document.body.innerText.includes('artist'));
   assert.equal(await page.evaluate(()=>isSecureContext),true);
+  await page.waitForFunction(()=>document.documentElement.dataset.playerSettings==='ready');
+  await page.locator('#settingsShortcut').click();
+  assert.equal(await page.locator('#settingsWorkspace').getAttribute('href'),WEB+'/');
+  await page.getByRole('tab',{name:'Colors & themes'}).click();
+  await page.getByRole('button',{name:'Neon Road',exact:true}).click();
+  await page.getByRole('button',{name:'Save appearance',exact:true}).click();
+  await page.reload();await page.waitForFunction(()=>document.documentElement.dataset.playerSettings==='ready');
+  assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('ybr:player:appearance:v1')).active.name),'Neon Road');
+  assert.equal(await page.locator('#audio').evaluate(audio=>audio.paused&&!audio.src),true);
+  assert.deepEqual(httpRequests,[],'Player settings and workspace links must not downgrade HTTPS');
   await context.close();
  }finally{await browser.close();}
  console.log('HTTPS MINT PASS: actual browser mint -> verified receipt through TLS RPC; trusted Node CA, Secure artist session, same-origin preview/bridge, no mixed HTTP, blocked key files and signing proxy. Synthetic CA; not live MetaMask.');

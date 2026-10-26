@@ -24,7 +24,7 @@ Use the animation toggle to reduce workspace motion. The operating system's redu
 
 ## Storage and scope
 
-The only settings key is `road:appearance:v1` in this workspace origin's localStorage. It is not encrypted: avoid private imagery in cosmetic assets. Themes are local to the browser and origin, not synchronized to a blockchain, account, repository, other port or another machine. JSON export/import supports portability. YBR Player and CLI palettes are not controlled by this first workspace Settings page. Existing creator drafts, Building associations, wallet settings, recovery records, IPFS pins and analytics are never cleared by appearance reset.
+The only settings key is `road:appearance:v1` in this workspace origin's localStorage. It is not encrypted: avoid private imagery in cosmetic assets. Themes are local to the browser and origin, not synchronized to a blockchain, account, repository, other port or another machine. JSON export/import supports portability. YBR Player has its own Settings page with the same theme format: export a workspace theme and import it in Player Settings to reuse colors and display graphics, including a custom logo. Appearance does not synchronize automatically across ports. The CLI palette remains separate. See [Player Settings](PLAYER_SETTINGS.md). Existing creator drafts, Building associations, wallet settings, recovery records, IPFS pins and analytics are never cleared by appearance reset.
 
 ## Dev Control title
 

@@ -63,3 +63,25 @@ Standards orientation: W3C PROV-O for graph provenance, C2PA where applicable fo
 The player now discovers opted-in sound-recording Bricks from the **same local Ganache factory as the main Road app** and plays them alongside local demo tracks. Tracks must have an on-chain SHA-256 media hash, chain-committed public metadata, a current-controller public playback grant, and locally available unencrypted public audio. Private Mint Studio Bricks remain private and are never included.
 
 See [Road public music guide](../../docs/ROAD_PUBLIC_MUSIC.md) for setup, opt-in publishing, shared `/road/api/music` and `/road/media/:ipId` endpoints, browser CORS and revocation. Before using Road mode, run `npm install` in this app (the adapter uses ethers v5), deploy the existing factory with `npm run ganache:deploy` from the repository root, and publish a demonstration track via `npm run road:publish` in this app. This proof is not a commercial license or royalty settlement.
+
+## Settings, themes and shared Road identity
+
+Open **Settings** in the sidebar or top bar. Playback & tools includes continuous
+play, session volume, library refresh, the inspector, the creator workspace and
+a read-only Player connection check. The audio element is not remounted when
+opening settings or previewing a theme. The Player uses the app's six-brick mark
+and **0x🟨 Road** wordmark instead of the old YBR / PLAYER / LIBRARY breadcrumb.
+
+Colors & themes provides the workspace's four presets and fourteen semantic
+colors, live preview, explicit save/discard, eight named themes and compatible
+JSON export/import. Icons & graphics controls installed navigation/placeholder
+icons and locally normalized logo, background and placeholder images. Import a
+workspace theme to bring over its custom logo. No automatic cross-origin sync.
+
+Player appearance saves only under `ybr:player:appearance:v1`, separately from
+playback preferences and workspace data. HTTP and HTTPS have separate storage.
+Themes never change rights, published artwork, files, keys or transaction approvals.
+The shared presentation modules are served through an exact static allowlist from
+this repository's `web/src`; run the Player from the complete checkout. No arbitrary
+workspace-file route, React bundle, third-party SDK or new dependency is added.
+See [Player Settings](../../docs/PLAYER_SETTINGS.md) for details and tests.
