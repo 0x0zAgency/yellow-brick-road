@@ -25,7 +25,11 @@ test('wide dashboard shows aligned side-by-side panels; all layouts stay in boun
  for(const columns of [70,80,100,113,120,180])for(const rows of [24,30,40]){
   const lines=renderDashboard(state(),{columns,rows,color:true,showSecrets:true});assert.ok(lines.length<rows);
   for(const line of lines)assert.ok(strip(line).length<columns,strip(line));
-  if(columns>=113)assert.ok(lines.some(l=>l.includes('SERVICES')&&l.includes('GANACHE')));
+  if(columns>=113){
+   const plain=lines.map(strip),artAt=plain.findIndex(l=>l.includes('YBR PLAYER LOGIN')&&l.indexOf('┌')===74);
+   if(artAt>=0&&rows>=35)assert.ok(plain.some(l=>l.slice(74).includes('SERVICES'))&&plain.some(l=>l.slice(74).includes('GANACHE')));
+   else assert.ok(lines.some(l=>l.includes('SERVICES')&&l.includes('GANACHE')));
+  }
  }
 });
 test('tiny terminal fallback is bounded and does not expose credentials',()=>{
@@ -185,4 +189,24 @@ test('two separate launcher processes start fresh logs without persisting verbos
   fs.writeFileSync(file+'.1','old rotation');execFileSync(process.execPath,['-e',script,root,'second'],{stdio:'pipe'});
   const current=fs.readFileSync(file,'utf8');assert.match(current,/second/);assert.doesNotMatch(current,/first|eth_chainId/);assert.equal(fs.existsSync(file+'.1'),false);
  }finally{fs.rmSync(root,{recursive:true,force:true});}
+});
+
+test('TTY resize swaps full artwork, framed-letter and compact layouts without losing controls',()=>{
+ const h=harness({tty:true});try{
+  h.dashboard.start();h.dashboard.update(state());
+  for(const [columns,rows,kind] of [[150,40,'full'],[150,30,'framed'],[80,24,'compact'],[150,40,'full']]){
+   Object.assign(h.output,{columns,rows});h.output.emit('resize');
+   const lines=h.dashboard.lastFrame.map(strip),text=lines.join('\n');
+   assert.ok(lines.length<rows);assert.ok(lines.every(line=>line.length<columns));
+   if(kind==='full')assert.ok(lines[3].startsWith('         ███'));
+   if(kind==='framed')assert.ok(lines[3].startsWith('     ██.----------------.'));
+   if(kind==='compact')assert.ok(lines[0].startsWith('##'));
+   for(const value of ['listener-fixture','artist-fixture','about',state().factory,'[q] quit'])assert.ok(text.includes(value),value);
+  }
+  h.input.emit('keypress','s',{name:'s'});
+  const hidden=strip(h.dashboard.lastFrame.join('\n'));
+  for(const value of ['listener-fixture','artist-fixture','abandon'])assert.ok(!hidden.includes(value));
+  h.input.emit('keypress','p',{name:'p'});assert.match(strip(h.dashboard.lastFrame[1]),/DISPLAY PAUSED/);
+  h.input.emit('keypress','p',{name:'p'});assert.match(strip(h.dashboard.lastFrame[1]),/CREATOR TOOLS/);
+ }finally{h.close();}
 });

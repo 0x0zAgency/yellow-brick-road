@@ -28,7 +28,7 @@ The only settings key is `road:appearance:v1` in this workspace origin's localSt
 
 ## Dev Control title
 
-Roomy terminals show the full **YELLOW BRICK ROAD** in solid five-row lettering, followed by **DEVELOPMENT CONTROL** and **CREATOR TOOLS / IP PROTOCOL**. At 80×24 the masthead switches to compact solid YBR lettering so credentials, selected network/factory, warnings and controls remain visible. Animated bricks, quiet logs, hidden interface controls and deployment approval remain unchanged. The tagline remains **FOLLOW THE YELLOW BRICK ROAD**.
+Roomy terminals show the creator-supplied, 72-column framed **YBR** artwork on the left, including its block/shade pattern, with **YBR PLAYER LOGIN** at the top right. Services and the active chain stack underneath the login box. The complete artwork is 27 rows; at least 135 columns and roughly 35 rows are needed, depending on wrapped credentials. Shorter wide terminals keep the original framed-letter section at left and put services/chain panels below it. Narrow or short windows (including 80×24) retain compact solid YBR lettering so credentials, selected network/factory, warnings and controls remain visible. The renderer measures the whole frame before choosing a layout; it never crops the art or login box to fit. The explicit **YELLOW BRICK ROAD // DEVELOPMENT CONTROL** title and **CREATOR TOOLS / IP PROTOCOL** remain above the wide layout. Animated bricks, quiet logs, hidden interface controls and deployment approval remain unchanged. The tagline remains **FOLLOW THE YELLOW BRICK ROAD**.
 
 ## Verification
 
