@@ -49,7 +49,8 @@ refusal to silent tag loss; it is not a universal tag repair or transcoding tool
 
 Audio bytes outside the ID3 envelope must match byte-for-byte before a download
 is offered. No audio is decoded/re-encoded for export. Tag encoding, padding and
-legacy-tag migration can change. **The whole-file checksum changes after editing.**
+legacy-tag migration can change. New tag blocks use no optional padding to avoid
+uncounted padding in the pinned writer; correctly padded source tags are supported. **The whole-file checksum changes after editing.**
 An edited copy is a new file version: it cannot silently satisfy an existing
 Brick's content commitment or replace authorized Player media. Register or revise
 it only through the separate reviewed workflow. Tags are not proof of rights.

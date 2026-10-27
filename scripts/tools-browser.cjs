@@ -4,7 +4,7 @@ const fs=require('node:fs'),path=require('node:path'),assert=require('node:asser
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
 const root=path.resolve(__dirname,'..'),out=path.join(root,'.road-local/player-browser-results');
 const MP3Tag=require(require.resolve('mp3tag.js',{paths:[path.join(root,'web')]}));
-function fixture(){const bytes=Buffer.alloc(417*8);for(let i=0;i<8;i++)bytes.set([255,251,144,100],i*417);return MP3Tag.writeBuffer(bytes,{v2:{TIT2:'Synthetic tag fixture',TPE1:'Test performer',TALB:'Original album',TCOM:'Original composer',TEXT:'Original lyricist',TXXX:[{description:'SONGWRITER',text:'Original songwriter'},{description:'PRIVATE NOTE',text:'Keep this note'}],USLT:[{language:'eng',descriptor:'',text:'Synthetic lyrics'}]}},{id3v2:{version:3,encoding:'utf-16'}});}
+function fixture(){const bytes=Buffer.alloc(417*8);for(let i=0;i<8;i++)bytes.set([255,251,144,100],i*417);return MP3Tag.writeBuffer(bytes,{v2:{TIT2:'Synthetic tag fixture',TPE1:'Test performer',TALB:'Original album',TCOM:'Original composer',TEXT:'Original lyricist',TXXX:[{description:'SONGWRITER',text:'Original songwriter'},{description:'PRIVATE NOTE',text:'Keep this note'}],USLT:[{language:'eng',descriptor:'',text:'Synthetic lyrics'}]}},{id3v2:{version:3,encoding:'utf-16',padding:0}});}
 async function main(){
  if(!process.env.CI)throw Error('This isolated browser regression is CI only.');
  const browser=await chromium.launch({headless:true});

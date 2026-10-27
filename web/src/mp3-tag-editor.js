@@ -12,7 +12,7 @@ export const TAG_FIELDS=[
  ['isrc','ISRC','TSRC'],['publisher','Publisher / label','TPUB'],['copyright','Copyright notice','TCOP'],
  ['comment','Comment','COMM'],['lyrics','Lyrics','USLT']
 ];
-const asBytes=value=>value instanceof Uint8Array?value:new Uint8Array(value);
+const asBytes=value=>value instanceof Uint8Array?new Uint8Array(value.buffer,value.byteOffset,value.byteLength):new Uint8Array(value);
 const equal=(a,b)=>a.length===b.length&&a.every((v,i)=>v===b[i]);
 const text=v=>typeof v==='string'?v:typeof v==='number'?String(v):'';
 const safeError=message=>new Error(message); // Do not echo parser internals or private tag contents.
@@ -144,8 +144,9 @@ export async function writeMp3Tags(buffer,changes,{coverMode='keep',coverBytes=n
  const expected=JSON.stringify(canonical(v));
  let output,after;
  try{
+  // Avoid uncounted padding in the pinned writer; source audio must stay byte-identical.
   output=asBytes(MP3Tag.writeBuffer(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),{v2:v},
-   {strict:false,id3v1:{include:false},id3v2:{include:true,version,unsupported:true,padding:1024,encoding:'utf-16'}}));
+   {strict:false,id3v1:{include:false},id3v2:{include:true,version,unsupported:true,padding:0,encoding:'utf-16'}}));
   after=MP3Tag.readBuffer(output.buffer.slice(output.byteOffset,output.byteOffset+output.byteLength),{unsupported:true});
  }catch{throw safeError('These tags cannot be exported safely. The original file is unchanged.');}
  const outEnvelope=inspectEnvelope(output);

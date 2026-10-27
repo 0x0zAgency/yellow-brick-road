@@ -6,7 +6,7 @@ import {readMp3Tags,writeMp3Tags,inspectEnvelope} from '../src/mp3-tag-editor.js
 import {extractUploadMetadata} from '../src/upload-metadata.js';
 function audio(){const b=Buffer.alloc(417*8);for(let i=0;i<8;i++)b.set([255,251,144,100],i*417);return b;}
 const png=Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'));
-function fixture(version=3,extras={}){return MP3Tag.writeBuffer(audio(),{v2:{TIT2:'Original',TPE1:'Performer',TALB:'Album before',TCOM:'Composer',TEXT:'Lyricist',TXXX:[{description:'SONGWRITER',text:'Songwriter'},{description:'PRIVATE NOTE',text:'Keep me'}],COMM:[{language:'eng',descriptor:'',text:'Notes'},{language:'spa',descriptor:'Alternate',text:'Comentario'}],USLT:[{language:'eng',descriptor:'',text:'First line\nSecond line'}],APIC:[{format:'image/png',type:3,description:'Cover',data:png}],PRIV:[{ownerId:'local.test',data:[1,2,3]}],...extras}},{id3v2:{version,encoding:'utf-16',unsupported:true}});}
+function fixture(version=3,extras={}){return MP3Tag.writeBuffer(audio(),{v2:{TIT2:'Original',TPE1:'Performer',TALB:'Album before',TCOM:'Composer',TEXT:'Lyricist',TXXX:[{description:'SONGWRITER',text:'Songwriter'},{description:'PRIVATE NOTE',text:'Keep me'}],COMM:[{language:'eng',descriptor:'',text:'Notes'},{language:'spa',descriptor:'Alternate',text:'Comentario'}],USLT:[{language:'eng',descriptor:'',text:'First line\nSecond line'}],APIC:[{format:'image/png',type:3,description:'Cover',data:png}],PRIV:[{ownerId:'local.test',data:[1,2,3]}],...extras}},{id3v2:{version,encoding:'utf-16',unsupported:true,padding:0}});}
 for(const version of [3,4])test('real ID3v2.'+version+' round-trip keeps audio, private tags and pictures; album feeds Mint Studio',async()=>{
  const source=fixture(version),original=Buffer.from(source),before=await readMp3Tags(source);
  assert.equal(before.fields.album,'Album before');assert.equal(before.fields.songwriter,'Songwriter');assert.equal(before.readOnly,false);assert.equal(before.picture.mime,'image/png');
@@ -41,4 +41,15 @@ test('non-MP3 input and flagged files cannot be exported',async()=>{
  await assert.rejects(()=>readMp3Tags(new TextEncoder().encode('Not an MP3 file')),/MP3|MPEG/);
  const source=new Uint8Array(fixture());source[5]=32;
  await assert.rejects(()=>writeMp3Tags(source,{album:'Nope'}),/Read-only|safely/);
+});
+
+test('standards-compliant padding belongs to the ID3 envelope, not the audio',async()=>{
+ const source=fixture(),old=inspectEnvelope(source),padding=2048;
+ const padded=Buffer.concat([source.subarray(0,old.start),Buffer.alloc(padding),source.subarray(old.start)]);
+ const size=old.start-10+padding;for(let i=0;i<4;i++)padded[6+i]=(size>>>(7*(3-i)))&127;
+ assert.equal(inspectEnvelope(padded).start,old.start+padding);
+ const result=await writeMp3Tags(padded,{album:'Padded source album'});
+ const envelope=inspectEnvelope(result.bytes);assert.equal(result.bytes[envelope.start],255);
+ assert.deepEqual(result.bytes.slice(envelope.start,envelope.end),new Uint8Array(audio()));
+ assert.equal((await readMp3Tags(result.bytes)).fields.album,'Padded source album');
 });
