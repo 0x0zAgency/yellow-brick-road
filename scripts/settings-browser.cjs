@@ -15,7 +15,8 @@ async function main(){
   await page.goto('http://127.0.0.1:5173/');
   const openSettings=async()=>{
    const button=page.getByRole('navigation',{name:'Main navigation'}).getByRole('button',{name:'Settings',exact:true});
-   if(!await button.isVisible()||await page.evaluate(()=>innerWidth<1000))await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+   if(await page.evaluate(()=>innerWidth<1000))await page.getByRole('button',{name:'Open navigation',exact:true}).click();
+   const tools=page.getByRole('button',{name:'Tools',exact:true});if(await tools.getAttribute('aria-expanded')==='false')await tools.click();
    await button.click();await page.getByRole('region',{name:'Workspace settings'}).waitFor();
   };
   await openSettings();await page.evaluate(()=>{localStorage.setItem('road:keep-recovery-sentinel','PRIVATE-SENTINEL');});
