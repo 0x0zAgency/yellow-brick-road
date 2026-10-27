@@ -51,9 +51,23 @@ async function main(){
   await page.getByRole('button',{name:'Use extracted album',exact:true}).click();
   assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'Imported album');
   assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'','Applying an album must not overwrite other edits');
+  // Simulate a previous remembered release, then reopen the real minter.
+  await page.evaluate(()=>localStorage.setItem('road:mint:form:v1',JSON.stringify({version:1,data:{meta:{title:'Cached old title',artist:'Cached artist',release:'Cached album',songwriters:'Cached writer',description:'Saved notes',daw:'Saved DAW'},training:'separate-license',share:7500}})));
+  await page.reload();await page.getByRole('button',{name:'Mint Studio',exact:true}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await attach('Choose Master recording','fresh.mp3',mp3('Fresh track title','Fresh artist','Fresh album','Fresh composer'));
+  await advance();
+  for(const [label,expected] of [['Track title','Fresh track title'],['Recording artist / claimant','Fresh artist'],['Album / release','Fresh album'],['Songwriters / composers (comma-separated)','Fresh composer, Lyric Writer, Custom Writer'],['Notes','Saved notes'],['DAW / software','Saved DAW']])assert.equal(await page.getByLabel(label,{exact:true}).inputValue(),expected,label);
+  const remembered=await page.evaluate(()=>JSON.parse(localStorage.getItem('road:mint:form:v1')).data);
+  assert.equal(remembered.meta.title,'Fresh track title');assert.equal(remembered.meta.release,'Fresh album');assert.equal(remembered.training,'separate-license');assert.equal(remembered.share,7500);
+  // User corrections made now still win; the next page reload makes them saved defaults.
+  await page.getByLabel('Track title',{exact:true}).fill('My current correction');
+  await page.getByRole('button',{name:'← Back',exact:true}).click();await attach('Choose Audio preview','latest-preview.mp3',mp3('New preview title','Preview creator','New preview album'));
+  await advance();assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'My current correction');assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'New preview album');
+  await page.reload();await page.getByRole('button',{name:'Mint Studio',exact:true}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await attach('Choose Master recording','next.mp3',mp3('Next release title','Next artist','Next album'));await advance();assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'Next release title');
   assert.deepEqual(errors,[]);
   fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-autofill.png'),fullPage:true});
-  console.log('PASS: worker MP3 extraction from master and preview, filename fallback for unknown formats, manual edits/clearing, replacement and preview metadata precedence.');
+  console.log('PASS: worker MP3 extraction from master and preview, filename fallback for unknown formats, manual edits/clearing, replacement and preview precedence, and new tags overriding remembered data across reloads.');
  }catch(e){fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-failure.png'),fullPage:true}).catch(()=>{});throw e;}
  finally{await browser.close();}
 }
