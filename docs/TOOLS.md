@@ -39,8 +39,9 @@ the limited v1 trailer is removed rather than preserving conflicting old values.
 The UI explicitly discloses this before export. Common fields cleared by the user
 are removed. Clearing album also removes explicit custom album-title aliases.
 Only the first comment/lyrics entry is edited; alternate languages/descriptors
-remain. Existing decoded frames, including private/custom frames and pictures,
-must round-trip equivalently or export is blocked.
+remain. Untouched frames, including private/custom data and pictures, are copied
+verbatim; only edited frames are encoded by the library. All decoded frame values
+must still round-trip equivalently or export is blocked.
 
 ID3v2.2, flagged/extended/unsynchronized tags, frame-level flags, ambiguous duplicate
 frames, APEv2 and Lyrics3 tails are read-only in this tool. Malformed/truncated tags
@@ -49,8 +50,9 @@ refusal to silent tag loss; it is not a universal tag repair or transcoding tool
 
 Audio bytes outside the ID3 envelope must match byte-for-byte before a download
 is offered. No audio is decoded/re-encoded for export. Tag encoding, padding and
-legacy-tag migration can change. New tag blocks use no optional padding to avoid
-uncounted padding in the pinned writer; correctly padded source tags are supported. **The whole-file checksum changes after editing.**
+legacy-tag migration can change. The standard ID3 envelope is rebuilt around
+retained and library-generated frames, with no optional output padding; correctly
+padded source tags are supported. **The whole-file checksum changes after editing.**
 An edited copy is a new file version: it cannot silently satisfy an existing
 Brick's content commitment or replace authorized Player media. Register or revise
 it only through the separate reviewed workflow. Tags are not proof of rights.

@@ -21,7 +21,7 @@ const rawSize=(b,i)=>b[i]*16777216+b[i+1]*65536+b[i+2]*256+b[i+3];
 /** Bounds and flags only, not a tag-content parser. ID3 decoding stays in mp3tag.js. */
 export function inspectEnvelope(input){
  const b=asBytes(input);if(b.length<4||b.length>MAX_MP3_BYTES)throw safeError('Choose an MP3 between 4 bytes and 128 MiB.');
- let start=0,version=3,reason='',hasV2=false;
+ let start=0,version=3,reason='',hasV2=false;const frameRanges=[];
  if(b[0]===73&&b[1]===68&&b[2]===51){
   hasV2=true;version=b[3];
   if(b.length<10||![2,3,4].includes(version)||b.slice(6,10).some(x=>x>127))throw safeError('Unsupported or damaged ID3 header. No file was changed.');
@@ -38,7 +38,7 @@ export function inspectEnvelope(input){
     if(!size||at+10+size>start)throw safeError('Truncated ID3 frame. No file was changed.');
     if(b[at+8]||b[at+9])reason='Read-only: flagged, encrypted or compressed ID3 frames cannot be safely rewritten here.';
     if(singles.has(id)&&!['TXXX','WXXX','COMM','USLT','APIC','PRIV','UFID','GEOB','POPM'].includes(id))reason='Read-only: repeated ID3 frames require a specialist editor.';
-    singles.add(id);at+=10+size;
+    frameRanges.push({id,start:at,end:at+10+size});singles.add(id);at+=10+size;
    }
    if(b.subarray(at,start).some(x=>x!==0))throw safeError('Invalid ID3 padding. No file was changed.');
   }
@@ -49,7 +49,7 @@ export function inspectEnvelope(input){
  // APE/Lyrics3 tails need coordinated edits to avoid old fields resurfacing.
  const tail=new TextDecoder('latin1').decode(b.subarray(Math.max(start,end-160),end));
  if(/APETAGEX|LYRICS200|LYRICSEND/.test(tail))reason='Read-only: APEv2 or Lyrics3 tags require coordinated editing in a specialist editor.';
- return {start,end,version,hasV1,hasV2,reason};
+ return {start,end,version,hasV1,hasV2,reason,frameRanges};
 }
 async function libraries(){const [{default:MP3Tag},{parseBuffer}]=await Promise.all([import('mp3tag.js'),import('music-metadata')]);return {MP3Tag,parseBuffer};}
 const frameId=(field,version)=>field==='year'&&version===4?'TDRC':TAG_FIELDS.find(f=>f[0]===field)?.[2];
@@ -142,16 +142,31 @@ export async function writeMp3Tags(buffer,changes,{coverMode='keep',coverBytes=n
   if(others.length)v.APIC=others;else delete v.APIC;
  }
  const expected=JSON.stringify(canonical(v));
+ const changed=new Set([...Object.keys(tags.v2||{}),...Object.keys(v)].filter(id=>JSON.stringify(canonical(tags.v2?.[id]))!==JSON.stringify(canonical(v[id]))));
+ const edited=Object.fromEntries(Object.entries(v).filter(([id])=>changed.has(id)));
  let output,after;
  try{
-  // Avoid uncounted padding in the pinned writer; source audio must stay byte-identical.
-  output=asBytes(MP3Tag.writeBuffer(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),{v2:v},
+  // Encode only edited frames. Preserve every untouched frame verbatim, including
+  // opaque/private metadata that a decode/re-encode cycle might normalize or lose.
+  // This tiny MPEG header satisfies the encoder API; none of its bytes are exported.
+  const encoderInput=new Uint8Array(417);encoderInput.set([255,251,144,100]);
+  const encoded=asBytes(MP3Tag.writeBuffer(encoderInput.buffer,{v2:edited},
    {strict:false,id3v1:{include:false},id3v2:{include:true,version,unsupported:true,padding:0,encoding:'utf-16'}}));
-  after=MP3Tag.readBuffer(output.buffer.slice(output.byteOffset,output.byteOffset+output.byteLength),{unsupported:true});
+  const generated=inspectEnvelope(encoded);
+  const retained=envelope.frameRanges.filter(frame=>!changed.has(frame.id)).map(frame=>bytes.subarray(frame.start,frame.end));
+  const parts=[...retained,encoded.subarray(10,generated.start)];
+  const tagSize=parts.reduce((size,part)=>size+part.length,0),audio=bytes.subarray(envelope.start,envelope.end);
+  if(tagSize+10>MAX_TAG_BYTES)throw safeError('Updated metadata exceeds the tag limit.');
+  // Assemble the standard ID3 envelope, generated/retained frames and exact source
+  // audio. ID3v1 removal is disclosed above; all other bytes remain unmodified.
+  const headerSize=tagSize?10:0;output=new Uint8Array(headerSize+tagSize+audio.length);
+  if(tagSize){output.set([73,68,51,version,0,0]);for(let i=0;i<4;i++)output[6+i]=(tagSize>>>(7*(3-i)))&127;}
+  let at=headerSize;for(const part of parts){output.set(part,at);at+=part.length;}output.set(audio,at);
+  after=MP3Tag.readBuffer(output.buffer,{unsupported:true});
  }catch{throw safeError('These tags cannot be exported safely. The original file is unchanged.');}
  const outEnvelope=inspectEnvelope(output);
  if(!equal(bytes.subarray(envelope.start,envelope.end),output.subarray(outEnvelope.start,outEnvelope.end)))throw safeError('Audio-byte verification failed. Export was blocked; the original is unchanged.');
  if(expected!==JSON.stringify(canonical(after.v2||{})))throw safeError('A metadata frame did not round-trip safely. Export was blocked to prevent tag loss.');
- return {bytes:output,fields:values(after,version),audioVerified:true,tagVersion:'ID3v2.'+version,legacyMigrated:envelope.hasV1};
+ return {bytes:output,fields:values(after,version),audioVerified:true,tagVersion:outEnvelope.hasV2?'ID3v2.'+version:'No ID3 tags',legacyMigrated:envelope.hasV1};
 }
 export function updatedFilename(name){return (String(name||'audio').split(/[\\/]/).pop().replace(/\.mp3$/i,'').replace(/[\x00-\x1f\x7f]/g,'').slice(0,150)||'audio')+'-tagged.mp3';}

@@ -6,7 +6,13 @@ import {readMp3Tags,writeMp3Tags,inspectEnvelope} from '../src/mp3-tag-editor.js
 import {extractUploadMetadata} from '../src/upload-metadata.js';
 function audio(){const b=Buffer.alloc(417*8);for(let i=0;i<8;i++)b.set([255,251,144,100],i*417);return b;}
 const png=Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'));
-function fixture(version=3,extras={}){return MP3Tag.writeBuffer(audio(),{v2:{TIT2:'Original',TPE1:'Performer',TALB:'Album before',TCOM:'Composer',TEXT:'Lyricist',TXXX:[{description:'SONGWRITER',text:'Songwriter'},{description:'PRIVATE NOTE',text:'Keep me'}],COMM:[{language:'eng',descriptor:'',text:'Notes'},{language:'spa',descriptor:'Alternate',text:'Comentario'}],USLT:[{language:'eng',descriptor:'',text:'First line\nSecond line'}],APIC:[{format:'image/png',type:3,description:'Cover',data:png}],PRIV:[{ownerId:'local.test',data:[1,2,3]}],...extras}},{id3v2:{version,encoding:'utf-16',unsupported:true,padding:0}});}
+function fixture(version=3,extras={}){const file=MP3Tag.writeBuffer(audio(),{v2:{TIT2:'Original',TPE1:'Performer',TALB:'Album before',TCOM:'Composer',TEXT:'Lyricist',TXXX:[{description:'SONGWRITER',text:'Songwriter'},{description:'PRIVATE NOTE',text:'Keep me'}],COMM:[{language:'eng',descriptor:'',text:'Notes'},{language:'spa',descriptor:'Alternate',text:'Comentario'}],USLT:[{language:'eng',descriptor:'',text:'First line\nSecond line'}],APIC:[{format:'image/png',type:3,description:'Cover',data:png}],...extras}},{id3v2:{version,encoding:'utf-16',unsupported:true,padding:0}});return addRawFrame(file,'PRIV',Buffer.from('local.test\0\x01\x02\x03','latin1'));}
+function addRawFrame(file,id,payload){
+ const envelope=inspectEnvelope(file),frame=Buffer.alloc(10+payload.length);frame.write(id,0,'ascii');
+ if(envelope.version===4)for(let i=0;i<4;i++)frame[4+i]=(payload.length>>>(7*(3-i)))&127;else frame.writeUInt32BE(payload.length,4);
+ payload.copy(frame,10);const output=Buffer.concat([file.subarray(0,envelope.start),frame,file.subarray(envelope.start)]);
+ const size=envelope.start-10+frame.length;for(let i=0;i<4;i++)output[6+i]=(size>>>(7*(3-i)))&127;return output;
+}
 for(const version of [3,4])test('real ID3v2.'+version+' round-trip keeps audio, private tags and pictures; album feeds Mint Studio',async()=>{
  const source=fixture(version),original=Buffer.from(source),before=await readMp3Tags(source);
  assert.equal(before.fields.album,'Album before');assert.equal(before.fields.songwriter,'Songwriter');assert.equal(before.readOnly,false);assert.equal(before.picture.mime,'image/png');
@@ -52,4 +58,13 @@ test('standards-compliant padding belongs to the ID3 envelope, not the audio',as
  const envelope=inspectEnvelope(result.bytes);assert.equal(result.bytes[envelope.start],255);
  assert.deepEqual(result.bytes.slice(envelope.start,envelope.end),new Uint8Array(audio()));
  assert.equal((await readMp3Tags(result.bytes)).fields.album,'Padded source album');
+});
+
+test('unedited opaque frames are preserved byte-for-byte, not reconstructed from decoded values',async()=>{
+ const source=addRawFrame(fixture(),'XABC',Buffer.from([0,1,255,0,42]));
+ const result=await writeMp3Tags(source,{title:'Edited title'});
+ for(const id of ['PRIV','XABC','APIC']){
+  const a=inspectEnvelope(source).frameRanges.find(f=>f.id===id),b=inspectEnvelope(result.bytes).frameRanges.find(f=>f.id===id);
+  assert.ok(a&&b,id);assert.deepEqual(new Uint8Array(source.subarray(a.start,a.end)),result.bytes.slice(b.start,b.end),id+' must be bit-identical');
+ }
 });
