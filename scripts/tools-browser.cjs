@@ -15,7 +15,8 @@ async function main(){
   await page.goto('http://127.0.0.1:5173/');
   const nav=page.getByRole('navigation',{name:'Main navigation'}),tools=nav.getByRole('button',{name:'Tools',exact:true});
   assert.equal(await tools.getAttribute('aria-expanded'),'false');assert.equal(await nav.getByRole('button',{name:'Settings',exact:true}).count(),0);
-  await tools.click();assert.equal(await tools.getAttribute('aria-expanded'),'true');await nav.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('region',{name:'Workspace settings'}).waitFor();
+  await tools.click();assert.equal(await tools.getAttribute('aria-expanded'),'true');
+  assert.ok(await page.evaluate(()=>{const nav=document.querySelector('.sidebar nav'),player=nav.nextElementSibling;return nav.getBoundingClientRect().bottom<=player.getBoundingClientRect().top+1;}),'Expanded Tools must not overlap the Player shortcut');await nav.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('region',{name:'Workspace settings'}).waitFor();
   await nav.getByRole('button',{name:'Recover files',exact:true}).click();await page.getByRole('heading',{name:'Recover your originals.',exact:true}).waitFor();
   await nav.getByRole('button',{name:'MP3 Tags',exact:true}).click();await page.getByRole('region',{name:'MP3 tag reader and updater'}).waitFor();
   await page.getByLabel('MP3 file',{exact:true}).setInputFiles({name:'synthetic-tags.mp3',mimeType:'audio/mpeg',buffer:fixture()});
@@ -38,6 +39,7 @@ async function main(){
   await page.getByLabel('Title',{exact:true}).fill('Another edit');assert.equal(await link.count(),0,'Any edit invalidates the prepared download');assert.equal(await page.getByLabel('Approve MP3 copy export',{exact:true}).isChecked(),false);
   await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Open navigation',exact:true}).click();await nav.getByRole('button',{name:'Recover files',exact:true}).click();await page.getByRole('heading',{name:'Recover your originals.',exact:true}).waitFor();
   await page.getByRole('button',{name:'Open navigation',exact:true}).click();await nav.getByRole('button',{name:'MP3 Tags',exact:true}).click();assert.equal(await page.getByLabel('Title',{exact:true}).inputValue(),'Another edit');
+  await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);
   await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.screenshot({path:path.join(out,'tools-mp3-mobile.png'),fullPage:true});
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No mobile horizontal overflow');
   await page.getByRole('button',{name:'Discard edits',exact:true}).click();assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'Original album');
