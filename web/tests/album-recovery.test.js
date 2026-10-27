@@ -32,10 +32,12 @@ test('worker timeout/crash retains decoded album; cancellation discards it and t
   assert.equal(terminated,1);
  }
 });
-test('recovered album cannot overwrite saved/manual data; explicit user edit can apply the suggestion',()=>{
+test('recovered album replaces a saved default but not a current-session edit',()=>{
  let state=initialUploadForm({release:'Saved album'});
  state=uploadFormReducer(state,{type:'start',role:'master',id:2,result:{fields:{release:'Tagged album'},fieldSources:{release:'embedded audio tags'}}});
- assert.equal(resolveUploadFields(state.manual,state.touched,state.uploads).values.release,'Saved album');
+ assert.equal(resolveUploadFields(state.manual,state.touched,state.uploads).values.release,'Tagged album');
+ state=uploadFormReducer(state,{type:'edit',field:'release',value:'My edited album'});
+ assert.equal(resolveUploadFields(state.manual,state.touched,state.uploads).values.release,'My edited album');
  const suggestion=resolveUploadFields({},[],state.uploads).values.release;
  state=uploadFormReducer(state,{type:'edit',field:'release',value:suggestion});
  assert.equal(resolveUploadFields(state.manual,state.touched,state.uploads).values.release,'Tagged album');

@@ -168,7 +168,9 @@ export async function extractUploadMetadata(file,{role='',parseAudio,parseImage,
 }
 function castGenre(metadata){const genre=metadata?.common?.genre;return Array.isArray(genre)?genre[0]:genre;}
 
-/** Pure deterministic form reconciliation. A typed (even cleared) field always wins.
+/** Pure deterministic form reconciliation. Restored values are fallback defaults.
+ * New uploaded metadata wins over them. A field edited (even cleared) in this
+ * session stays authoritative while asynchronous reads finish or files change.
  * Preview tags win over conflicting master tags; sidecars are explicit metadata input.
  * Other assets retain their own extracted title but cannot rename the release.
  */
@@ -192,7 +194,8 @@ export function resolveUploadFields(manual={},touched=[],uploads={}){
  return {values,sources};
 }
 export function initialUploadForm(values={}){
- return {manual:{...values},touched:Object.entries(values).filter(([,v])=>v!==''&&v!==null&&v!==undefined).map(([key])=>key),uploads:{}};
+ // Restoring a form is not a user edit. Only the edit action locks a field.
+ return {manual:{...values},touched:[],uploads:{}};
 }
 export function uploadFormReducer(state,action){
  if(action.type==='edit')return {...state,manual:{...state.manual,[action.field]:action.value},touched:[...new Set([...state.touched,action.field])]};

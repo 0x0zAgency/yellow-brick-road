@@ -119,8 +119,8 @@ public approval separate from file encryption and Player delivery.
 
 Album extraction retains successfully decoded tags after later parser failure or
 worker timeout, checks standard/legacy/custom album tags via music-metadata, and
-keeps manual fields intact. **Use extracted album** explicitly replaces a remembered
-value. Original MP3 bytes are never rewritten; embedded tags are unverified suggestions.
+replaces remembered defaults with new uploaded metadata. Current-session manual
+edits remain intact; **Use extracted album** explicitly replaces such an edit. Original MP3 bytes are never rewritten; embedded tags are unverified suggestions.
 
 Registry and My Bricks distinguish metadata-read failures from an NFT with no public
 image. Retry works for image fetch failures. Registry polling does not discard an
