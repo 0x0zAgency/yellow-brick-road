@@ -56,7 +56,8 @@ async function main(){
   await page.reload();await page.getByRole('button',{name:'Mint Studio',exact:true}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();
   await attach('Choose Master recording','fresh.mp3',mp3('Fresh track title','Fresh artist','Fresh album','Fresh composer'));
   await advance();
-  for(const [label,expected] of [['Track title','Fresh track title'],['Recording artist / claimant','Fresh artist'],['Album / release','Fresh album'],['Songwriters / composers (comma-separated)','Fresh composer, Lyric Writer, Custom Writer'],['Notes','Saved notes'],['DAW / software','Saved DAW']])assert.equal(await page.getByLabel(label,{exact:true}).inputValue(),expected,label);
+  for(const [label,expected] of [['Track title','Fresh track title'],['Recording artist / claimant','Fresh artist'],['Album / release','Fresh album'],['Songwriters / composers (comma-separated)','Fresh composer, Lyric Writer, Custom Writer'],['DAW / software','Saved DAW']])assert.equal(await page.getByLabel(label,{exact:true}).inputValue(),expected,label);
+  assert.equal(await page.locator('.ms-fields label').filter({has:page.getByText('Notes',{exact:true})}).locator('textarea').inputValue(),'Saved notes');
   const remembered=await page.evaluate(()=>JSON.parse(localStorage.getItem('road:mint:form:v1')).data);
   assert.equal(remembered.meta.title,'Fresh track title');assert.equal(remembered.meta.release,'Fresh album');assert.equal(remembered.training,'separate-license');assert.equal(remembered.share,7500);
   // User corrections made now still win; the next page reload makes them saved defaults.
