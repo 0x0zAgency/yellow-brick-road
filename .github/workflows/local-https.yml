@@ -26,3 +26,11 @@ jobs:
       - run: docker compose -f infra/ipfs/compose.yaml pull kubo
       - name: Mint through the real HTTPS workspace and Player
         run: node scripts/dev-https.integration.cjs
+      - name: Preserve isolated thumbnail failure screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: https-thumbnail-diagnostics
+          path: .road-test/https/*-failure.png
+          if-no-files-found: ignore
+          retention-days: 3

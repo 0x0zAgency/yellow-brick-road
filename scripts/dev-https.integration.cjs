@@ -29,6 +29,14 @@ async function worker(){
  try{
   const context=await browser.newContext({ignoreHTTPSErrors:true});const page=await context.newPage();
   const httpRequests=[];page.on('request',request=>{if(request.url().startsWith('http:'))httpRequests.push(request.url());});
+  // Diagnostics contain only this isolated fixture's public DOM and sanitized
+  // route/status information, never wallet keys or raw JSON-RPC bodies.
+  const diagnostics=[];
+  page.on('pageerror',()=>diagnostics.push('Browser JavaScript error'));
+  page.on('response',response=>{
+   const url=new URL(response.url());
+   if(url.origin===WEB&&response.status()>=400)diagnostics.push(url.pathname+' HTTP '+response.status());
+  });
   let walletWrites=0;
   const allowed=new Set(['eth_requestAccounts','eth_call','eth_getCode','eth_getLogs','eth_getTransactionReceipt','eth_getTransactionByHash','eth_blockNumber','eth_chainId','eth_accounts','eth_getBlockByNumber','eth_getBlockByHash','eth_sendTransaction','eth_estimateGas','eth_getTransactionCount','eth_gasPrice','eth_maxPriorityFeePerGas']);
   await page.exposeFunction('testWalletRpc',async({method,params})=>{assert.ok(allowed.has(method),'unexpected wallet method '+method);if(method==='eth_sendTransaction')walletWrites++;return rpc(method==='eth_requestAccounts'?'eth_accounts':method,params||[]);});
@@ -55,7 +63,29 @@ async function worker(){
   for(const view of ['My Bricks','IP Registry']){
    await page.getByRole('button',{name:view,exact:true}).click();
    if(view==='My Bricks')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
-   await page.waitForFunction(cid=>Array.from(document.querySelectorAll('.br-record img')).filter(img=>img.src.endsWith('/'+cid)&&img.naturalWidth>0).length>=3,cid,{timeout:45000});
+   try{
+    // Each real NFT must load its approved CID. Bring each card into view:
+    // thumbnails intentionally defer RPC/image requests until near the viewport.
+    // Waiting for all offscreen images at once incorrectly tests eager loading.
+    for(const receipt of result.receipts){
+     const card=page.locator('.br-record').filter({hasText:new RegExp(receipt.contractAddress,'i')});
+     await card.waitFor({state:'visible',timeout:30000});
+     assert.equal(await card.count(),1,view+' must have one card per minted Brick');
+     await card.scrollIntoViewIfNeeded();
+     const image=card.locator('img[src="/api/road-ipfs/nft-cover/'+cid+'"]');
+     await image.waitFor({state:'visible',timeout:20000});
+     await page.waitForFunction(img=>img.complete&&img.naturalWidth>0,await image.elementHandle(),{timeout:20000});
+    }
+    assert.equal(await page.locator('.br-record img[src="/api/road-ipfs/nft-cover/'+cid+'"]').count(),3,view+' must show all three initial covers');
+    console.log('HTTPS collection covers verified: '+view+' / 3 original NFT images');
+   }catch(error){
+    const dir=path.join(ROOT,'.road-test/https');fs.mkdirSync(dir,{recursive:true});
+    const name=view==='My Bricks'?'my-bricks':'registry';
+    await page.screenshot({path:path.join(dir,name+'-failure.png'),fullPage:true}).catch(()=>{});
+    const visible=await page.locator('.br-record').evaluateAll(cards=>cards.map(card=>({caption:card.querySelector('figcaption')?.textContent,images:Array.from(card.querySelectorAll('img')).map(img=>({src:new URL(img.src).pathname,width:img.naturalWidth,complete:img.complete})),top:card.getBoundingClientRect().top}))).catch(()=>[]);
+    console.error('HTTPS collection diagnostic: '+JSON.stringify({view,diagnostics:diagnostics.slice(-12),cards:visible}));
+    throw error;
+   }
   }
   assert.equal(walletWrites,1,'Viewing NFTs never asks for another artwork or mint transaction');
   assert.deepEqual(httpRequests,[],'Browser traffic must not downgrade to HTTP');
