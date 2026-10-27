@@ -1,6 +1,6 @@
 # Workspace Settings and Dev Control identity
 
-The workspace sidebar now includes **Settings** with **Tools & status**, **Colors & themes**, and **Icons & graphics**. This is a presentation layer, not a rights database or deployment authority.
+The workspace sidebar now includes **Tools → Settings** with **Tools & status**, **Colors & themes**, and **Icons & graphics**. This is a presentation layer, not a rights database or deployment authority.
 
 ## Tools
 
@@ -33,3 +33,8 @@ Roomy terminals show the creator-supplied, 72-column framed **YBR** artwork on t
 ## Verification
 
 `node --test web/tests/appearance.test.js` covers theme validation, original palette preservation, CSS transformation, named-library bounds, import attacks and storage errors. `node --test scripts/dev-title.test.cjs scripts/dev-dashboard.test.cjs` covers sizing, credentials, honest status, animation and redaction. CI runs `scripts/settings-browser.cjs` against the actual workspace with synthetic graphics; it performs no chain writes. No contract redeployment, chain reset or remint is required.
+
+## Tools navigation
+
+Workspace Settings now lives under **Tools → Settings**; **Recover files** and the
+local **MP3 Tags** reader/updater are in the same menu. See [Workspace Tools](TOOLS.md).
