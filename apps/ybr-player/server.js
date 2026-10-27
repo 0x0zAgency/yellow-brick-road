@@ -331,7 +331,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
       if (req.method !== 'GET' && req.method !== 'HEAD') return fail(res,405,'Method not allowed');
       const staticPath = route==='/'?'/index.html':route;
       const sharedAppearance=appearanceAsset(staticPath);
-      if (!sharedAppearance && !['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js','/interaction-ui.js','/settings.mjs','/settings-icons.mjs','/settings.css'].includes(staticPath)) return fail(res,404,'Not found');
+      if (!sharedAppearance && !['/index.html','/styles.css','/app.js','/favicon.svg','/release-ui.js','/releases.css','/library-model.js','/saved-uploads.js','/interaction-ui.js','/settings.mjs','/settings-icons.mjs','/settings.css','/artwork.css','/artwork-model.js','/artwork-engine.js','/artwork-ui.js'].includes(staticPath)) return fail(res,404,'Not found');
       const filePath=sharedAppearance || path.join(PUBLIC,staticPath.slice(1));
       const body=fs.readFileSync(filePath);
       res.writeHead(200,{
@@ -366,3 +366,4 @@ if (require.main===module) {
   });
 }
 module.exports={createApp,parseRange,canStream,loadBricks};
+

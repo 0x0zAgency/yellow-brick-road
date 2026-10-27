@@ -56,14 +56,18 @@ const stamp= (sec) => {
 };
 function selectedIndex() { return bricks.findIndex(b=>b.id===selected?.id); }
 function updatePlayback() {
-  const playing = !audio.paused && !audio.ended;
+  const mix=window.YBRAudiocover?.active?window.YBRAudiocover:null;
+  const playing = mix?mix.playing:!audio.paused && !audio.ended;
+  $('nowTitle').textContent=mix?'Artwork mix · '+(selected?.title||'Sound map'):selected?.title||'Nothing playing';
+  $('nowArtist').textContent=mix?'Interactive artwork listening':selected?.creator||'Pick a brick to begin';
   $('playGlyph').textContent=playing?'Ⅱ':'▶';
   $('playPause').setAttribute('aria-label',playing?'Pause':'Play');
   $('nowStatus').classList.toggle('on',playing);
-  const duration=Number.isFinite(audio.duration)?audio.duration:(selected?.durationSeconds || 0);
+  const duration=mix?mix.duration:Number.isFinite(audio.duration)?audio.duration:(selected?.durationSeconds || 0);
+  const position=mix?mix.currentTime:audio.currentTime;
   $('duration').textContent=stamp(duration);
-  $('elapsed').textContent=stamp(audio.currentTime);
-  $('seek').value=duration>0?String(Math.round(audio.currentTime/duration*1000)):'0';
+  $('elapsed').textContent=stamp(position);
+  $('seek').value=duration>0?String(Math.round(position/duration*1000)):'0';
 }
 function updateInspector(brick) {
   $('brickTitle').textContent=brick?.title || 'Select a brick';
@@ -118,6 +122,7 @@ function renderList() {
   window.dispatchEvent(new CustomEvent('ybr:library',{detail:{bricks,uploads:savedUploads}}));
 }
 function stopMedia() {
+  window.YBRAudiocover?.stop();
   interactionRun=null;
   selectionRevision++;
   currentMediaBrick=null;
@@ -176,6 +181,7 @@ async function choose(brick, playNow=true, {automatic=false}={}) {
 }
 async function togglePlay() {
   playIntent++;
+  if(window.YBRAudiocover?.active)return window.YBRAudiocover.toggle();
   if (!selected) return choose(bricks.find(b=>b.streamAllowed),true);
   if (!currentMediaBrick || currentMediaBrick!==selected.id) return choose(selected,true);
   if (audio.paused) {
@@ -277,6 +283,7 @@ $('next').addEventListener('click',()=>{if(!bricks.length)return;recordEvent('sk
 $('previous').addEventListener('click',()=>{if(!bricks.length)return;recordEvent('skip');choose(bricks[(selectedIndex()+bricks.length-1)%bricks.length],true);});
 $('volume').addEventListener('input',e=>{audio.volume=Number(e.target.value)/100;});
 $('seek').addEventListener('input',e=>{
+  if(window.YBRAudiocover?.active){window.YBRAudiocover.seek(Number(e.target.value)/1000*window.YBRAudiocover.duration);updatePlayback();return;}
   if (Number.isFinite(audio.duration) && audio.duration>0) audio.currentTime=Number(e.target.value)/1000*audio.duration;
 });
 $('copyId').addEventListener('click',async()=>{
@@ -298,6 +305,16 @@ audio.addEventListener('error',()=>{
   if([3,4].includes(audio.error?.code))hideUnavailable(id,'This audio cannot be played and has been hidden. Refresh the library to retry after fixing it.');
   else {stopMedia();toast('Playback was interrupted. Click Play to retry.');}
 });
+// The artwork mode shares this session, authorization path and event queue.
+// It cannot supply URLs, grants or rights through an imported layout.
+window.YBRAudiocoverHost={
+ authorize:id=>post(`/api/bricks/${encodeURIComponent(id)}/authorize`),
+ takeOver:()=>{playIntent++;stopMedia();},changed:updatePlayback,
+ report:(entry,event)=>{
+  if(!signedIn)return;
+  sendInteraction({event,brickId:entry.brick.id,sha256:entry.brick.media.sha256,playbackId:entry.playbackId,eventId:crypto.randomUUID(),positionSeconds:Number(entry.audio.currentTime)||0});
+ }
+};
 refreshSession().catch(e=>toast(e.message));
 
 async function refreshLibrary(){
@@ -310,3 +327,4 @@ window.addEventListener('ybr:refresh-request',()=>{unavailable.clear();librarySi
 window.addEventListener('ybr:select-release',event=>{const found=bricks.find(brick=>brick.id===event.detail?.id);if(found)void choose(found,false);});
 setInterval(()=>{if(!document.hidden)void refreshLibrary();},5000);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)void refreshLibrary();});
+
