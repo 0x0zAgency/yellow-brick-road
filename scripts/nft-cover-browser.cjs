@@ -44,13 +44,13 @@ window.renderCoverTest=mode=>{
  root.render(<NftCoverPublisher key={mode} mint={mint} wallet={account}/>);
 };
 window.renderCoverTest('current');
-window.renderCoverReviewTest=async()=>{
+window.renderCoverReviewTest=async(role='artwork')=>{
  const bytes=Uint8Array.from(atob('${fixture.toString('base64')}'),c=>c.charCodeAt(0));
  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
- const vault=await encryptDemoBatch({items:[{id:'artwork',file:new File([bytes],'original.png',{type:'image/png'}),originalSha256:hash}]});
- const packet={bricks:[{metadata:{media:[{role:'artwork',name:'original.png',byteLength:bytes.length,integrity:{digest:'0x'+hash}}]}}]};
+ const vault=await encryptDemoBatch({items:[{id:role,file:new File([bytes],'original.png',{type:'image/png'}),originalSha256:hash}]});
+ const packet={bricks:[{metadata:{media:[{role,mediaType:'image/png',name:'original.png',byteLength:bytes.length,integrity:{digest:'0x'+hash}}]}}]};
  function Review(){const [value,setValue]=useState(null);return <NftCoverReview getPacket={()=>packet} vault={vault} sourceDigest={'0x'+hash} value={value} onChange={next=>{window.reviewedNftConsent=next.consent;setValue(next);}}/>;}
- root.render(<Review/>);
+ root.render(<Review key={role}/>);
 };
 `,{flag:'wx'});
  const browser=await chromium.launch({headless:true});
@@ -98,11 +98,15 @@ window.renderCoverReviewTest=async()=>{
   await page.waitForFunction(()=>!document.querySelector('.nft-cover'));
   await page.evaluate(()=>window.renderCoverReviewTest());
   await page.getByRole('button',{name:'Preview cover for NFTs'}).click();
-  await page.getByAltText('NFT cover to apply after minting').waitFor();
+  await page.getByAltText('NFT image included at mint').waitFor();
   assert.equal(uploads,2,'Review preparation must not publish a public image');
   assert.equal(await page.getByRole('checkbox').isChecked(),false);
   await page.getByRole('checkbox').check();assert.equal(await page.evaluate(()=>window.reviewedNftConsent),true);
   await page.screenshot({path:path.join(out,'nft-cover-premint-review.png'),fullPage:true});
+  await page.evaluate(()=>window.renderCoverReviewTest('master'));
+  await page.getByRole('button',{name:'Preview cover for NFTs'}).click();
+  await page.getByAltText('NFT image included at mint').waitFor();
+  assert.equal(await page.getByRole('checkbox').isChecked(),false);assert.equal(uploads,2,'Primary photo review never publishes source bytes');
   console.log('NFT COVER BROWSER PASS: decoded/rasterized PNG, metadata stripped, explicit consent, wallet cancellation, legacy refusal before upload, simulation exclusion. Mock wallet; not MetaMask.');
  }finally{await browser.close();}
 }

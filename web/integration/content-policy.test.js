@@ -53,14 +53,15 @@ test('real signed mint initializes permissions and Player checks revocation, has
  const options={packet,provider,rpcUrl,chainId:1337,network:'ganache',factoryAddress};
  await preflightPolicyMint(options);assert.equal(writes,0,'Pre-mint review is read-only.');
  const approval=reviewPlayerDelivery({packet,consent:true,execution:'ganache',chainId:1337});
- const mint=await mintOnChain(options);assert.equal(writes,3,'Each Brick and policy uses one atomic transaction.');
+ const mint=await mintOnChain(options);assert.equal(writes,1,'All Bricks and policies share one atomic transaction.');
  assert.deepEqual(mint.receipts.map(r=>r.contentPolicy.permissions),[1,2,4]);
+ assert.equal(new Set(mint.receipts.map(r=>r.transactionHash)).size,1);assert.equal(mint.atomic,true);
  const building=await buildingFromPacket(packet,mint);
  const scan=await discoverWalletBricks({client,factoryAddress,wallet:account.address});
  const groups=rollupBuildings(scan.bricks,[building],mint);
  assert.equal(groups.length,1);assert.equal(groups[0].kind,'building');assert.equal(groups[0].parts.length,3);
  assert.ok(exportBuildingGraph(packet,mint).members.every(m=>m.ref.includes(factoryAddress.toLowerCase())));
- assert.equal(writes,3,'Building rollups do not add transactions or alter member permissions');
+ assert.equal(writes,1,'Building rollups do not add transactions or alter member permissions');
  console.log('BUILDING ROLLUP PASS: committed associations resolve to real Ganache identities without another mint or rights grant.');
  const encrypted=await encryptDemoBatch({items:Object.entries(data).map(([id,bytes])=>({id,file:new File([bytes],assets[id].name,{type:mime[id]}),originalSha256:hash(bytes)}))});
  const payload=await buildPlayerRelease({packet,mint,vault:{secret:encrypted.secret,encrypted:encrypted.encrypted},consent:true});
@@ -81,7 +82,7 @@ test('real signed mint initializes permissions and Player checks revocation, has
  const delivered=await deliver();assert.equal(delivered.status,'delivered',delivered.error);
  const id=delivered.brick.id;
  assert.equal((await deliver()).brick.id,id,'A retry reuses the saved release rather than minting again');
- assert.equal(writes,3,'Automatic delivery does not submit another blockchain transaction');
+ assert.equal(writes,1,'Automatic delivery does not submit another blockchain transaction');
  assert.equal(studio.list().length,1);
  console.log('STEP 3 DELIVERY PASS: reviewed permissions committed on real Ganache, automatic delivery, duplicate-safe retry and no extra mint.');
  const login=await fetch(base+'/api/session',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'listener',password:'test-only-password'})});

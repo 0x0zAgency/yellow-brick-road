@@ -10,18 +10,25 @@ Registration**; its `image` determines the artwork. An `ipfs://...` image is a
 published cover. An embedded yellow-square SVG is the fallback, not an IPFS
 retrieval error. A cover shown in the Player does not prove the NFT image was set.
 
-For a new real mint, **Review mint > Preview cover for NFTs** prepares the attached
-artwork locally. Inspect it, then explicitly approve public publication. The mint
-workflow checks collection support before uploading, pins the reviewed thumbnail,
-registers the Bricks, and requests one additional `setCovers` transaction. Success
-requires reading the actual `tokenURI.image` back. NFT-cover consent is independent
-of encrypted-IPFS upload and Player-preview permissions. Without public-cover
-consent, the yellow-square fallback remains intentional.
+For a new real mint on a `mintBatchVersion() == 1` factory, **Review mint >
+Preview cover for NFTs** prepares the attached cover or a standalone PNG/JPEG/WebP
+primary image locally. Review it and explicitly approve public publication. The
+workflow pins only the normalized display copy, then sends **one factory batch
+transaction** registering all new Bricks, their policies and their initial NFT
+images. No post-mint `setCovers` transaction is requested. Success requires reading
+back every `tokenURI.image` and registration identity at the confirmed block.
 
-Rejecting the artwork signature does **not** undo completed mints. Receipts say
-that artwork still needs attention, preserve the public pin and any submitted
-transaction hash, and offer the existing cover editor. Do not mint duplicates.
-A pending/uncertain transaction is not automatically resubmitted.
+The yellow fallback remains intentional without an approved public image.
+Encrypted-source upload and Player permissions are separate from public NFT
+artwork consent. A canceled mint does not undo an already-public IPFS pin. A pending
+or uncertain batch retains one shared transaction hash for all parts; inspect it
+before retrying. Do not remint to repair artwork.
+
+Older factories cannot gain the batch function from a frontend update. They are
+refused before the new UI begins uploads. Deploy the new local factory explicitly
+once while Ganache is running (`npm run ganache:deploy`), restart the stack, and
+select the startup factory. Fresh profiles get the current factory normally.
+Existing contracts and pins remain intact; see `ATOMIC_MINTING.md`.
 
 For existing supported NFTs, use **My Bricks > Set or update NFT cover**. Select
 **Inspect actual NFT metadata** to read their current image without signing or
@@ -31,7 +38,7 @@ matter only after the actual image has changed; local pinning still does not
 promise worldwide reachability.
 
 Collections deployed before `artworkVersion() == 1` have immutable, fixed artwork.
-This frontend improvement cannot rewrite them. It does not deploy a new factory,
+This update cannot rewrite them. It does not automatically deploy a new factory,
 migrate, remint, reset Ganache or delete anything. The previous one-time factory
 upgrade requirement for future mints is documented in `NFT_COVERS.md`.
 

@@ -78,4 +78,19 @@ test('approved capped deployment, reuse, selected-network registry/playback/anal
    console.log('REMOTE STACK PASS: Dev Control, Vite, Registry and Player share one Sepolia-ID backend; no Ganache process, demo mint or extra spending. Kubo remains local.');
   }catch(e){console.error(log);throw e;}
  }
+ // Deliberately selecting a blank factory prepares a new quoted deployment even
+ // when a legacy/current profile already exists. No automatic replacement.
+ const upgrade=await prepareSepolia({root,input:{...input,factoryAddress:''},env:{}});
+ const beforeUpgrade=await provider.getTransactionCount(signer.address);assert.equal(upgrade.kind,'deploy');
+ await assert.rejects(applySepolia(upgrade,{root,approval:''}),/approval/);
+ assert.equal(await provider.getTransactionCount(signer.address),beforeUpgrade);
+ const replacement=await applySepolia(upgrade,{root,approval:'DEPLOY SEPOLIA'});
+ assert.notEqual(replacement.factoryAddress,profile.factoryAddress);
+ assert.equal(await provider.getTransactionCount(signer.address),beforeUpgrade+1);
+ const archived=readRecord(root,'sepolia-history-'+profile.factoryAddress.slice(2).toLowerCase()+'-'+profile.genesisHash.slice(2).toLowerCase());
+ assert.equal(archived.factoryAddress,profile.factoryAddress);
+ assert.notEqual(await provider.getCode(brickAddress),'0x','Original registrations survive an explicit factory replacement');
+ assert.equal(await new ethers.Contract(replacement.factoryAddress,['function mintBatchVersion() view returns (uint8)'],provider).mintBatchVersion(),1);
+ console.log('FACTORY REPLACEMENT PASS: fresh quote/approval, one capped deployment, old reference archived and old Brick retained.');
+
 });

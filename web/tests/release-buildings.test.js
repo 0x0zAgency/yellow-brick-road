@@ -78,3 +78,13 @@ test('malformed/full/unavailable local index fails safely and does not include u
  const rows=rowsOf(mint).map(r=>({...r,transactionHash:hash(999)}));assert.equal(rollupBuildings(rows,[record],mint).length,3);
  const serialized=JSON.parse(JSON.stringify(record));serialized.members[0].files=['master','secret'];assert.throws(()=>saveBuildingRecord(storage,serialized),/Invalid/);
 });
+
+test('one transaction can register every independent Building member without collapsing their identities',async()=>{
+ const packet=make(),mint=minted(packet);mint.atomic=true;mint.transactionHash=hash(999);
+ for(const r of mint.receipts)r.transactionHash=mint.transactionHash;
+ const building=await buildingFromPacket(packet,mint);
+ const groups=rollupBuildings(rowsOf(mint),[building],mint);
+ assert.equal(groups.length,1);assert.equal(groups[0].kind,'building');assert.equal(groups[0].parts.length,packet.bricks.length);
+ assert.equal(new Set(building.members.map(m=>m.address)).size,packet.bricks.length);
+ assert.equal(new Set(building.members.map(m=>m.transactionHash)).size,1);
+});

@@ -7,42 +7,34 @@ function harness(){
  const calls=[],result={simulated:false,status:'pending',receipts:[]};
  const options={packet:{account:{address:'creator'},bricks:[{metadata:{media:[{role:'artwork',integrity:{digest:sourceDigest}}]}}]},nftCover:{bytes,sourceDigest,consent:true},result};
  const dependencies={preflight:async()=>calls.push('preflight'),upload:async(data,{consent})=>{assert.equal(consent,true);assert.deepEqual(data,bytes);calls.push('upload');return {imageURI};},
-  mint:async({result})=>{calls.push('mint');Object.assign(result,{status:'confirmed',receipts:[{status:'verified',tokenId:'17'}]});return result;},
-  session:async()=>({update:async(uri,{onTransaction})=>{assert.equal(uri,imageURI);calls.push('cover');onTransaction('transaction');return {imageURI,transactionHash:'transaction',metadata:[{image:imageURI}]};}})};
+  mint:async({result,initialImageURI})=>{calls.push('mint');assert.equal(initialImageURI,options.nftCover.consent?imageURI:undefined);Object.assign(result,{status:'confirmed',atomic:true,transactionHash:'one-mint',receipts:[{status:'verified',tokenId:'17',transactionHash:'one-mint'}]});if(initialImageURI)Object.assign(result.nftCover,{status:'verified',transactionHash:'one-mint'});return result;},
+  session:async()=>{throw Error('A second artwork transaction must never be requested.');}};
  return {options,dependencies,calls};
 }
-test('reviewed cover is applied and verified as part of a single mint workflow',async()=>{
+test('reviewed cover is part of the same mint request, with no post-mint artwork call',async()=>{
  const h=harness(),out=await mintWithReviewedCover(h.options,h.dependencies);
- assert.deepEqual(h.calls,['preflight','upload','mint','cover']);assert.equal(out.status,'confirmed');assert.equal(out.nftCover.status,'verified');assert.equal(out.receipts.length,1);
+ assert.deepEqual(h.calls,['preflight','upload','mint']);assert.equal(out.status,'confirmed');assert.equal(out.nftCover.status,'verified');assert.equal(out.nftCover.transactionHash,out.receipts[0].transactionHash);assert.equal(out.nftCover.atMint,true);
 });
-test('no public consent means no upload or artwork transaction',async()=>{
- const h=harness();h.options.nftCover.consent=false;
- await mintWithReviewedCover(h.options,h.dependencies);assert.deepEqual(h.calls,['mint']);assert.equal(h.options.result.nftCover,undefined);
+test('no public consent means no upload and no initial image',async()=>{
+ const h=harness();h.options.nftCover.consent=false;await mintWithReviewedCover(h.options,h.dependencies);assert.deepEqual(h.calls,['mint']);assert.equal(h.options.result.nftCover,undefined);
 });
 test('changed source and invalid public PNG fail before every operation',async()=>{
- for(const patch of [{sourceDigest:'changed'},{bytes:new Uint8Array([1,2,3])}]){
-  const h=harness();Object.assign(h.options.nftCover,patch);await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.deepEqual(h.calls,[]);
- }
+ for(const patch of [{sourceDigest:'changed'},{bytes:new Uint8Array([1,2,3])}]){const h=harness();Object.assign(h.options.nftCover,patch);await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.deepEqual(h.calls,[]);}
  assert.equal(reviewedMintCover({},null),null);
 });
-test('legacy collection and upload failures cannot leave newly minted fallback NFTs',async()=>{
- for(const step of ['preflight','upload']){
-  const h=harness();h.dependencies[step]=async()=>{throw Error(step+' failed');};
-  await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.ok(!h.calls.includes('mint'));
- }
+test('legacy batch support or pin failures cannot create fallback NFTs',async()=>{
+ for(const step of ['preflight','upload']){const h=harness();h.dependencies[step]=async()=>{throw Error(step+' failed');};await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.ok(!h.calls.includes('mint'));}
 });
-test('declined artwork signature retains successful mints and public pin for repair, not remint',async()=>{
- const h=harness();h.dependencies.session=async()=>({update:async()=>{throw Error('Rejected');}});
- const out=await mintWithReviewedCover(h.options,h.dependencies);
- assert.equal(out.status,'confirmed');assert.equal(out.nftCover.status,'action-required');assert.equal(out.nftCover.imageURI,imageURI);assert.equal(out.receipts.length,1);
- await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Do not remint/);
- assert.equal(h.calls.filter(x=>x==='mint').length,1);
+test('a rejected mint retains the public pin but does not attempt artwork or another mint',async()=>{
+ const h=harness();h.dependencies.mint=async()=>{h.calls.push('rejected-mint');throw Error('Rejected');};
+ await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Rejected/);assert.equal(h.options.result.nftCover.imageURI,imageURI);assert.equal(h.options.result.nftCover.status,'pinned');assert.deepEqual(h.calls,['preflight','upload','rejected-mint']);
 });
-test('uncertain cover confirmation keeps the submitted hash and never labels it verified',async()=>{
- const h=harness();h.dependencies.session=async()=>({update:async(_uri,{onTransaction})=>{onTransaction('pending-hash');throw Error('Timed out');}});
- const out=await mintWithReviewedCover(h.options,h.dependencies);assert.equal(out.status,'confirmed');assert.equal(out.nftCover.status,'pending');assert.equal(out.nftCover.transactionHash,'pending-hash');
+test('an uncertain batch retains its hash and is never automatically resubmitted',async()=>{
+ const h=harness();h.dependencies.mint=async({result})=>{result.transactionHash='pending';result.receipts=[{status:'pending',transactionHash:'pending'}];throw Error('Timed out');};
+ await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Timed out/);await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Do not remint/);
+ assert.equal(h.calls.filter(c=>c==='upload').length,1);assert.equal(h.options.result.transactionHash,'pending');
 });
-test('a mint rejection still reports the already-public cover without a second mint',async()=>{
- const h=harness();h.dependencies.mint=async()=>{throw Error('mint rejected');};
- await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.equal(h.options.result.nftCover.imageURI,imageURI);assert.ok(!h.calls.includes('cover'));
+test('an uploaded primary photograph can supply the initial NFT image',async()=>{
+ const h=harness();h.options.packet.bricks[0].metadata.media[0]={role:'master',mediaType:'image/jpeg',name:'photo.jpg',integrity:{digest:sourceDigest}};
+ const out=await mintWithReviewedCover(h.options,h.dependencies);assert.equal(out.nftCover.status,'verified');assert.deepEqual(h.calls,['preflight','upload','mint']);
 });

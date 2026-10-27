@@ -4,10 +4,10 @@ import fs from 'node:fs';
 import ganache from 'ganache';
 import {createWalletClient, http, createPublicClient} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
-import {connectChain,mintOnChain,localConfig} from '../src/chain-mint.js';
+import {connectChain,mintLegacyOnChain as mintOnChain,localConfig} from '../src/chain-mint.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
 
-for(const network of ['ganache','sepolia'])test(`wallet-signed ${network} path against a disposable local chain`,async t=>{
+for(const network of ['ganache','sepolia'])test(`explicit legacy wallet-signed ${network} compatibility path against a disposable local chain`,async t=>{
  const testChainId=network==='sepolia'?11155111:1337;
  const testChainHex='0x'+testChainId.toString(16);
  const server=ganache.server({logging:{quiet:true},chain:{chainId:testChainId,networkId:5777},wallet:{deterministic:true}});

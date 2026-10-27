@@ -12,6 +12,19 @@ contract YellowBrickFactory {
     mapping(address => bool) public isBrick;
     mapping(bytes32 => address) public brickById;
 
+    uint256 public constant MAX_MINT_BATCH = 32;
+    struct Registration {
+        bytes32 contentHash;
+        string uri;
+        bytes32 metadataDigest;
+        bytes32 nonce;
+        bool withPolicy;
+        YellowBrickContentPolicy.InitialPolicy policy;
+    }
+
+    /// @notice One creator-signed transaction, including initial ERC-721 artwork.
+    function mintBatchVersion() external pure returns (uint8) { return 1; }
+
     event BrickDeployed(bytes32 indexed ipId, address indexed brick, address indexed originator, bytes32 contentHash);
 
     constructor() {
@@ -78,6 +91,47 @@ contract YellowBrickFactory {
         brickById[id] = brick;
         YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
         emit BrickDeployed(id, brick, msg.sender, contentHash);
+    }
+
+    /// @notice Register an entire release atomically. Every item belongs to msg.sender.
+    /// @dev No external recipient callbacks, delegated multicall, fees or partial success.
+    ///      The shared display URI is stored once by the receipt collection.
+    function deployBricksWithPolicy(Registration[] calldata registrations, string calldata imageURI)
+        external returns (address[] memory bricks)
+    {
+        uint256 length = registrations.length;
+        require(length > 0 && length <= MAX_MINT_BATCH, "Factory: batch limit");
+        bricks = new address[](length);
+        uint256[] memory tokenIds = new uint256[](length);
+        bytes memory code = minimalProxyCode(implementation);
+        for (uint256 i; i < length; ++i) {
+            Registration calldata r = registrations[i];
+            require(r.contentHash != bytes32(0) && bytes(r.uri).length > 0 &&
+                bytes(r.uri).length <= 8192 && r.metadataDigest != bytes32(0),
+                "Factory: invalid metadata registration");
+            bytes32 salt = deploymentSalt(msg.sender, r.contentHash, r.nonce);
+            address brick;
+            assembly { brick := create2(0, add(code, 32), mload(code), salt) }
+            require(brick != address(0), "Factory: duplicate or failed");
+            bytes32 id = ipIdentity(msg.sender, r.contentHash, r.nonce);
+            if (r.withPolicy) {
+                YellowBrick(brick).initializeWithPolicy(id, r.contentHash, msg.sender, r.uri, r.metadataDigest, r.policy);
+            } else {
+                require(r.policy.files.manifestDigest == bytes32(0) &&
+                    r.policy.files.previewHash == bytes32(0) &&
+                    r.policy.files.artworkHash == bytes32(0) &&
+                    r.policy.files.lyricsHash == bytes32(0) &&
+                    r.policy.permissions == 0 && !r.policy.locked, "Factory: unexpected policy");
+                YellowBrick(brick).initializeWithDigest(id, r.contentHash, msg.sender, r.uri, r.metadataDigest);
+            }
+            isBrick[brick] = true;
+            brickById[id] = brick;
+            bricks[i] = brick;
+            tokenIds[i] = uint256(id);
+            emit BrickDeployed(id, brick, msg.sender, r.contentHash);
+        }
+        // Invalid artwork or a failed receipt reverts ALL deployments and events above.
+        YellowBrickReceipt(receiptToken).mintBatch(msg.sender, tokenIds, bricks, imageURI);
     }
 
     function predictBrickAddress(address originator, bytes32 contentHash, bytes32 nonce)

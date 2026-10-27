@@ -74,8 +74,17 @@ async function prepareSepolia({root,input={},env=process.env,compile=async()=>{}
  const budget=deploymentBudget({estimatedGas:estimate,blockGasLimit:block.gasLimit,baseFeePerGas:block.baseFeePerGas,maxFeePerGas:fees.maxFeePerGas,maxPriorityFeePerGas:fees.maxPriorityFeePerGas,balance,budgetWei:parseEther(input.maxEth||env.YBR_DEPLOY_MAX_ETH||'0.05')});
  if(!Number.isSafeInteger(nonce)||nonce<0)throw Error('Cannot determine the deployer nonce.');
  const transaction=Object.freeze({type:2,chainId:CHAIN,nonce,data,value:'0',gasLimit:budget.gasLimit,maxFeePerGas:budget.maxFeePerGas,maxPriorityFeePerGas:budget.maxPriorityFeePerGas});
- return {kind:'deploy',provider,ethers,signer,root,rpcUrl,genesisHash,bytecodeHash,budget,transaction,createdAt:now(),expiresAt:now()+QUOTE_MS,
-  lines:['Sepolia / chain 11155111',rpcLabel(rpcUrl),'Signer: '+signer.address,'New factory + implementation + NFT collection','1 transaction / gas estimate '+budget.estimatedGas+' / limit '+budget.gasLimit,'Fee cap: '+ethers.utils.formatUnits(budget.maxFeePerGas,9)+' gwei / priority: '+ethers.utils.formatUnits(budget.maxPriorityFeePerGas,9)+' gwei','Expected fee: '+formatEther(budget.estimatedWei)+' Sepolia ETH','MAXIMUM SPEND: '+formatEther(budget.maximumWei)+' Sepolia ETH','Balance: '+formatEther(budget.balanceWei)+' / remaining >= '+formatEther(budget.remainingWei),'Quote valid 90 seconds. No test music will be minted.']};
+ return {kind:'deploy',previousProfile:saved,provider,ethers,signer,root,rpcUrl,genesisHash,bytecodeHash,budget,transaction,createdAt:now(),expiresAt:now()+QUOTE_MS,
+  lines:['Sepolia / chain 11155111',rpcLabel(rpcUrl),'Signer: '+signer.address,saved?'Replace selected factory; old registrations are retained':'New factory + implementation + NFT collection','1 transaction / gas estimate '+budget.estimatedGas+' / limit '+budget.gasLimit,'Fee cap: '+ethers.utils.formatUnits(budget.maxFeePerGas,9)+' gwei / priority: '+ethers.utils.formatUnits(budget.maxPriorityFeePerGas,9)+' gwei','Expected fee: '+formatEther(budget.estimatedWei)+' Sepolia ETH','MAXIMUM SPEND: '+formatEther(budget.maximumWei)+' Sepolia ETH','Balance: '+formatEther(budget.balanceWei)+' / remaining >= '+formatEther(budget.remainingWei),'Quote valid 90 seconds. No test music will be minted.']};
+}
+/** Explicit replacement only: preserve the old reference, never its signing key. */
+function preservePreviousDeployment(root,previous){
+ const current=readRecord(root,'sepolia');
+ if(JSON.stringify(current)!==JSON.stringify(previous??null))throw Error('The saved Sepolia factory changed after review. Refresh the quote before deploying.');
+ if(current){
+  const profile=checkedProfile(current);
+  writeRecord(root,'sepolia-history-'+profile.factoryAddress.slice(2).toLowerCase()+'-'+profile.genesisHash.slice(2).toLowerCase(),profile);
+ }
 }
 async function applySepolia(plan,{root,approval,now=Date.now,receiptTimeoutMs=120000,onProgress=()=>{}}={}){
  if(!plan||!['reuse','deploy'].includes(plan.kind))throw Error('Review the network plan first.');
@@ -93,7 +102,7 @@ async function applySepolia(plan,{root,approval,now=Date.now,receiptTimeoutMs=12
  catch{throw Error('Another deployment is active or its lock needs inspection. No transaction sent.');}
  try{
   const existing=readRecord(root,'sepolia-pending');if(existing?.status==='submitted')throw Error('Resolve the existing pending deployment before sending another transaction.');
-  if(readRecord(root,'sepolia')?.factoryAddress)throw Error('A Sepolia factory was saved elsewhere. Review and reuse it before considering another deployment.');
+  preservePreviousDeployment(root,plan.previousProfile);
   if(plan.ethers.utils.keccak256(artifactAt(root).bytecode)!==plan.bytecodeHash)throw Error('Compiled contracts changed after the quote. Review again.');
   const [nonce,balance,block,estimate]=await request(()=>Promise.all([plan.provider.getTransactionCount(plan.signer.address,'pending'),plan.provider.getBalance(plan.signer.address,'pending'),plan.provider.getBlock('latest'),plan.provider.estimateGas({from:plan.signer.address,data:plan.transaction.data,value:0})]),'Final deployment preflight');
   if(nonce!==plan.transaction.nonce)throw Error('Signer nonce changed. Refresh the deployment estimate.');
@@ -116,4 +125,4 @@ async function applySepolia(plan,{root,approval,now=Date.now,receiptTimeoutMs=12
   try{const st=fs.lstatSync(lock);if(st.ino===opened.ino&&st.dev===opened.dev)fs.unlinkSync(lock);}catch(e){if(e.code!=='ENOENT')throw e;}
  }
 }
-module.exports={prepareSepolia,applySepolia,chainIdentity,verifyDeployment,QUOTE_MS};
+module.exports={preservePreviousDeployment,prepareSepolia,applySepolia,chainIdentity,verifyDeployment,QUOTE_MS};

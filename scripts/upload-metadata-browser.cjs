@@ -48,6 +48,9 @@ async function main(){
   assert.equal(await page.getByLabel('Recording artist / claimant',{exact:true}).inputValue(),'Later preview artist');
   assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'');
   assert.equal(await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).inputValue(),'');
+  await page.getByRole('button',{name:'Use extracted album',exact:true}).click();
+  assert.equal(await page.getByLabel('Album / release',{exact:true}).inputValue(),'Imported album');
+  assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'','Applying an album must not overwrite other edits');
   assert.deepEqual(errors,[]);
   fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-autofill.png'),fullPage:true});
   console.log('PASS: worker MP3 extraction from master and preview, filename fallback for unknown formats, manual edits/clearing, replacement and preview metadata precedence.');
