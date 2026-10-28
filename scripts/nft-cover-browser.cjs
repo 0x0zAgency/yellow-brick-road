@@ -12,6 +12,7 @@ async function main(){
  fs.writeFileSync(jsx,`
 import React,{useState} from 'react';
 import NftCoverReview from './NftCoverReview.jsx';
+import {ArtworkTile} from './BrickPresentation.jsx';
 import {encryptDemoBatch} from './demo-vault.js';
 import {createRoot} from 'react-dom/client';
 import {decodeFunctionData,encodeFunctionResult,parseAbi} from 'viem';
@@ -28,7 +29,7 @@ window.ethereum={request:async({method,params=[]})=>{
   const {functionName}=decodeFunctionData({abi,data:params[0].data});
   if(functionName==='artworkVersion'&&window.nftLegacy)throw Error('Legacy collection');
   if(functionName==='setCovers')return '0x';
-  const values={artworkVersion:1n,factory,receiptToken:collection,ownerOf:account,brickForToken:brick};
+  const values={artworkVersion:1n,factory,receiptToken:collection,ownerOf:account,brickForToken:brick,tokenURI:'data:application/json;base64,'+btoa(JSON.stringify({name:'Fixture NFT',image:window.currentNftImage||'data:image/svg+xml;base64,PHN2Zy8+'}))};
   if(!(functionName in values))throw Error('Unexpected contract function '+functionName);
   return encodeFunctionResult({abi,functionName,result:values[functionName]});
  }
@@ -44,6 +45,10 @@ window.renderCoverTest=mode=>{
  root.render(<NftCoverPublisher key={mode} mint={mint} wallet={account}/>);
 };
 window.renderCoverTest('current');
+window.renderArtworkTileTest=()=>{
+ function Tile(){const [retry,setRetry]=useState(0);return <ArtworkTile imageURI={'ipfs://bafy'+'a'.repeat(55)} title="Delivery fixture" retryKey={retry} onRetry={()=>setRetry(n=>n+1)} imageTimeoutMs={1500}/>;}
+ root.render(<Tile/>);
+};
 window.renderCoverReviewTest=async(role='artwork')=>{
  const bytes=Uint8Array.from(atob('${fixture.toString('base64')}'),c=>c.charCodeAt(0));
  const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
@@ -56,9 +61,10 @@ window.renderCoverReviewTest=async(role='artwork')=>{
  const browser=await chromium.launch({headless:true});
  try{
   const page=await browser.newPage({viewport:{width:1120,height:1000}});
-  let uploads=0;
+  let uploads=0,uploadedBytes,deliveryBroken=false;
+  await page.route('**/api/road-ipfs/nft-cover/*',route=>deliveryBroken?route.fulfill({status:503,contentType:'application/json',body:'{}'}):route.fulfill({contentType:'image/png',body:uploadedBytes}));
   await page.route('**/api/road-ipfs/nft-cover',async route=>{
-   uploads++;const bytes=route.request().postDataBuffer();validateNftCoverPng(bytes);
+   uploads++;const bytes=route.request().postDataBuffer();validateNftCoverPng(bytes);uploadedBytes=bytes;
    assert.ok(!bytes.includes(Buffer.from('PRIVATE-SOURCE-METADATA-DO-NOT-PUBLISH')));
    assert.notDeepEqual(bytes,fixture);
    assert.equal(route.request().headers()['x-road-public-cover'],'publish-public-nft-cover-v1');
@@ -90,23 +96,46 @@ window.renderCoverReviewTest=async(role='artwork')=>{
   await page.getByRole('button',{name:'Publish cover to NFTs'}).click();
   await page.getByRole('alert').filter({hasText:/rejected/i}).waitFor();
   assert.equal(uploads,2);assert.equal(await page.evaluate(()=>window.nftWalletSends),2);
+  // Re-uploading the exact existing public image must repair availability without gas.
+  await page.evaluate(()=>{window.currentNftImage='ipfs://bafy'+'a'.repeat(55);window.renderCoverTest('same-cover');});
+  await page.locator('input[type=file]').setInputFiles({name:'same.png',mimeType:'image/png',buffer:fixture});
+  await page.getByRole('button',{name:'Prepare NFT cover'}).click();await page.getByRole('checkbox').check();
+  await page.getByRole('button',{name:'Publish cover to NFTs'}).click();
+  await page.getByText(/no wallet transaction or gas is needed/).waitFor();
+  assert.equal(await page.evaluate(()=>window.nftWalletSends),2);assert.equal(uploads,3);
+  await page.getByRole('status').filter({hasText:/Verified public PNG/}).waitFor();
+  await page.evaluate(()=>{window.currentNftImage=null;});
   await page.evaluate(()=>window.renderCoverTest('legacy'));
   await page.locator('input[type=file]').setInputFiles({name:'cover.png',mimeType:'image/png',buffer:fixture});
   await page.getByRole('button',{name:'Prepare NFT cover'}).click();
-  await page.getByRole('alert').filter({hasText:/fixed yellow-square/}).waitFor();assert.equal(uploads,2);
+  await page.getByRole('alert').filter({hasText:/fixed yellow-square/}).waitFor();assert.equal(uploads,3);
   await page.evaluate(()=>window.renderCoverTest('simulated'));
   await page.waitForFunction(()=>!document.querySelector('.nft-cover'));
   await page.evaluate(()=>window.renderCoverReviewTest());
   await page.getByRole('button',{name:'Preview cover for NFTs'}).click();
   await page.getByAltText('NFT image included at mint').waitFor();
-  assert.equal(uploads,2,'Review preparation must not publish a public image');
+  assert.equal(uploads,3,'Review preparation must not publish a public image');
   assert.equal(await page.getByRole('checkbox').isChecked(),false);
   await page.getByRole('checkbox').check();assert.equal(await page.evaluate(()=>window.reviewedNftConsent),true);
   await page.screenshot({path:path.join(out,'nft-cover-premint-review.png'),fullPage:true});
   await page.evaluate(()=>window.renderCoverReviewTest('master'));
   await page.getByRole('button',{name:'Preview cover for NFTs'}).click();
   await page.getByAltText('NFT image included at mint').waitFor();
-  assert.equal(await page.getByRole('checkbox').isChecked(),false);assert.equal(uploads,2,'Primary photo review never publishes source bytes');
+  assert.equal(await page.getByRole('checkbox').isChecked(),false);assert.equal(uploads,3,'Primary photo review never publishes source bytes');
+  deliveryBroken=true;await page.evaluate(()=>window.renderArtworkTileTest());
+  await page.getByRole('button',{name:'Retry cover for Delivery fixture'}).waitFor();
+  assert.equal(await page.locator('figcaption').innerText(),'Cover unavailable');
+  deliveryBroken=false;await page.getByRole('button',{name:'Retry cover for Delivery fixture'}).click();
+  await page.waitForFunction(()=>document.querySelector('figcaption')?.textContent==='NFT cover');
+  assert.equal(await page.getByAltText('Delivery fixture cover').getAttribute('loading'),'eager');
+  assert.ok(await page.getByAltText('Delivery fixture cover').evaluate(image=>image.complete&&image.naturalWidth>0));
+  // Structural PNG validity alone does not establish a visible image.
+  const transparent=await page.evaluate(async()=>{
+   const canvas=document.createElement('canvas');canvas.width=16;canvas.height=16;
+   const blob=await new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+   const {decodePublicCover}=await import('/src/nft-cover-read.js');
+   try{await decodePublicCover(new Uint8Array(await blob.arrayBuffer()));return false;}catch(error){return /fully transparent/.test(error.message);}
+  });assert.equal(transparent,true);
   console.log('NFT COVER BROWSER PASS: decoded/rasterized PNG, metadata stripped, explicit consent, wallet cancellation, legacy refusal before upload, simulation exclusion. Mock wallet; not MetaMask.');
  }finally{await browser.close();}
 }

@@ -60,6 +60,13 @@ async function worker(){
   // pinned PNG, not a mock thumbnail resolver or a local-preview substitute.
   await page.locator('button.wallet').click();
   const cid=result.nftCover.imageURI.slice(7);
+  assert.equal(result.nftCover.upload.displayVerified,true,'The browser-facing PNG is decoded before signing');
+  // Disposable CI data only: show that an existing NFT does not need a local
+  // pin or another transaction just to display its already-public thumbnail.
+  const unpin=await fetch('http://127.0.0.1:5001/api/v0/pin/rm?arg='+cid,{method:'POST'});
+  assert.equal(unpin.status,200);
+  const publicImage=await fetch(WEB+'/api/road-ipfs/nft-cover/'+cid);
+  assert.equal(publicImage.status,200);assert.equal(publicImage.headers.get('content-type'),'image/png');
   for(const view of ['My Bricks','IP Registry']){
    await page.getByRole('button',{name:view,exact:true}).click();
    if(view==='My Bricks')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
@@ -77,7 +84,10 @@ async function worker(){
      await page.waitForFunction(img=>img.complete&&img.naturalWidth>0,await image.elementHandle(),{timeout:20000});
     }
     assert.equal(await page.locator('.br-record img[src="/api/road-ipfs/nft-cover/'+cid+'"]').count(),3,view+' must show all three initial covers');
-    console.log('HTTPS collection covers verified: '+view+' / 3 original NFT images');
+    const check=page.locator('.br-record').getByRole('button',{name:/Check NFT image for/}).first();await check.click();
+    await page.getByRole('dialog',{name:'NFT image diagnostics'}).getByText(/Verified public PNG/).waitFor();
+    await page.getByRole('button',{name:'Close image check'}).click();
+    console.log('HTTPS collection covers verified: '+view+' / 3 original NFT images, unpinned public retrieval and read-only image diagnostics');
    }catch(error){
     const dir=path.join(ROOT,'.road-test/https');fs.mkdirSync(dir,{recursive:true});
     const name=view==='My Bricks'?'my-bricks':'registry';
