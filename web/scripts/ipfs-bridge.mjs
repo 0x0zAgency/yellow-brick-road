@@ -157,13 +157,18 @@ export async function storeNftCover(bytes,{fetchImpl=fetch}={}){
  await localPin(cid,{fetchImpl});
  return {...info,cid,sha256:sha256(buffer),pinned:true,verified:true};
 }
-/** Read only locally pinned public PNG renditions. Never unwrap encrypted assets. */
+/** Public covers may be provided by another IPFS node; ciphertext recovery stays local-pin-only. */
 export async function retrieveNftCover(cid,{fetchImpl=fetch}={}){
  if(!validCoverCid(cid))throw failure('A bare public-cover CID is required.',400);
- await localPin(cid,{fetchImpl,missingStatus:404});
- const response=await kuboCall('cat?arg='+encodeURIComponent(cid)+'&length='+(MAX_NFT_COVER_BYTES+1),{fetchImpl,timeout:12000});
- const bytes=await readBoundedBytes(response,{max:MAX_NFT_COVER_BYTES});
- validateNftCoverPng(bytes);
+ // A local pin proves retention, not whether a PUBLIC image may be read. Kubo
+ // can fetch this bounded rendition from peers. Do not apply this to recovery.
+ let bytes;
+ try{
+  const response=await kuboCall('cat?arg='+encodeURIComponent(cid)+'&length='+(MAX_NFT_COVER_BYTES+1),{fetchImpl,timeout:12000});
+  bytes=await readBoundedBytes(response,{max:MAX_NFT_COVER_BYTES});
+ }catch(error){throw Object.assign(failure('Public thumbnail is unavailable through this IPFS node.',error.name==='TimeoutError'?504:503),{code:error.name==='TimeoutError'?'COVER_TIMEOUT':'COVER_UNAVAILABLE'});}
+ if(bytes.subarray(0,8).equals(Buffer.from('0ZROAD01')))throw Object.assign(failure('The NFT image reference is encrypted, not a public thumbnail.',422),{code:'COVER_ENCRYPTED'});
+ try{validateNftCoverPng(bytes);}catch{throw Object.assign(failure('The NFT image reference is not a supported public PNG.',422),{code:'COVER_NOT_PNG'});}
  return {bytes,size:bytes.length};
 }
 async function bodyBytes(req,max=MAX_CIPHERTEXT_BYTES){
@@ -227,9 +232,14 @@ export async function handleUploadRequest(req,res,{store=storeEncryptedBytes,ret
   try{
    const cover=await retrieveCover(cid,{fetchImpl});
    validateNftCoverPng(cover.bytes);
-   res.writeHead(200,{'Content-Type':'image/png','Content-Length':cover.bytes.length,'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Cross-Origin-Resource-Policy':'same-origin'});
+   res.writeHead(200,{'Content-Type':'image/png','Content-Length':cover.bytes.length,'Content-Disposition':'inline; filename="nft-cover.png"','X-Road-CID':cid,'X-Road-Image-SHA256':sha256(cover.bytes),'Cache-Control':'private, max-age=300','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'; sandbox",'Cross-Origin-Resource-Policy':'same-origin'});
    res.end(cover.bytes);
-  }catch(error){json(res,error.status||404,{error:'Public NFT thumbnail unavailable on this local node.'});}
+  }catch(error){
+   const known=new Set(['COVER_ENCRYPTED','COVER_NOT_PNG','COVER_UNAVAILABLE','COVER_TIMEOUT']);
+   const code=known.has(error.code)?error.code:'COVER_UNAVAILABLE';
+   res.setHeader('X-Road-Cover-Error',code);
+   json(res,error.status||503,{code,error:'Public NFT thumbnail unavailable. Inspect the public image reference or retry IPFS.'});
+  }
   return;
  }
  if(req.method==='POST'&&path==='/api/road-ipfs/nft-cover'){

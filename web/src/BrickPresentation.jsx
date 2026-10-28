@@ -1,3 +1,4 @@
+import PublicNftCoverCheck from './PublicNftCoverCheck.jsx';
 import {WorkspaceIcon,WorkspaceGraphic} from './AppearanceContext.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {Image,Layers,ChevronLeft,ChevronRight} from 'lucide-react';
@@ -6,13 +7,19 @@ import {prepareNftCover,readAttachedCover} from './nft-cover-source.js';
 import './brick-presentation.css';
 
 export function StatusPill({tone='neutral',children}){return <span className={'br-status br-status--'+tone}>{children}</span>;}
-export function ArtworkTile({imageURI,localUrl,title='Registered work',caption,status='ready',onRetry,retryKey=0}){
+export function ArtworkTile({imageURI,localUrl,title='Registered work',caption,status='ready',onRetry,retryKey=0,imageTimeoutMs=15000}){
  const src=publicCoverSource(imageURI)||localUrl||null;
- const [failed,setFailed]=useState(null),loadKey=JSON.stringify([src,retryKey]);
- const available=src&&failed!==loadKey;
- const label=status==='loading'?'Reading NFT cover…':status==='error'?'NFT read unavailable':available?(caption||'NFT cover'):src?'Cover unavailable':'No public cover';
+ const [failed,setFailed]=useState(null),[loaded,setLoaded]=useState(null),loadKey=JSON.stringify([src,retryKey]);
+ const available=!!src&&failed!==loadKey,ready=available&&loaded===loadKey;
+ useEffect(()=>{
+  if(!src||loaded===loadKey||failed===loadKey)return;
+  const timer=setTimeout(()=>setFailed(loadKey),imageTimeoutMs);
+  return()=>clearTimeout(timer);
+ },[src,loadKey,loaded,failed,imageTimeoutMs]);
+ const label=status==='loading'?'Reading NFT cover…':status==='error'?(ready?'Last verified cover':'NFT read unavailable'):ready?(caption||'NFT cover'):available?'Loading thumbnail…':src?'Cover unavailable':'No public cover';
  return <figure className="br-artwork" title={label}>
-  {available?<img key={loadKey} src={src} alt={title+' cover'} loading="lazy" referrerPolicy="no-referrer" onError={()=>setFailed(loadKey)}/>:<div className="br-artwork-fallback" aria-label="Cover unavailable"><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
+  {available&&<img key={loadKey} src={src} alt={title+' cover'} width="512" height="512" loading="eager" decoding="async" referrerPolicy="no-referrer" onLoad={event=>{if(event.currentTarget.naturalWidth)setLoaded(loadKey);else setFailed(loadKey);}} onError={()=>setFailed(loadKey)}/>}
+  {!ready&&<div className="br-artwork-fallback" aria-label={available?'Loading public thumbnail':'Cover unavailable'}><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
   <figcaption>{label}</figcaption>
   {onRetry&&(status==='error'||failed===loadKey)&&<button type="button" className="text-action br-cover-retry" onClick={onRetry} aria-label={'Retry cover for '+title}>Retry cover</button>}
  </figure>;
@@ -41,6 +48,8 @@ function pump(){while(active<3&&pending.length){const run=pending.shift();active
 function queued(task){return new Promise((resolve,reject)=>{pending.push(async()=>{try{resolve(await task());}catch(e){reject(e);}});pump();});}
 /** Lazy, bounded, read-only NFT inspection. Visible cards never fetch private metadata. */
 export function RegistrationThumbnail({client,identity,anchor,title}){
+ const dialog=useRef(null),[inspecting,setInspecting]=useState(false);
+ useEffect(()=>{if(inspecting)dialog.current?.showModal();},[inspecting]);
  const node=useRef(null),[visible,setVisible]=useState(false),[revision,setRevision]=useState(0),[state,setState]=useState(null);
  const key=JSON.stringify(identity),latest=useRef({identity,anchor}),attempt=useRef(null);
  latest.current={identity,anchor};
@@ -65,7 +74,7 @@ export function RegistrationThumbnail({client,identity,anchor,title}){
     const selected=latest.current;
     return Promise.race([readRegistrationCover({client,...selected.identity,anchor:selected.anchor}),new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Thumbnail read timed out.')),12000);})]);
    }).then(image=>{if(alive)setState({key,image,status:'ready'});})
-    .catch(()=>{if(alive)setState({key,image:null,status:'error'});})
+    .catch(()=>{if(alive)setState(previous=>({key,image:previous?.key===key?previous.image:null,status:'error'}));})
     .finally(()=>{clearTimeout(timer);inFlight=false;});
   };
   attempt.current=run;run();
@@ -75,7 +84,10 @@ export function RegistrationThumbnail({client,identity,anchor,title}){
  // every five seconds. Requests are serialized per tile and snapshot-verified.
  useEffect(()=>{attempt.current?.();},[anchor?.number,anchor?.hash,revision]);
  const current=state?.key===key?state:null;
- return <div ref={node}><ArtworkTile imageURI={current?.image} status={!client?'error':current?.status||'loading'} title={title} retryKey={revision} onRetry={()=>setRevision(x=>x+1)}/></div>;
+ return <div ref={node} className="br-thumbnail-wrap"><ArtworkTile imageURI={current?.image} status={!client?'error':current?.status||'loading'} title={title} retryKey={revision} onRetry={()=>setRevision(x=>x+1)}/>
+  {current?.image&&<button type="button" className="text-action br-image-check" onClick={()=>setInspecting(true)} aria-label={'Check NFT image for '+title}>Check image</button>}
+  {inspecting&&<dialog ref={dialog} className="nft-public-dialog" onClose={()=>setInspecting(false)} aria-label="NFT image diagnostics"><form method="dialog"><button type="submit" className="ms-outline">Close image check</button></form><PublicNftCoverCheck imageURI={current?.image}/></dialog>}
+ </div>;
 }
 export function CollectionPager({page,pages,total,onPage}){
  if(pages<=1)return null;

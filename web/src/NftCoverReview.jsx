@@ -1,3 +1,4 @@
+import {decodePublicCover} from './nft-cover-read.js';
 import {useEffect,useRef,useState} from 'react';
 import {readAttachedCover,prepareNftCover} from './nft-cover-source.js';
 import './nft-cover.css';
@@ -18,6 +19,7 @@ export default function NftCoverReview({getPacket,vault,sourceDigest,value,onCha
   try{
    const packet=getPacket(),bytes=await readAttachedCover({packet,vault,signal:controller.signal});
    const thumbnail=await prepareNftCover(bytes,{signal:controller.signal});
+   await decodePublicCover(thumbnail,{signal:controller.signal});
    if(!controller.signal.aborted)onChange({bytes:thumbnail,sourceDigest,consent:false});
   }catch(e){if(!controller.signal.aborted)setError(e.message);}
   finally{if(!controller.signal.aborted){lock.current=false;setBusy(false);}}

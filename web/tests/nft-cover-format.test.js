@@ -37,6 +37,7 @@ test('upload refuses absent consent and invalid images before any HTTP call',asy
 test('upload sends only reviewed image bytes and verifies the returned pin',async()=>{
  const bytes=png();
  const result=await uploadNftCover(bytes,{consent:true,fetchImpl:async(url,options)=>{
+  if(url.endsWith('/'+cid)){assert.equal(options.cache,'no-store');return new Response(bytes,{headers:{'Content-Type':'image/png'}});}
   assert.equal(url,'/api/road-ipfs/nft-cover');assert.equal(options.headers['X-Road-Public-Cover'],PUBLIC_COVER_CONSENT);
   assert.equal(options.headers['Content-Type'],'image/png');assert.equal(options.redirect,'error');assert.deepEqual(options.body,bytes);
   return Response.json(receipt(bytes));
@@ -82,16 +83,16 @@ test('public cover HTTP endpoint enforces consent, loopback origin, size and PNG
  assert.equal(stored,1);
 });
 
-test('thumbnail retrieval reads only a locally pinned, bounded normalized PNG',async()=>{
+test('public thumbnail retrieval accepts peer-provided PNGs without a local pin, retaining bounds',async()=>{
  const {retrieveNftCover}=await import('../scripts/ipfs-bridge.mjs');
  const bytes=png();let calls=0;
- const fetchImpl=async url=>{calls++;if(url.includes('/pin/ls?'))return Response.json({Keys:{[cid]:{Type:'recursive'}}});assert.ok(url.includes('length=524289'));return new Response(bytes);};
- const result=await retrieveNftCover(cid,{fetchImpl});assert.deepEqual(result.bytes,bytes);assert.equal(calls,2);
- await assert.rejects(retrieveNftCover(cid+'/private',{fetchImpl}));assert.equal(calls,2);
+ const fetchImpl=async url=>{calls++;assert.ok(!url.includes('/pin/'));assert.ok(url.includes('length=524289'));return new Response(bytes);};
+ const result=await retrieveNftCover(cid,{fetchImpl});assert.deepEqual(result.bytes,bytes);assert.equal(calls,1);
+ await assert.rejects(retrieveNftCover(cid+'/private',{fetchImpl}));assert.equal(calls,1);
  for(const invalid of [Buffer.from('0ZROAD01encrypted-work'),Buffer.from('<svg/>'),Buffer.alloc(MAX_NFT_COVER_BYTES+1)]){
   await assert.rejects(retrieveNftCover(cid,{fetchImpl:async url=>url.includes('/pin/ls?')?Response.json({Keys:{[cid]:{Type:'recursive'}}}):new Response(invalid)}));
  }
- await assert.rejects(retrieveNftCover(cid,{fetchImpl:async()=>Response.json({Keys:{}})}),/pinned/);
+ await assert.rejects(retrieveNftCover(cid,{fetchImpl:async()=>Response.json({Keys:{}})}),/public PNG/);
 });
 test('thumbnail HTTP route returns PNG only and retains origin, Host and exact-path checks',async t=>{
  let calls=0;
