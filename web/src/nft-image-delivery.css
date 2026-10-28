@@ -1,7 +1,7 @@
 
 /* Visibility is already gated by RegistrationThumbnail. Reserve dimensions and
    load the visible image eagerly; never leave an unbounded blank image request. */
-.br-artwork>img{position:absolute;inset:0}.br-artwork-fallback{position:absolute;inset:0}.br-artwork figcaption{z-index:1}.br-cover-retry{z-index:2}
+.br-artwork>img{position:absolute;inset:0}.br-artwork-fallback{position:absolute;inset:0;pointer-events:none}.br-artwork figcaption{z-index:1}.br-cover-retry{position:absolute;inset:6px 4px auto;z-index:2;padding:4px 2px;border:1px solid #756239;border-radius:5px;background:#1b2026;color:#f3eee3;font-size:10px;cursor:pointer}
 .br-thumbnail-wrap{width:80px;flex:none}.br-image-check{font-size:10px;margin-top:5px;max-width:100%}
 .nft-public-dialog{width:560px;max-width:calc(100vw - 32px);max-height:85vh;box-sizing:border-box;overflow:auto;border:1px solid #756239;border-radius:14px;padding:20px;background:#1b2026;color:#f3eee3}
 .nft-public-dialog::backdrop{background:#0009}.nft-public-check{font-size:12px;line-height:1.6;overflow-wrap:anywhere}.nft-public-check code{word-break:break-all}.nft-public-check .nft-cover-preview{max-width:100%;width:160px;height:auto;object-fit:contain}.nft-public-check button{display:block;margin-top:12px}
