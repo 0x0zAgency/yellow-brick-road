@@ -2,6 +2,7 @@
 /** Real workspace, local synthetic graphics, no wallet writes or deployment. */
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
+const taggedMp3=require('./fixtures/tagged-mp3.cjs');
 const root=path.resolve(__dirname,'..'),out=path.join(root,'.road-local/player-browser-results');
 async function main(){
  if(!process.env.CI)throw Error('This browser regression is CI only.');
@@ -71,6 +72,31 @@ async function main(){
   await page.setViewportSize({width:390,height:844});await page.getByRole('tab',{name:'Colors & themes'}).click();
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No mobile horizontal overflow');await capture('settings-mobile.png');
   await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();await page.getByRole('heading',{name:'01. Identify the creator.',exact:true}).waitFor();
+  await page.setViewportSize({width:1280,height:1000});await openSettings();await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();
+  const enable=page.getByRole('switch',{name:'Use saved defaults and pre-check approvals',exact:true});assert.equal(await enable.isChecked(),false);await enable.check();
+  assert.equal(await page.getByLabel('Content locked by default',{exact:true}).isChecked(),true);
+  assert.equal(await page.getByLabel('Deliver to YBR-compatible Players by default',{exact:true}).isChecked(),true);
+  await page.getByLabel('Sound recording ingestion fee (USDC)',{exact:true}).fill('125.50');
+  await page.getByLabel('Songwriting use fee (USDC)',{exact:true}).fill('12.25');
+  await page.getByLabel('Default AI training policy',{exact:true}).selectOption('not-authorized');
+  await page.getByRole('button',{name:'Save creator defaults',exact:true}).click();await page.reload();await openSettings();
+  await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();assert.equal(await enable.isChecked(),true);
+  assert.equal(await page.getByLabel('Sound recording ingestion fee (USDC)',{exact:true}).inputValue(),'125.5');
+  await capture('settings-creator-defaults.png');
+  await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();
+  await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles(path.join(root,'apps/ybr-player/media/golden-hour.wav'));
+  await page.getByLabel('Choose Audio preview',{exact:true}).setInputFiles({name:'preview.mp3',mimeType:'audio/mpeg',buffer:taggedMp3()});
+  await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
+  const delivery=page.getByRole('checkbox',{name:'Deliver approved copies to YBR Player automatically after mint',exact:false});
+  await delivery.waitFor();assert.equal(await delivery.isChecked(),true);assert.equal(await page.getByRole('switch',{name:'Content locked',exact:false}).isChecked(),true);
+  assert.equal(await page.getByLabel('AI training policy',{exact:true}).inputValue(),'not-authorized');
+  assert.equal(await page.getByLabel(/^Recording ingestion:/).inputValue(),'12550');assert.equal(await page.getByLabel(/^Songwriting use:/).inputValue(),'1225');
+  await delivery.uncheck();await page.getByLabel('Track title',{exact:true}).fill('Per-work delivery opt-out');assert.equal(await delivery.isChecked(),false);
+  await openSettings();await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();await enable.uncheck();await page.getByRole('button',{name:'Save creator defaults',exact:true}).click();
+  await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles(path.join(root,'apps/ybr-player/media/golden-hour.wav'));await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
+  await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();await page.getByRole('switch',{name:'Content locked',exact:false}).waitFor();assert.equal(await page.getByRole('switch',{name:'Content locked',exact:false}).isChecked(),false);
   assert.equal(await page.evaluate(()=>localStorage.getItem('road:keep-recovery-sentinel')),'PRIVATE-SENTINEL');assert.equal(await page.evaluate(()=>window.settingsWalletWrites),0);assert.deepEqual(errors,[]);
   console.log('SETTINGS PASS: actual desktop/mobile workspace, CSS variables, presets, save/reload, safe PNG logo, installed icons, reduced motion, export/import rejection, reset/discard, common tools, no wallet writes or unrelated-storage deletion.');
  }catch(error){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'settings-failure.png'),fullPage:true}).catch(()=>{});}throw error;}

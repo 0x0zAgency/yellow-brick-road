@@ -10,6 +10,7 @@ const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
 const ROOT=path.resolve(__dirname,'..');
+const taggedMp3=require('./fixtures/tagged-mp3.cjs');
 const OUT=path.join(ROOT,'.road-local/player-browser-results');
 const key='browser-test-listener-only';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -38,7 +39,7 @@ async function main(){
   await studio.getByRole('button',{name:'Mint Studio',exact:true}).click();
   await studio.getByRole('button',{name:'Continue →',exact:true}).click();
   await studio.locator('input[aria-label="Choose Master recording"]').setInputFiles(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'));
-  await studio.getByLabel('Choose Audio preview',{exact:true}).setInputFiles(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'));
+  await studio.getByLabel('Choose Audio preview',{exact:true}).setInputFiles({name:'preview.mp3',mimeType:'audio/mpeg',buffer:taggedMp3()});
   await studio.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles(path.join(tmp,'cover.png'));
   await studio.getByLabel('Choose Lyrics manuscript / writing evidence',{exact:true}).setInputFiles(path.join(tmp,'lyrics.txt'));
   await studio.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
@@ -89,7 +90,7 @@ async function main(){
   await player.locator('#playPause').click();
   await player.waitForFunction(()=>document.getElementById('audio').currentTime>0.2,{},{timeout:15000});
   const servedHash=await player.evaluate(async()=>{const response=await fetch(document.getElementById('audio').src);const bytes=await response.arrayBuffer();return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');});
-  assert.equal(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'))),'Player must stream the selected Audio Preview, not the distinct Master Recording');
+  assert.equal(servedHash,digest(taggedMp3()),'Player must stream the selected Audio Preview, not the distinct Master Recording');
   assert.notEqual(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'))));
   await player.screenshot({path:path.join(OUT,'uploaded-release.png'),fullPage:true});
   // Publish a WebVTT companion through the same local ingestion boundary.

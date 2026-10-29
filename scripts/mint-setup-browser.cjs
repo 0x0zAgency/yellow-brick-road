@@ -2,6 +2,7 @@
 /** Actual Mint Studio UI; mock wallet for read-only setup, never a transaction. */
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
+const taggedMp3=require('./fixtures/tagged-mp3.cjs');
 const root=path.resolve(__dirname,'..'),stem='mint-setup-browser-'+process.pid;
 const html=path.join(root,'web',stem+'.html'),jsx=path.join(root,'web','src',stem+'.jsx');
 const current='0x'+'1'.repeat(40),old='0x'+'2'.repeat(40),next='0x'+'3'.repeat(40),manual='0x'+'4'.repeat(40),sepolia='0x'+'5'.repeat(40);
@@ -42,8 +43,8 @@ createRoot(document.getElementById('setup-root')).render(<Test/>);
   await page.getByRole('button',{name:'Continue →',exact:true}).click();
   const editor=page.getByRole('region',{name:'Pre-mint Player permissions and content lock'});
   assert.equal(await editor.count(),0,'Files contains no permission editor');
-  for(const [label,file] of [['Choose Master recording','golden-hour.wav'],['Choose Audio preview','after-the-rain.wav']])
-   await page.getByLabel(label,{exact:true}).setInputFiles(path.join(root,'apps/ybr-player/media',file));
+  await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles(path.join(root,'apps/ybr-player/media/golden-hour.wav'));
+  await page.getByLabel('Choose Audio preview',{exact:true}).setInputFiles({name:'preview.mp3',mimeType:'audio/mpeg',buffer:taggedMp3()});
   await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
   await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
   await editor.waitFor();
