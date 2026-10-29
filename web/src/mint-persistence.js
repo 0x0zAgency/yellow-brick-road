@@ -21,7 +21,7 @@ const bounded=(value,min,max,fallback)=>Number.isInteger(Number(value))&&Number(
 const defaults={
  meta:{title:'',artist:'',songwriters:'',daw:'FL Studio',release:'',genre:'',bpm:'',key:'',isrc:'',iswc:'',description:''},
  ipCategoryId:'sound-recording',spatial:{},cover:{useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'},composition:true,training:'separate-license',
- share:10000,currency:'USDC',unit:'per-1000-outputs',
+ licensingEmail:'',share:10000,currency:'USDC',unit:'per-1000-outputs',
  fees:{masterIngestionCents:10000,masterUseCents:500,writingIngestionCents:5000,writingUseCents:250}
 };
 const networkDefaults={
@@ -43,6 +43,7 @@ export function sanitizeMintForm(value={}){
    ?value.cover.useMainArtist:!clean.cover.artist.trim();
   if(['illustration','photograph','digital-art','painting'].includes(value.cover.ipCategory))clean.cover.ipCategory=value.cover.ipCategory;
  }
+ clean.licensingEmail=text(value.licensingEmail,254);
  if(typeof value.composition==='boolean')clean.composition=value.composition;
  if(TRAINING.has(value.training))clean.training=value.training;
  clean.share=bounded(value.share,0,10000,10000);

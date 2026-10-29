@@ -1,4 +1,5 @@
 import {rpcConnectionError} from './rpc-diagnostics.js';
+import {packetLicensingEmails} from './licensing-contact.js';
 import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {initialPolicyFor} from './content-policy.js';
 import {verifyLocalChainHistory} from './chain-history.js';
@@ -9,6 +10,8 @@ export const factoryAbi=parseAbi([
  'function receiptToken() view returns (address)',
  'function contentPolicyVersion() view returns (uint8)',
  'function mintBatchVersion() view returns (uint8)',
+ 'function licensingContactInterfaceVersion() view returns (uint8)',
+ 'function deployBricksWithLicensingContact((bytes32 contentHash,string uri,bytes32 metadataDigest,bytes32 nonce,bool withPolicy,((bytes32 manifestDigest,bytes32 previewHash,bytes32 artworkHash,bytes32 lyricsHash) files,uint8 permissions,bool locked) policy)[] registrations,string imageURI,string[] licensingEmails) returns (address[])',
  'function deployBricksWithPolicy((bytes32 contentHash,string uri,bytes32 metadataDigest,bytes32 nonce,bool withPolicy,((bytes32 manifestDigest,bytes32 previewHash,bytes32 artworkHash,bytes32 lyricsHash) files,uint8 permissions,bool locked) policy)[] registrations,string imageURI) returns (address[])',
  'function deployBrickWithPolicy(bytes32,string,bytes32,bytes32,((bytes32 manifestDigest,bytes32 previewHash,bytes32 artworkHash,bytes32 lyricsHash) files,uint8 permissions,bool locked) policy) returns (address)',
  'function isBrick(address) view returns (bool)',
@@ -98,6 +101,12 @@ export async function preflightPolicyMint(options){
  await verifyFactory(client,options.factoryAddress);
  await requirePolicyFactory(client,options.factoryAddress);
  await requireBatchFactory(client,options.factoryAddress);
+ if(packetLicensingEmails(options.packet).some(Boolean))await requireLicensingContactFactory(client,options.factoryAddress);
+}
+export async function requireLicensingContactFactory(client,factoryAddress){
+ let version;
+ try{version=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'licensingContactInterfaceVersion'});}catch{}
+ if(Number(version)!==1)throw Error('This factory cannot store a licensor email on the Brick. Deploy the updated factory (npm run ganache:deploy locally), then restart the dev stack. Existing immutable Bricks cannot be upgraded. No mint was submitted.');
 }
 export async function mintOnChain(options){
  const {mintBatchOnChain}=await import('./batch-mint.js');
@@ -105,6 +114,7 @@ export async function mintOnChain(options){
 }
 // Explicit compatibility API only. Never selected by Mint Studio or by fallback.
 export async function mintLegacyOnChain({packet,provider,rpcUrl,chainId,factoryAddress,network='ganache',receiptTimeoutMs=120000,onUpdate=()=>{},result={simulated:false,status:'pending',receipts:[]}}){
+ if(packetLicensingEmails(packet).some(Boolean))throw Error('Licensor contacts require the current atomic mint entry point.');
  const account=packet?.account?.address;
  if(result.receipts.length)throw Error('Use a fresh batch only after reviewing all prior transaction hashes.');
  if(packet?.packetType!=='LOCAL_PREVIEW_NOT_MINTED'||!packet.bricks?.length)throw Error('Invalid registration packet.');

@@ -78,10 +78,12 @@ async function main(){
   assert.equal(await page.getByLabel('Deliver to YBR-compatible Players by default',{exact:true}).isChecked(),true);
   await page.getByLabel('Sound recording ingestion fee (USDC)',{exact:true}).fill('125.50');
   await page.getByLabel('Songwriting use fee (USDC)',{exact:true}).fill('12.25');
+  await page.getByLabel('Default licensor email',{exact:true}).fill('Licensing+Music@EXAMPLE.COM');
   await page.getByLabel('Default AI training policy',{exact:true}).selectOption('not-authorized');
   await page.getByRole('button',{name:'Save creator defaults',exact:true}).click();await page.reload();await openSettings();
   await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();assert.equal(await enable.isChecked(),true);
   assert.equal(await page.getByLabel('Sound recording ingestion fee (USDC)',{exact:true}).inputValue(),'125.5');
+  assert.equal(await page.getByLabel('Default licensor email',{exact:true}).inputValue(),'Licensing+Music@example.com');
   await capture('settings-creator-defaults.png');
   await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();
   await page.getByRole('button',{name:'Continue →',exact:true}).click();
@@ -92,6 +94,8 @@ async function main(){
   await delivery.waitFor();assert.equal(await delivery.isChecked(),true);assert.equal(await page.getByRole('switch',{name:'Content locked',exact:false}).isChecked(),true);
   assert.equal(await page.getByLabel('AI training policy',{exact:true}).inputValue(),'not-authorized');
   assert.equal(await page.getByLabel(/^Recording ingestion:/).inputValue(),'12550');assert.equal(await page.getByLabel(/^Songwriting use:/).inputValue(),'1225');
+  assert.equal(await page.getByLabel('Licensor email',{exact:true}).inputValue(),'Licensing+Music@example.com');
+  await page.getByLabel('Licensor email',{exact:true}).fill('per-work@example.com');
   await delivery.uncheck();await page.getByLabel('Track title',{exact:true}).fill('Per-work delivery opt-out');assert.equal(await delivery.isChecked(),false);
   await openSettings();await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();await enable.uncheck();await page.getByRole('button',{name:'Save creator defaults',exact:true}).click();
   await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();

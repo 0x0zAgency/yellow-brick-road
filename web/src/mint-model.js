@@ -1,3 +1,4 @@
+import {normalizeLicensingEmail} from './licensing-contact.js';
 import {releaseProposal,bindBuildingToBricks} from './release-buildings.js';
 import {addContentPolicy} from './content-policy.js';
 import {normalizeMusicGenre} from './music-genres.js';
@@ -40,8 +41,9 @@ export function assetRecord(slot,item){
   cid:item.ipfsUpload?.verified?item.ipfsUpload.cid:null,
   ...(item.extracted?{extractedMetadata:{title:item.extracted.fields.title,technical:item.extracted.technical,source:item.extracted.parser,status:'unverified-file-metadata'}}:{})};
 }
-export function validateMintInput({metadata,assets,identity,royalties,cover={},linkedBricks=[]}){
+export function validateMintInput({metadata,assets,identity,royalties,licensing={},cover={},linkedBricks=[]}){
  const errors=[];
+ try{normalizeLicensingEmail(licensing.email);}catch(e){errors.push(e.message);}
  if(getIpCategory(metadata.ipCategory||'sound-recording').group==='Music & audio'&&normalizeMusicGenre(metadata.genre)===null)errors.push('Select an approved music genre, Other, or leave genre blank.');
  if(!(metadata.title||'').trim())errors.push('Work title is required.');
  if(!(metadata.artist||'').trim())errors.push('Artist / claimant is required.');
@@ -85,7 +87,8 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
  const useUnit=['per-1000-outputs','per-output','per-model-deployment'].includes(licensing.useUnit)?licensing.useUnit:'per-1000-outputs';
  const moneyCents=n=>Number.isInteger(Number(n))&&Number(n)>=0&&Number(n)<=100000000?Number(n):0;
  const licenseQuote=kind=>({status:'draft-only-not-an-authorization',denomination,ingestion:{amountCents:moneyCents(kind==='writing'?licensing.writingIngestionCents:licensing.masterIngestionCents),unit:'per-dataset-inclusion'},use:{amountCents:moneyCents(kind==='writing'?licensing.writingUseCents:licensing.masterUseCents),unit:useUnit}});
- const common={standard:'0x0z-road-ip',schemaVersion:'1.0.0',schema:namespace,provenance:{recordedAt:now,sourceApplication:category.musical?(metadata.daw||'Unknown DAW'):'Creator-declared source',authStatus:identity.mode==='external'?'wallet-to-be-signed':'assisted-wallet-pending'},creators:[{name:metadata.artist.trim(),role:'primary-artist',wallet:isEvmAddress(identity.address)?identity.address:null,alias:aliasFor(metadata.artist)}],rights:{ownershipStatus:'self-declared-not-verified',territories:['worldwide'],aiTraining:{mode:training,requiresAttribution:training==='licensed-with-terms',generationRoyalties:'by-separate-agreement'}},extensions:{}};
+ const licensingEmail=normalizeLicensingEmail(licensing.email);
+ const common={standard:'0x0z-road-ip',schemaVersion:'1.0.0',schema:namespace,provenance:{recordedAt:now,sourceApplication:category.musical?(metadata.daw||'Unknown DAW'):'Creator-declared source',authStatus:identity.mode==='external'?'wallet-to-be-signed':'assisted-wallet-pending'},creators:[{name:metadata.artist.trim(),role:'primary-artist',wallet:isEvmAddress(identity.address)?identity.address:null,alias:aliasFor(metadata.artist)}],rights:{...(licensingEmail?{licensingContact:{email:licensingEmail}}:{}),ownershipStatus:'self-declared-not-verified',territories:['worldwide'],aiTraining:{mode:training,requiresAttribution:training==='licensed-with-terms',generationRoyalties:'by-separate-agreement'}},extensions:{}};
  const master={...common,objectType:category.objectType,ipCategory:category.id,categoryLabel:category.label,title:metadata.title.trim(),description:metadata.description||'',identifiers:{isrc:category.musical?(metadata.isrc||null):null,iswc:null,upc:null},music:category.musical?{release:metadata.release||null,genre:normalizeMusicGenre(metadata.genre)||null,bpm:metadata.bpm?Number(metadata.bpm):null,key:metadata.key||null,daw:metadata.daw||'Unknown DAW'}:category.group==='Music & audio'?{genre:normalizeMusicGenre(metadata.genre)||null}:undefined,proposedAiLicense:licenseQuote('master'),media:files.filter(x=>x.role!=='artwork'&&x.role!=='lyrics'),relationships:[],payout:{type:'proposed-split',shares:[{party:metadata.artist.trim(),bps:Number(royalties.creatorBps)},{party:'Additional rights holders (specify before signing)',bps:10000-Number(royalties.creatorBps)}].filter(x=>x.bps>0)}};
  if(category.spatial){
   master.evidence={...spatialEvidence(metadata.spatial||{},now),

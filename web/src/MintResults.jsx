@@ -8,6 +8,7 @@ import CopyAllButton from './CopyAllButton.jsx';
 import {formatMintReceiptForCopy} from './mint-receipt-copy.js';
 import NftCoverPublisher from './NftCoverPublisher.jsx';
 import PlayerReleasePublisher from './PlayerReleasePublisher.jsx';
+import LicensingContactEditor from './LicensingContactEditor.jsx';
 
 /** Human summary first. Every receipt and recovery action remains available. */
 export default function MintResults({packet,mint,vault,preparedCover,delivery,onRetry,busy,onCoverVerified,onExportPacket,onExportRecovery,onReset,onDownload,downloadSlots=[]}){
@@ -60,6 +61,7 @@ export default function MintResults({packet,mint,vault,preparedCover,delivery,on
      <div className="br-record-copy"><span className="br-kicker">{r.role||'IP registration'}</span><h4>{r.title||title}</h4><StatusPill tone={overview.simulated?'neutral':r.status==='verified'?'success':'warning'}>{overview.simulated?'Simulated':r.status==='verified'?'Verified on chain':r.status||'Unverified'}</StatusPill></div>
     </div>
     <FileRoleChips roles={(packet.bricks?.find(b=>b.localId===r.sourceId)?.metadata?.media||[]).map(f=>f.role)}/>
+    {!overview.simulated&&r.status==='verified'&&<details><summary>Licensor contact</summary><LicensingContactEditor wallet={packet.account?.address} chainId={r.chainId} factoryAddress={mint.factoryAddress} brickAddress={r.contractAddress}/></details>}
     <div className="br-record-footer"><small title={r.contractAddress||r.id}>{shortId(r.contractAddress||r.id)}</small><CopyAllButton label={r.role||r.title||'Brick'} text={formatMintReceiptForCopy(r,mint)}/></div>
     <details><summary>Receipt details &amp; wallet import</summary><div className="br-details"><dl>
      {r.nftContractAddress&&r.tokenId?<><div><dt>NFT contract address (import this)</dt><dd><CopyField label="NFT contract address" value={r.nftContractAddress}/></dd></div><div><dt>Token ID (decimal, import this)</dt><dd><CopyField label="NFT token ID" value={r.tokenId}/></dd></div></>:<div><dt>NFT import</dt><dd>{overview.simulated?'Not available in simulation.':'No verified ERC-721 receipt. This may be a legacy or incomplete registration.'}</dd></div>}

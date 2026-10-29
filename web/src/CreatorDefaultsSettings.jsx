@@ -18,6 +18,8 @@ export default function CreatorDefaultsSettings(){
   </fieldset>
   <fieldset className="creator-default-fields" disabled={!value.enabled}>
    <legend>Licensing defaults</legend>
+   <label>Default licensor email<input type="email" maxLength={254} autoComplete="email" value={value.licensingEmail} onChange={e=>change({licensingEmail:e.target.value})} placeholder="licensing@example.com"/></label>
+   <p>This optional contact is published on each new Brick. Use a public licensing address; it can be changed per work and later by the Brick controller.</p>
    <label>Default AI training policy<select aria-label="Default AI training policy" value={value.training} onChange={e=>change({training:e.target.value})}>{trainingModes.map(mode=><option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
    <label className="settings-toggle"><input type="checkbox" checked={value.composition} onChange={e=>change({composition:e.target.checked})}/><span>Create a separate songwriting Brick by default</span></label>
    <label>Default creator payout share (%)<input type="number" min="0" max="100" step="1" value={value.share/100} onChange={e=>change({share:Math.round(Number(e.target.value)*100)})}/></label>

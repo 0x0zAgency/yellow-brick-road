@@ -1,14 +1,16 @@
 /** Explicit browser preferences for new registrations, not transaction authorization. */
+import {normalizeLicensingEmail} from './licensing-contact.js';
 import {defaultMintForm} from './mint-persistence.js';
 import {DEFAULT_CONTENT_POLICY} from './content-policy.js';
 export const CREATOR_DEFAULTS_KEY='road:creator-defaults:v1';
 export function defaultCreatorDefaults(){
  const form=defaultMintForm();
- return {enabled:false,delivery:true,contentPolicy:{...DEFAULT_CONTENT_POLICY,locked:true},training:form.training,
+ return {licensingEmail:'',enabled:false,delivery:true,contentPolicy:{...DEFAULT_CONTENT_POLICY,locked:true},training:form.training,
   composition:form.composition,share:form.share,currency:form.currency,unit:form.unit,fees:{...form.fees}};
 }
 export function sanitizeCreatorDefaults(value){
  const clean=defaultCreatorDefaults();if(!value||typeof value!=='object'||Array.isArray(value))return clean;
+ try{clean.licensingEmail=normalizeLicensingEmail(value.licensingEmail);}catch{}
  for(const key of ['enabled','delivery','composition'])if(typeof value[key]==='boolean')clean[key]=value[key];
  for(const key of Object.keys(clean.contentPolicy))if(typeof value.contentPolicy?.[key]==='boolean')clean.contentPolicy[key]=value.contentPolicy[key];
  if(['not-authorized','separate-license','licensed-with-terms'].includes(value.training))clean.training=value.training;
@@ -24,13 +26,14 @@ export function loadCreatorDefaults(storage){
  }catch{return defaultCreatorDefaults();}
 }
 export function saveCreatorDefaults(storage,value){
+ normalizeLicensingEmail(value?.licensingEmail);
  const clean=sanitizeCreatorDefaults(value);
  if(!storage?.setItem)throw Error('Browser storage is unavailable. Creator defaults were not saved.');
  storage.setItem(CREATOR_DEFAULTS_KEY,JSON.stringify({version:1,data:clean}));return clean;
 }
 export function applyCreatorDefaults(form,defaults){
  if(!defaults.enabled)return form;
- return {...form,...Object.fromEntries(['training','composition','share','currency','unit'].map(key=>[key,defaults[key]])),fees:{...defaults.fees}};
+ return {...form,...Object.fromEntries(['training','composition','share','currency','unit','licensingEmail'].map(key=>[key,defaults[key]])),fees:{...defaults.fees}};
 }
 export const initialContentPolicy=defaults=>({... (defaults.enabled?defaults.contentPolicy:DEFAULT_CONTENT_POLICY)});
 export function defaultDeliveryApproved({defaults,choice,consent,scope,assets,policy}){
