@@ -7,6 +7,7 @@
 })(globalThis, () => {
   function isPlayable(brick, canPlayType) {
     if (!brick || brick.streamAllowed !== true || brick.source === 'road-registry') return false;
+    if(brick.source==='playable-cover')return brick.type==='PlayableCover'&&/^COVER-[a-f0-9]{64}$/.test(brick.id||'')&&Array.isArray(brick.sources)&&brick.sources.length>0&&brick.sources.length<=9&&brick.sources.every(s=>isPlayable({id:s.id,streamAllowed:true,media:s},canPlayType));
     const mime = brick.media?.mimeType;
     if (typeof mime !== 'string' || !/^audio\//i.test(mime)) return false;
     if (canPlayType) {
@@ -22,8 +23,10 @@
   }
   function playableNewest(items, {canPlayType, unavailable = new Set()} = {}) {
     const seen = new Set();
+    const sources=new Map((Array.isArray(items)?items:[]).filter(b=>b?.source!=='playable-cover'&&isPlayable(b,canPlayType)&&!unavailable.has(b.id)).map(b=>[b.id,b]));
     return (Array.isArray(items) ? items : []).filter(brick => {
       if (!isPlayable(brick, canPlayType) || unavailable.has(brick.id) || seen.has(brick.id)) return false;
+      if(brick.source==='playable-cover'&&brick.sources.some(s=>sources.get(s.id)?.media?.sha256!==s.sha256))return false;
       seen.add(brick.id); return true;
     }).sort((a, b) => {
       const left = publicationTime(a), right = publicationTime(b);

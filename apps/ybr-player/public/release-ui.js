@@ -30,7 +30,7 @@
   previous?.remove();target.classList.remove('release-has-cover');
   if(!src)return;
   const image=make('img','release-cover-image');image.alt=(brick.title||'Release')+' cover artwork';image.src=src;image.loading='lazy';
-  image.addEventListener('load',()=>window.dispatchEvent(new CustomEvent('ybr:file-display',{detail:{brickId:brick.id,role:'artwork',sha256:brick.artwork.sha256}})));
+  image.addEventListener('load',()=>window.dispatchEvent(new CustomEvent('ybr:file-display',{detail:{brickId:brick.artwork.sourceBrickId||brick.id,role:'artwork',sha256:brick.artwork.sha256}})));
   image.addEventListener('error',()=>{image.remove();target.classList.remove('release-has-cover');});
   target.append(image);target.classList.add('release-has-cover');
  }
@@ -51,6 +51,7 @@
   if(!filesBody.children.length)filesBody.textContent='No additional files attached to this release.';
  }
  async function select(brick){
+  panel.hidden=brick?.source==='playable-cover';
   paintCover(document.getElementById('miniCover'),brick);paintCover(document.getElementById('inspectorCover'),brick);
   const key=JSON.stringify([brick?.id,brick?.lyrics?.sha256,brick?.artwork?.sha256]);
   if(key===selectionKey)return;

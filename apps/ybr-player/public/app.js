@@ -81,6 +81,10 @@ function updateInspector(brick) {
   $('brickHash').textContent=digest?digest.slice(0,13)+'…':'—';
   $('brickHash').title=digest||'SHA-256 commitment';
   $('brickProvenance').textContent=brick ? `${brick.provenance.agent} · ${brick.provenance.activity}. ${brick.rights.notes} SHA-256 binds this manifest to the original audio bytes.` : 'Select an audio brick to inspect its source and origin.';
+  if(brick?.source==='playable-cover'){
+    $('brickFormat').textContent='Playable Cover';
+    $('brickProvenance').textContent=brick.buildingTitle+' · '+brick.layout.regions.length+' sounds. '+brick.rights.notes;
+  }
   if(brick?.source==='road-registry'){
     const r=brick.registration;
     $('brickFormat').textContent='Not published';
@@ -99,10 +103,10 @@ function renderList() {
     const cover=document.createElement('span');cover.className=`track-thumbnail ${brick.theme==='violet'?'violet':'gold'}`;cover.textContent='◆';
     const info=document.createElement('div');info.className='track-info';
     const name=document.createElement('strong');name.textContent=brick.title;
-    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+((brick.source==='road'||brick.source==='road-registry')?'CHAIN '+(brick.road?.chainId||brick.registration?.chainId||'?')+' · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
+    const creator=document.createElement('small');creator.textContent=brick.creator+' · '+(brick.source==='playable-cover'?brick.buildingTitle:(brick.source==='road'||brick.source==='road-registry')?'CHAIN '+(brick.road?.chainId||brick.registration?.chainId||'?')+' · '+brick.id.slice(0,12)+'…':brick.source==='studio-demo'?'UPLOADED DEMO':brick.id);
     info.append(name,creator);
-    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='road-registry'?'⌁ ON CHAIN':brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
-    const duration=document.createElement('span');duration.className='track-duration';duration.textContent=brick.source==='road-registry'?'—':stamp(brick.durationSeconds);
+    const tag=document.createElement('span');tag.className='track-tag'+(brick.streamAllowed?'':' locked');tag.textContent=brick.source==='playable-cover'?'Playable Cover':brick.source==='road-registry'?'⌁ ON CHAIN':brick.source==='studio-demo'?'◈ DEMO UPLOAD':brick.source==='road'?'◈ ROAD OPEN':brick.streamAllowed?'◈ DEMO READY':'⌁ RESTRICTED';
+    const duration=document.createElement('span');duration.className='track-duration';duration.textContent=brick.source==='playable-cover'?'Mix':brick.source==='road-registry'?'—':stamp(brick.durationSeconds);
     const play=document.createElement('button');play.className='track-action';play.type='button';play.setAttribute('aria-label',`${brick.streamAllowed?'Play':'Inspect restricted'} ${brick.title}`);play.textContent=brick.streamAllowed?'▶':'⌁';
     const action=()=>{if(currentMediaBrick&&currentMediaBrick!==brick.id)recordEvent('skip');void choose(brick,true);};
     play.addEventListener('click',(e)=>{e.stopPropagation();action();});
@@ -161,6 +165,11 @@ async function choose(brick, playNow=true, {automatic=false}={}) {
   if (!playNow) return;
   if (!brick.streamAllowed) {toast(brick.source==='road-registry'?'This Brick is registered. Share a preview through Add release to Player in Mint Studio to enable local playback.':`Access denied: ${brick.title} is not licensed to this account.`);return;}
   try {
+    if(brick.source==='playable-cover'){
+      currentMediaBrick=brick.id;
+      window.YBRAudiocover.focus();
+      await window.YBRAudiocover.toggle();return 'playing';
+    }
     const grant=await post(`/api/bricks/${encodeURIComponent(brick.id)}/authorize`);
     if (revision!==selectionRevision||intent!==playIntent||!signedIn||selected?.id!==brick.id) return;
     if (!grant.authorized) throw Object.assign(new Error('Authorization refused'),{status:403});
@@ -242,7 +251,7 @@ function recordEvent(event){
 let displaySelection=null,displayed=new Set();
 window.addEventListener('ybr:selection',event=>{const id=event.detail?.brick?.id;if(id!==displaySelection){displaySelection=id;displayed.clear();}});
 window.addEventListener('ybr:file-display',event=>{
- const value=event.detail;if(!signedIn||value?.brickId!==selected?.id||!['artwork','lyrics'].includes(value.role))return;
+ const value=event.detail;if(!signedIn||![selected?.id,selected?.artwork?.sourceBrickId].includes(value?.brickId)||!['artwork','lyrics'].includes(value.role))return;
  const key=value.role+':'+value.sha256;if(displayed.has(key))return;displayed.add(key);
  sendInteraction({event:value.role+'-view',brickId:value.brickId,sha256:value.sha256,playbackId:crypto.randomUUID(),eventId:crypto.randomUUID(),positionSeconds:0});
 });
@@ -309,7 +318,7 @@ audio.addEventListener('error',()=>{
 // It cannot supply URLs, grants or rights through an imported layout.
 window.YBRAudiocoverHost={
  authorize:id=>post(`/api/bricks/${encodeURIComponent(id)}/authorize`),
- takeOver:()=>{playIntent++;stopMedia();},changed:updatePlayback,
+ takeOver:()=>{playIntent++;interactionRun=null;audio.pause();audio.removeAttribute('src');audio.load();currentMediaBrick=selected?.source==='playable-cover'?selected.id:null;},changed:updatePlayback,
  report:(entry,event)=>{
   if(!signedIn)return;
   sendInteraction({event,brickId:entry.brick.id,sha256:entry.brick.media.sha256,playbackId:entry.playbackId,eventId:crypto.randomUUID(),positionSeconds:Number(entry.audio.currentTime)||0});

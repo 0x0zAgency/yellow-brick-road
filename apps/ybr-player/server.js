@@ -9,6 +9,7 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { createStudioLibrary } = require('./studio-releases');
 const { createStudioHttp } = require('./studio-http');
+const {createPlayableCovers}=require('./playable-covers');
 const { readPlayerCatalog } = require('./road-registry');
 const {handleReadRpc}=require('./road-rpc');
 const { mayUseDemoLogin } = require('./demo-login');
@@ -118,7 +119,7 @@ function streamAudio(req,res,brick) {
   if(req.method==='HEAD')return res.end();
   return fs.createReadStream(brick.mediaPath,{start,end}).pipe(res);
 }
-function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, interactionFile, roadGateway, studioLibrary, demoAutoLogin = null, tls = null } = {}) {
+function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, interactionFile, roadGateway, studioLibrary, coverDirectory, demoAutoLogin = null, tls = null } = {}) {
   if(demoAutoLogin!==null&&(demoAutoLogin!=='artist'||!Object.hasOwn(accounts,'artist')))throw Error('Demo auto-login requires the configured artist account.');
   const studio = studioLibrary || createStudioLibrary();
   const road = roadGateway || require('./road-music').makeGateway();
@@ -166,7 +167,8 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
     if(brick.lyrics&&!(await checkPermission(brick,'lyrics')).allowed)result.lyrics=null;
     return result;
   }
-  const studioHttp = createStudioHttp({library:studio,sendJson,requireSession,parseRange,checkPermission});
+  const covers=createPlayableCovers({directory:coverDirectory,studio,checkPermission,now});
+  const studioHttp = createStudioHttp({library:studio,covers,sendJson,requireSession,parseRange,checkPermission});
   const interactionHttp=createInteractionHttp({file:interactionFile,now,requireSession,studio,bricks,road,checkPermission,canStream,sendJson,readJson,fail});
   const serve = tls ? handler => https.createServer(tls,handler) : handler => http.createServer(handler);
   const server = serve(async (req, res) => {
@@ -275,7 +277,7 @@ function createApp({ accounts = {}, now = () => Date.now(), eventFile = EVENTS, 
         return sendJson(res,200,{format:'ybr-player-demo-manifest/0.4',
           network:catalog.status,registry:catalog.registry?{matchingEvents:catalog.registry.matchingEvents,limitReached:catalog.registry.limitReached,limited:catalog.registry.limited}:null,
           uploads:newestSavedUploads(stored.map(item=>item.summary)),
-          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,stored.map(item=>item.playable).filter(Boolean))});
+          bricks:[...bricks.values()].map(b=>exposeBrick(b,s.user)).concat(catalog.bricks,stored.map(item=>item.playable).filter(Boolean),await covers.playable())});
       }
       const brickRoute = /^\/api\/bricks\/(0x[\da-fA-F]{64}|[A-Za-z0-9-]+)(?:\/(authorize|media))?$/.exec(route);
       if (brickRoute) {
