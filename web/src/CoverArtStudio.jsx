@@ -16,9 +16,10 @@ function newDraft(building,uploads){
  return {title:building.title,artworkBrickId:uploads.find(b=>members.includes(b.id)&&b.artwork)?.id||uploads.find(b=>b.artwork)?.id||'',
   regions:members.map((id,i)=>M.region({brickId:id,x:.1+(i%3)*.3,y:.1+Math.floor(i/3)*.3,width:.2,height:.2})),sensitivity:.25};
 }
-export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},onMint=()=>{}}){
+export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},onMint=()=>{},referenceBuildings=null}){
  const [catalog,setCatalog]=useState(EMPTY),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[message,setMessage]=useState(''),[error,setError]=useState('');
  const [buildingId,setBuildingId]=useState(''),[drafts,setDrafts]=useState({}),[newTitle,setNewTitle]=useState(''),[members,setMembers]=useState([]),[creating,setCreating]=useState(false);
+ const [releaseType,setReleaseType]=useState(''),[uploadsExpanded,setUploadsExpanded]=useState(false);
  const [selectedPin,setSelectedPin]=useState(0),[sound,setSound]=useState(''),[coverUrl,setCoverUrl]=useState(''),[cursor,setCursor]=useState({x:.5,y:.5}),[engineState,setEngineState]=useState(0),[committed,setCommitted]=useState(null);
  const wasActive=useRef(active),token=useRef(''),stage=useRef(null),drag=useRef(null),engine=useRef(null),previewAbort=useRef(null),urls=useRef(new Set()),loadId=useRef(0);
  const building=catalog.buildings.find(b=>b.id===buildingId),draft=building?(drafts[buildingId]||newDraft(building,catalog.uploads)):null;
@@ -30,7 +31,7 @@ export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},
   try{
    const config=await json('config');if(revision!==loadId.current)return;token.current=config.token;
    const data=await json('cover-studio',{headers:{'X-YBR-Publish-Token':config.token}});if(revision!==loadId.current)return;
-   stop();setCatalog(data);setBuildingId(id=>data.buildings.some(b=>b.id===id)?id:data.buildings[0]?.id||'');
+   stop();setCatalog(data);setBuildingId(id=>data.buildings.some(b=>b.id===id)?id:data.buildings.find(b=>b.source==='creator')?.id||'');
   }catch(e){if(revision===loadId.current){stop();setCatalog(EMPTY);setError(e.message);}}finally{if(revision===loadId.current)setLoading(false);}
  }
  async function mutate(path,body,method='POST'){
@@ -47,7 +48,7 @@ export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},
   void refresh();const open=()=>setCreating(true);window.addEventListener('ybr:new-audio-building',open);
   return()=>{loadId.current++;value.changed=()=>{};value.notifyError=()=>{};stop();window.removeEventListener('ybr:new-audio-building',open);};
  },[]);
- useEffect(()=>{if(!active)stop();else if(!wasActive.current)void refresh();wasActive.current=active;},[active]);
+ useEffect(()=>{if(!active){stop();setUploadsExpanded(false);}else if(!wasActive.current)void refresh();wasActive.current=active;},[active]);
  const coverId=draft?.artworkBrickId||'';
  useEffect(()=>{
   setCoverUrl('');if(!coverId||!token.current)return;
@@ -62,7 +63,7 @@ export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},
  useEffect(()=>{if(draft)engine.current?.setLevels(M.gains(draft.regions,cursor,new Map(),draft.sensitivity),.75);},[draft,cursor,engineState]);
  async function create(e){
   e.preventDefault();setBusy(true);setError('');
-  try{const result=await mutate('audio-buildings',{title:newTitle,members});await refresh();setBuildingId(result.record.id);setCreating(false);setNewTitle('');setMembers([]);setMessage('Audio Building created. Cover Art Studio is unlocked.');onOpen();}
+  try{const result=await mutate('audio-buildings',{title:newTitle,releaseType,members});await refresh();setBuildingId(result.record.id);setCreating(false);setNewTitle('');setReleaseType('');setMembers([]);setMessage(result.record.releaseType+' Building created. Cover Art Studio is unlocked.');onOpen();}
   catch(e){setError(e.message);}finally{setBusy(false);}
  }
  async function commit(){
@@ -87,17 +88,24 @@ export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},
   const {index,dx,dy}=drag.current;movePin(index,p.x-dx,p.y-dy);
  }
  const pin=draft?.regions[selectedPin],available=catalog.uploads.filter(b=>!draft?.regions.some(r=>r.brickId===b.id));
+ const created=catalog.buildings.filter(b=>b.source==='creator'),uploaded=catalog.buildings.filter(b=>b.source==='mint-studio');
+ const buildingCard=b=><button type="button" className={'cas-building'+(buildingId===b.id?' selected':'')} key={b.id} data-building-id={b.id} disabled={busy||loading} aria-pressed={buildingId===b.id} onClick={()=>{selectBuilding(b.id);if(view==='buildings')onOpen();}}><Layers3 size={21}/><strong>{b.title}</strong><small>{b.releaseType|| (b.source==='mint-studio'?(b.groupBy==='album'?'Album title group':'Track title group'):'Audio Building')} · {b.members.length} audio {b.members.length===1?'Brick':'Bricks'}</small><span>Open Cover Art Studio →</span></button>;
  return <section className="cover-studio" aria-label="Creator Cover Art Studio" hidden={!active}>
   <div className="cas-heading"><div><span className="eyebrow"><Layers3 size={15}/> AUDIO BUILDINGS</span><h2>{view==='buildings'?'Build with your uploaded audio.':'Turn your cover into an instrument.'}</h2><p>Create an audio Building, arrange its sounds on artwork, then commit a Playable Cover.</p></div><button className="quiet" type="button" onClick={()=>void refresh()} disabled={busy||loading}>Refresh uploads</button></div>
   {error&&<p className="cas-error" role="alert">{error}</p>}{message&&<p className="cas-success" role="status">{message}</p>}
   {loading&&<p role="status">Loading your audio Buildings…</p>}
   {!loading&&!catalog.uploads.length&&<div className="cas-empty"><Music2 size={30}/><h3>Your audio starts here.</h3><p>Add an Audio Preview in Mint Studio and share it with the Player. Your uploaded previews will be available here.</p><button className="gold-btn" onClick={onMint}>Open Mint Studio</button></div>}
+  {!loading&&<section className="cas-created" aria-labelledby="cas-created-heading"><div className="cas-section-title"><h3 id="cas-created-heading">Your Buildings</h3><span>Created by you</span></div>
+   {!created.length&&!referenceBuildings&&<p className="cas-group-note">Your own Buildings will appear here. Choose a release type and add your uploaded audio to get started.</p>}
+   <div className="cas-buildings">{created.map(buildingCard)}{!!catalog.uploads.length&&<button type="button" className="cas-building cas-new" disabled={busy||loading} onClick={()=>setCreating(v=>!v)} aria-expanded={creating}><Plus size={24}/><strong>New audio Building</strong><small>Single, EP, Album or Compilation</small></button>}</div>
+   {referenceBuildings}
+  </section>}
   {!!catalog.uploads.length&&<>
-   <div className="cas-buildings">{catalog.buildings.map(b=><button type="button" className={'cas-building'+(buildingId===b.id?' selected':'')} key={b.id} disabled={busy||loading} aria-pressed={buildingId===b.id} onClick={()=>{selectBuilding(b.id);if(view==='buildings')onOpen();}}><Layers3 size={21}/><strong>{b.title}</strong><small>{b.members.length} audio {b.members.length===1?'Brick':'Bricks'} · {b.source==='mint-studio'?'Release Building':'Audio Building'}</small><span>Open Cover Art Studio →</span></button>)}<button type="button" className="cas-building cas-new" disabled={busy||loading} onClick={()=>setCreating(v=>!v)} aria-expanded={creating}><Plus size={24}/><strong>New audio Building</strong><small>Group audio you have already uploaded.</small></button></div>
-   {(creating||!catalog.buildings.length)&&<form className="cas-create" onSubmit={create}><h3>Create an audio Building</h3><label>Building title<input required maxLength={200} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="An album, a soundscape, a new experiment…"/></label><fieldset><legend>Add your uploaded audio</legend><div className="cas-upload-list">{catalog.uploads.map(b=><label key={b.id}><input type="checkbox" checked={members.includes(b.id)} onChange={e=>setMembers(v=>e.target.checked?[...v,b.id]:v.filter(id=>id!==b.id))}/><span><strong>{b.title}</strong><small>{b.creator}</small></span></label>)}</div></fieldset><button className="gold-btn" disabled={busy||!members.length||!newTitle.trim()}>{busy?'Creating…':'Create Building & unlock Cover Art Studio'}</button></form>}
+   {creating&&<form className="cas-create" onSubmit={create}><h3>Create an audio Building</h3><div className="cas-fields"><label>What kind of audio Building?<select aria-label="What kind of audio Building?" required value={releaseType} onChange={e=>setReleaseType(e.target.value)}><option value="">Choose a release type</option>{['Single','EP','Album','Compilation'].map(type=><option key={type} value={type}>{type}</option>)}</select></label><label>Building title<input required maxLength={200} value={newTitle} onChange={e=>setNewTitle(e.target.value)} placeholder="Give your release a name"/></label></div><fieldset><legend>Add your uploaded audio</legend><div className="cas-upload-list">{catalog.uploads.map(b=><label key={b.id}><input type="checkbox" checked={members.includes(b.id)} onChange={e=>setMembers(v=>e.target.checked?[...v,b.id]:v.filter(id=>id!==b.id))}/><span><strong>{b.title}</strong><small>{b.creator}{b.album?' · '+b.album:''}</small></span></label>)}</div></fieldset><div className="cas-actions"><button className="gold-btn" disabled={busy||!members.length||!newTitle.trim()||!releaseType}>{busy?'Creating…':'Create Building & unlock Cover Art Studio'}</button><button type="button" className="quiet" disabled={busy} onClick={()=>setCreating(false)}>Cancel</button></div></form>}
   </>}
-  {view==='studio'&&!building&&!loading&&<p className="cas-locked">Cover Art Studio unlocks when you create an audio Building. Existing Mint Studio release Buildings also unlock it.</p>}
-  {view==='studio'&&draft&&<div className="cas-composer"><div className="cas-heading"><div><span className="eyebrow">COVER ART STUDIO · {building.title}</span><h3>Place your audio pins.</h3><p>Drag a numbered pin to move its sound region. Use arrow keys for fine adjustments.</p></div><span className="pill">{committed?'Committed':'Draft · not in the Player yet'}</span></div>
+  {!loading&&<details className="cas-upload-buildings" open={uploadsExpanded} onToggle={e=>setUploadsExpanded(e.currentTarget.open)}><summary><Layers3 size={18}/><strong>Created on upload</strong><span>{uploaded.length} {uploaded.length===1?'Building':'Buildings'}</span></summary><p className="cas-group-note">Uploads with the same album title are grouped together. Without an album title, the track title is used.</p>{uploaded.length?<div className="cas-buildings">{uploaded.map(buildingCard)}</div>:<p className="cas-group-note">No upload groups yet.</p>}</details>}
+  {view==='studio'&&!building&&!loading&&<p className="cas-locked">Create an audio Building, or choose one from Created on upload, to open Cover Art Studio.</p>}
+  {view==='studio'&&draft&&<div className="cas-composer"><div className="cas-heading"><div><span className="eyebrow">COVER ART STUDIO · {building.releaseType||'Audio'} · {building.title}</span><h3>Place your audio pins.</h3><p>Drag a numbered pin to move its sound region. Use arrow keys for fine adjustments.</p></div><span className="pill">{committed?'Committed':'Draft · not in the Player yet'}</span></div>
    <fieldset disabled={busy||loading} className="cas-fields"><label>Playable Cover title<input maxLength={200} value={draft.title} onChange={e=>update({title:e.target.value})}/></label><label>Cover artwork<select value={draft.artworkBrickId} onChange={e=>update({artworkBrickId:e.target.value})}><option value="">Choose shared cover artwork</option>{catalog.uploads.filter(b=>b.artwork).map(b=><option key={b.id} value={b.id}>{b.title}</option>)}</select></label></fieldset>
    {!catalog.uploads.some(b=>b.artwork)&&<p>Share a cover image with one of your releases in Mint Studio to add artwork.</p>}
    <div className="cas-editor"><div><div ref={stage} className={'cas-stage'+(playing?' listening':'')} aria-label={playing?'Preview listening point':'Cover art with movable audio pins'}

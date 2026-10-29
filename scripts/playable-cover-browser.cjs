@@ -11,8 +11,9 @@ async function main(){
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-cover-browser-'));let browser,player,web,page;const errors=[];let denied=false;
  try{
   const studio=createStudioLibrary({directory:path.join(tmp,'uploads')});
-  const upload=(title,hz)=>studio.publish({format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',title,creator:'Test musician',assets:{audio:encode(wav(hz),'preview.wav','audio/wav'),artwork:encode(png,'cover.png','image/png')},files:[{role:'preview',name:'preview.wav',sharedAs:'audio'}],bricks:[]}).brick;
-  const first=upload('First sound',220),second=upload('Second sound',440);
+  const upload=(title,hz,album='')=>studio.publish({format:'ybr-studio-preview/1',audioSourceRole:'preview',consent:'share-selected-copies-with-local-player',title,album,creator:'Test musician',assets:{audio:encode(wav(hz),'preview.wav','audio/wav'),artwork:encode(png,'cover.png','image/png')},files:[{role:'preview',name:'preview.wav',sharedAs:'audio'}],bricks:[]}).brick;
+  const first=upload('First sound',220,'Grouped album'),second=upload('Second sound',440,'Grouped album');
+  upload('Track without an album',330);upload('Track without an album',660);
   ({server:player}=createApp({accounts:{artist:'cover-fixture'},demoAutoLogin:'artist',studioLibrary:studio,coverDirectory:path.join(tmp,'covers'),interactionFile:path.join(tmp,'interactions'),roadGateway:{list:async()=>({status:{ready:false},tracks:[]}),track:async()=>null,playerPolicy:{check:async b=>({allowed:!(denied&&b.id===second.id)})}}}));
   await new Promise(r=>player.listen(0,'127.0.0.1',r));const playerBase='http://127.0.0.1:'+player.address().port;
   // Exercise the production React bundle with the same-origin publishing proxy.
@@ -28,11 +29,31 @@ async function main(){
   await page.addInitScript(()=>{window.walletWrites=0;window.ethereum={request:async({method})=>{if(method==='eth_accounts')return [];window.walletWrites++;throw Error('No wallet writes in this test');}};});
   await page.goto('http://127.0.0.1:'+web.address().port);
   const nav=page.getByRole('navigation',{name:'Main navigation'});
-  await nav.getByRole('button',{name:'Tools',exact:true}).click();await nav.getByRole('button',{name:'Cover Art Studio',exact:true}).click();
+  await nav.getByRole('button',{name:'Buildings',exact:true}).click();
+  await page.getByRole('heading',{name:'Your Buildings',exact:true}).waitFor();
+  const uploaded=page.locator('.cas-upload-buildings');
+  assert.equal(await uploaded.evaluate(el=>el.open),false,'Upload-created Buildings start collapsed');
+  assert.equal(await page.locator('.cas-created [data-building-id]').count(),0,'Only manually created Buildings belong in the main list');
+  assert.equal(await page.getByText('Reference Building examples',{exact:true}).count(),0);
+  await uploaded.locator('summary').click();assert.equal(await uploaded.locator('[data-building-id]').count(),2,'Album grouping and fallback track grouping each combine two uploads');
+  assert.match(await uploaded.textContent(),/Grouped album.*Album title group · 2 audio Bricks/s);
+  assert.match(await uploaded.textContent(),/Track without an album.*Track title group · 2 audio Bricks/s);
+  await uploaded.locator('summary').click();
+  await page.getByRole('button',{name:'New audio Building',exact:false}).click();
   await page.getByRole('heading',{name:'Create an audio Building',exact:true}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Commit Playable Cover',exact:true}).count(),0,'Locked before an audio Building exists');
-  await page.getByLabel('Building title',{exact:true}).fill('Immersive album');await page.getByRole('checkbox',{name:'First sound Test musician',exact:true}).check();
+  await page.getByLabel('Building title',{exact:true}).fill('Immersive album');await page.getByRole('checkbox',{name:'First sound Test musician · Grouped album',exact:true}).check();
+  assert.equal(await page.getByRole('button',{name:'Create Building & unlock Cover Art Studio',exact:true}).isDisabled(),true,'A release type must be chosen');
+  assert.deepEqual(await page.getByLabel('What kind of audio Building?',{exact:true}).locator('option').allTextContents(),['Choose a release type','Single','EP','Album','Compilation']);
+  await page.getByLabel('What kind of audio Building?',{exact:true}).selectOption('Album');
   await page.getByRole('button',{name:'Create Building & unlock Cover Art Studio',exact:true}).click();
+  await page.getByRole('heading',{name:'Place your audio pins.',exact:true}).waitFor();
+  assert.match(await page.locator('.cas-created').textContent(),/Immersive album.*Album · 1 audio Brick/s);
+  await nav.getByRole('button',{name:'Buildings',exact:true}).click();
+  fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'buildings-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=1);await page.screenshot({path:path.join(out,'buildings-mobile.png'),fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Buildings fit a mobile viewport');
+  await page.setViewportSize({width:1440,height:1050});await page.locator('.cas-created [data-building-id]').click();
   await page.getByRole('heading',{name:'Place your audio pins.',exact:true}).waitFor();
   await page.getByLabel('Playable Cover title',{exact:true}).fill('Album you can touch');
   await page.getByLabel('Audio to add',{exact:true}).selectOption(second.id);await page.getByRole('button',{name:'Add audio pin',exact:false}).click();
@@ -66,11 +87,13 @@ async function main(){
   assert.equal(await listener.locator('#artworkPlayer').isVisible(),false,'Normal tracks do not open a cover editor');
   await row.locator('.track-action').click();await listener.waitForFunction(()=>window.YBRAudiocover.playing);
   await page.reload();await nav.getByRole('button',{name:'Tools',exact:true}).click();await nav.getByRole('button',{name:'Cover Art Studio',exact:true}).click();
+  assert.equal(await page.locator('.cas-upload-buildings').evaluate(el=>el.open),false,'Automatic groups stay collapsed after reload');
+  assert.match(await page.locator('.cas-created').textContent(),/Immersive album.*Album · 1 audio Brick/s,'The chosen type survives reload');
   await page.getByRole('button',{name:'Edit copy',exact:true}).click();assert.equal(await page.getByLabel('Pin 1 width percent',{exact:true}).inputValue(),'30','Saved geometry can be reopened for editing');
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'playable-cover-creator-mobile.png'),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No mobile horizontal overflow');
   denied=true;await listener.locator('#refreshLibrary').click();await row.waitFor({state:'detached'});assert.equal(await listener.evaluate(()=>window.YBRAudiocover.active),false,'Permission change stops the whole cover');
   assert.equal(await page.evaluate(()=>window.walletWrites),0);assert.deepEqual(errors,[]);
-  console.log('PLAYABLE COVER PASS: Building unlock, any uploaded sound, drag and keyboard movement, resizing, preview, draft retention, commit, saved layout reload, separate Player item, independent playback, permission revocation and mobile layout.');
+  console.log('PLAYABLE COVER PASS: creator-only Building list, collapsed upload groups, album/track grouping, required persistent release type, Building unlock, any uploaded sound, drag and keyboard movement, resizing, preview, draft retention, commit, saved layout reload, separate Player item, independent playback, permission revocation and mobile layout.');
  }catch(e){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'playable-cover-failure.png'),fullPage:true}).catch(()=>{});}console.error('Browser errors:',errors);throw e;}
  finally{await browser?.close();for(const server of [web,player])if(server){server.closeAllConnections();await new Promise(r=>server.close(r));}fs.rmSync(tmp,{recursive:true,force:true});}
 }
