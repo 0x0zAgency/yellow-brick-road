@@ -20,6 +20,8 @@ on:
       - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
+      - 'scripts/album-cover-browser.cjs'
+      - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
       - '.github/workflows/player-releases.yml'
@@ -43,6 +45,8 @@ on:
       - 'scripts/dev-player.cjs'
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
+      - 'scripts/album-cover-browser.cjs'
+      - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
       - '.github/workflows/player-releases.yml'
@@ -102,6 +106,7 @@ jobs:
           node scripts/mint-setup-browser.cjs
           node scripts/player-release-browser.cjs
           node scripts/upload-metadata-browser.cjs
+          node scripts/album-cover-browser.cjs
           node scripts/nft-cover-browser.cjs
           node scripts/player-library-browser.cjs
           node scripts/compact-bricks-browser.cjs

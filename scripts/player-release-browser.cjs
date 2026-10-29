@@ -10,6 +10,7 @@ const path=require('node:path');
 const {createHash}=require('node:crypto');
 const {chromium}=require(require.resolve('playwright',{paths:[process.env.YBR_BROWSER_DEPS||'/tmp/ybr-browser']}));
 const ROOT=path.resolve(__dirname,'..');
+const taggedMp3=require('./fixtures/tagged-mp3.cjs');
 const OUT=path.join(ROOT,'.road-local/player-browser-results');
 const key='browser-test-listener-only';
 const digest=value=>createHash('sha256').update(value).digest('hex');
@@ -38,7 +39,7 @@ async function main(){
   await studio.getByRole('button',{name:'Mint Studio',exact:true}).click();
   await studio.getByRole('button',{name:'Continue →',exact:true}).click();
   await studio.locator('input[aria-label="Choose Master recording"]').setInputFiles(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'));
-  await studio.getByLabel('Choose Audio preview',{exact:true}).setInputFiles(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'));
+  await studio.getByLabel('Choose Audio preview',{exact:true}).setInputFiles({name:'preview.mp3',mimeType:'audio/mpeg',buffer:taggedMp3()});
   await studio.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles(path.join(tmp,'cover.png'));
   await studio.getByLabel('Choose Lyrics manuscript / writing evidence',{exact:true}).setInputFiles(path.join(tmp,'lyrics.txt'));
   await studio.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));

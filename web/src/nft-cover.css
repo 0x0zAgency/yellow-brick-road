@@ -2,3 +2,4 @@
 
 .nft-cover-inspection{overflow-wrap:anywhere;border:1px solid #665b32;padding:14px;border-radius:10px;margin:14px 0}
 .nft-cover-inspection p{font-size:12px;line-height:1.6}
+.album-cover-option{padding:.75rem 0;border-top:1px solid #665b32;min-width:0}.album-cover-option code{display:block;font-size:.8rem}.album-cover-option .nft-cover-preview{max-height:150px;width:auto;max-width:100%;object-fit:contain}

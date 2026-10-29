@@ -38,3 +38,17 @@ test('an uploaded primary photograph can supply the initial NFT image',async()=>
  const h=harness();h.options.packet.bricks[0].metadata.media[0]={role:'master',mediaType:'image/jpeg',name:'photo.jpg',integrity:{digest:sourceDigest}};
  const out=await mintWithReviewedCover(h.options,h.dependencies);assert.equal(out.nftCover.status,'verified');assert.deepEqual(h.calls,['preflight','upload','mint']);
 });
+test('album artwork reuses the existing URI with no upload or second artwork transaction',async()=>{
+ const h=harness();h.options.packet.bricks[0].localId='master';h.options.packet.bricks[0].metadata.media[0].role='preview';
+ h.options.nftCover={kind:'album',bytes,sourceDigest,consent:true,sha256:'a'.repeat(64),candidate:{imageURI,brickAddress:'previous'}};
+ h.dependencies.upload=()=>assert.fail('Reusing an existing URI must not upload');
+ h.dependencies.readPublicCover=async(uri,{expectedSha256})=>{assert.equal(uri,imageURI);assert.equal(expectedSha256,h.options.nftCover.sha256);h.calls.push('verify-image');};
+ const result=await mintWithReviewedCover(h.options,h.dependencies);assert.deepEqual(h.calls,['preflight','verify-image','mint']);assert.equal(result.nftCover.imageURI,imageURI);assert.equal(result.nftCover.reusedFrom,'previous');
+});
+test('changed preview or unavailable album artwork prevents minting',async()=>{
+ const h=harness();h.options.packet.bricks[0].localId='master';h.options.packet.bricks[0].metadata.media[0].role='preview';
+ h.options.nftCover={kind:'album',bytes,sourceDigest:'changed',consent:true,sha256:'a'.repeat(64),candidate:{imageURI}};
+ await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Audio Preview changed/);assert.deepEqual(h.calls,[]);
+ h.options.nftCover.sourceDigest=sourceDigest;h.dependencies.readPublicCover=async()=>{throw Error('Unavailable');};
+ await assert.rejects(mintWithReviewedCover(h.options,h.dependencies),/Unavailable/);assert.deepEqual(h.calls,['preflight']);
+});

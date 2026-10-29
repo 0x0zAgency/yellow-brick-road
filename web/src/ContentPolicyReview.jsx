@@ -1,7 +1,7 @@
 import './content-policy.css';
 
 const permissions=[['preview','Play Audio Preview'],['artwork','Display cover artwork'],['lyrics','Display lyrics']];
-export default function ContentPolicyReview({value,onChange,assets,simulated=false,readOnly=false,onEdit,delivery=false,onDeliveryChange}){
+export default function ContentPolicyReview({value,onChange,assets,simulated=false,readOnly=false,onEdit,delivery=false,onDeliveryChange,usingDefaults=false}){
  if(readOnly)return <section className="cp-review" aria-label="Player permissions summary">
   <span className="eyebrow">SELECTED IN STEP 3</span><h3>YBR Player permissions</h3>
   <p>{simulated?'Simulation only: these choices will not be written to a blockchain.':'The mint records this policy on each applicable Brick. The Player database cannot grant or override these permissions.'}</p>
@@ -15,6 +15,7 @@ export default function ContentPolicyReview({value,onChange,assets,simulated=fal
  </section>;
  return <section className="cp-review" aria-label="Pre-mint Player permissions and content lock">
   <span className="eyebrow">STEP 3 / IP AND RIGHTS</span><h3>YBR Player permissions</h3>
+  {usingDefaults&&<p className="cp-note">Your saved creator defaults are applied. Review these selections for this work. You can turn delivery off below before minting.</p>}
   <p>{simulated?'Simulation only: these choices will not be written to a blockchain.':'Your wallet-signed mint will record these choices on each applicable Brick, in the same transaction as its registration.'}</p>
   {permissions.map(([role,label])=>
    <label key={role}><input type="checkbox" checked={value[role]&&!!assets[role]?.hash} disabled={!assets[role]?.hash}
@@ -22,7 +23,7 @@ export default function ContentPolicyReview({value,onChange,assets,simulated=fal
   <p className="cp-note">Masters and project files remain private. These permissions do not grant downloads, redistribution, commercial licensing, or AI training. Local delivery is approved here, before mint, rather than in a later Player panel.</p>
   <label className="pr-consent"><input type="checkbox" checked={delivery} disabled={!value.preview||!assets.preview?.hash} onChange={e=>onDeliveryChange?.(e.target.checked)}/>
    <span>Deliver approved copies to YBR Player automatically after mint<small>I have permission to share the permitted Audio Preview, cover, lyrics and release/file labels with users of this local Player.</small></span></label>
-  <p className="cp-note">This saves unencrypted copies of the permitted files on your local Player server after confirmation. Changing files, credits or permissions requires renewed approval here. No master, project file or recovery key is sent. Public NFT-cover publication remains a separate choice.</p>
+  <p className="cp-note">This saves unencrypted copies of the permitted files on your local Player server after confirmation. {usingDefaults?'Default delivery follows your reviewed files and permissions until you change this checkbox.':'Changing files, credits or permissions requires renewed approval here.'} No master, project file or recovery key is sent. Public NFT-cover publication remains a separate choice.</p>
   <label className="cp-lock"><input type="checkbox" role="switch" checked={value.locked} onChange={e=>onChange({...value,locked:e.target.checked})}/>
    <span>Content locked<small>{value.locked?'Permanent after mint: the committed file set cannot be replaced on this Brick.':'Editable through explicit, versioned file revisions. New file bytes require new Player approval.'}</small></span></label>
   {value.locked&&<p className="cp-warning">Permanent file lock. You cannot switch it off after confirmation. Replacement files need a new linked Brick. Playback permissions can still be revoked.</p>}
