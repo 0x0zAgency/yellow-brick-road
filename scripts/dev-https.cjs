@@ -93,4 +93,4 @@ function setupHttps(root,{run=spawnSync,log=console.log}={}){
   log('[YBR] HTTPS ready: https://127.0.0.1:5173 and https://127.0.0.1:4173. Restart with npm run dev.');
  }finally{fs.rmSync(temp,{recursive:true,force:true});}
 }
-module.exports={loadHttps,localUrls,prepareHttpsEnvironment,setupHttps};
+module.exports={loadHttps,localUrls,prepareHttpsEnvironment,setupHttps,privateDirectory,readPrivate};
