@@ -16,9 +16,13 @@ workspace tool retains the editing session until cleared or the tab closes.
 
 Editable fields: title, artist, album, album artist, composer, lyricist, songwriter
 (explicit SONGWRITER custom text frame), genre, year/date, track/disc, BPM, ISRC,
-publisher, copyright notice, comment and lyrics. Artist is not inferred to be the
-songwriter. A frame inventory exposes original text and counts for binary fields.
+publisher, copyright notice, official audio source webpage (**WOAS**), comment and
+lyrics. Artist is not inferred to be the songwriter. A frame inventory exposes
+original text and counts for binary fields.
 Imported strings are rendered as text, never executed or followed as URLs.
+WOAS can be added, changed or cleared in ID3v2.3/v2.4. It is written as the
+standard URL frame, independently of other webpage/custom URL fields. URLs are
+stored as Latin-1 text; use percent-encoded URLs for characters outside Latin-1.
 
 Artwork previews accept embedded PNG/JPEG bytes, not remote references or SVG.
 Replace/remove affects the front cover; other pictures remain. Replacements use
@@ -76,3 +80,5 @@ Primary references:
 - https://mp3tag.js.org/docs/mp3tag.html
 - https://mp3tag.js.org/docs/frames.html
 - https://github.com/Borewit/music-metadata
+- https://id3.org/id3v2.3.0#URL_link_frames
+- https://id3.org/id3v2.4.0-frames

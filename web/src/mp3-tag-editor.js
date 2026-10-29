@@ -10,6 +10,7 @@ export const TAG_FIELDS=[
  ['songwriter','Songwriter','TXXX'],['genre','Genre','TCON'],['year','Year / date','TYER'],
  ['track','Track number / total','TRCK'],['disc','Disc number / total','TPOS'],['bpm','BPM','TBPM'],
  ['isrc','ISRC','TSRC'],['publisher','Publisher / label','TPUB'],['copyright','Copyright notice','TCOP'],
+ ['audioSourceUrl','Official audio source webpage','WOAS'],
  ['comment','Comment','COMM'],['lyrics','Lyrics','USLT']
 ];
 const asBytes=value=>value instanceof Uint8Array?new Uint8Array(value.buffer,value.byteOffset,value.byteLength):new Uint8Array(value);
@@ -55,7 +56,7 @@ async function libraries(){const [{default:MP3Tag},{parseBuffer}]=await Promise.
 const frameId=(field,version)=>field==='year'&&version===4?'TDRC':TAG_FIELDS.find(f=>f[0]===field)?.[2];
 function values(tags,version,common={}){
  const v=tags.v2||{},v1=tags.v1||{},out={};
- const aliases={albumArtist:'albumartist'},old={TPE2:'TP2',TCOM:'TCM',TEXT:'TXT',TCON:'TCO',TYER:'TYE',TRCK:'TRK',TPOS:'TPA',TBPM:'TBP',TSRC:'TRC',TPUB:'TPB',TCOP:'TCR'};
+ const aliases={albumArtist:'albumartist'},old={TPE2:'TP2',TCOM:'TCM',TEXT:'TXT',TCON:'TCO',TYER:'TYE',TRCK:'TRK',TPOS:'TPA',TBPM:'TBP',TSRC:'TRC',TPUB:'TPB',TCOP:'TCR',WOAS:'WAS'};
  for(const [key] of TAG_FIELDS){const id=frameId(key,version),fallback=common[aliases[key]||key];out[key]=text(v[id]||v[old[id]]||v1[key]||(Array.isArray(fallback)?fallback.join('; '):fallback));}
  out.album=text(tags.album||common.album);out.title=text(tags.title||common.title);out.artist=text(tags.artist||common.artist);
  out.comment=text((v.COMM||v.COM)?.[0]?.text||v1.comment);out.lyrics=text((v.USLT||v.ULT)?.[0]?.text);
@@ -94,6 +95,7 @@ export function validateChanges(changes){
  for(const [key,value] of Object.entries(changes)){
   if(!allowed.includes(key)||typeof value!=='string'||value.length>(key==='lyrics'?64000:key==='comment'?8000:1024)||/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/.test(value))throw safeError('Invalid or oversized tag value.');
   if(!['lyrics','comment'].includes(key)&&/[\r\n]/.test(value))throw safeError('Only lyrics and comments support multiple lines.');
+  if(key==='audioSourceUrl'&&/[^\x20-\xff]/.test(value))throw safeError('WOAS uses Latin-1 text. Use a percent-encoded URL for Unicode characters.');
   if(key==='isrc'&&value&&!/^[A-Z]{2}[A-Z0-9]{3}\d{7}$/i.test(value))throw safeError('ISRC must contain 12 letters/digits without spaces or hyphens.');
   if(['track','disc'].includes(key)&&value&&!/^\d{1,4}(\/\d{1,4})?$/.test(value))throw safeError('Track and disc must use a number or number/total.');
   if(key==='bpm'&&value&&(!/^\d{1,4}$/.test(value)||Number(value)<1||Number(value)>1000))throw safeError('BPM must be a whole number between 1 and 1000.');

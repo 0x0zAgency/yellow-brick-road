@@ -28,6 +28,31 @@ test('clearing standard album removes custom album aliases, without removing unr
  const output=await writeMp3Tags(source,{album:''});const parsed=await parseBuffer(output.bytes,{mimeType:'audio/mpeg'});
  assert.equal(parsed.common.album,undefined);assert.equal(MP3Tag.readBuffer(output.bytes.buffer).v2.TXXX[0].text,'Keep me');
 });
+for(const version of [3,4])test('WOAS can be read, edited, cleared and added in ID3v2.'+version+' without changing audio or other URL frames',async()=>{
+ const source=fixture(version,{WOAS:'https://source.example/original',WOAF:'https://file.example/track'});
+ const original=Buffer.from(source);assert.equal((await readMp3Tags(source)).fields.audioSourceUrl,'https://source.example/original');
+ const url='https://source.example/caf\u00e9?release=one&track=2#credits';
+ const edited=await writeMp3Tags(source,{audioSourceUrl:url});
+ assert.equal((await readMp3Tags(edited.bytes)).fields.audioSourceUrl,url);
+ const tags=MP3Tag.readBuffer(edited.bytes.buffer);assert.equal(tags.v2.WOAS,url);assert.equal(tags.v2.WOAF,'https://file.example/track');
+ const env=inspectEnvelope(edited.bytes),frame=env.frameRanges.find(f=>f.id==='WOAS');
+ assert.equal(Buffer.from(edited.bytes.slice(frame.start+10,frame.end)).toString('latin1'),url+'\0','WOAS has no text-encoding prefix');
+ for(const id of ['WOAF','TXXX','APIC','PRIV']){
+  const a=inspectEnvelope(source).frameRanges.find(f=>f.id===id),b=env.frameRanges.find(f=>f.id===id);
+  assert.deepEqual(edited.bytes.slice(b.start,b.end),new Uint8Array(source.subarray(a.start,a.end)),id+' remains byte-identical');
+ }
+ assert.deepEqual(edited.bytes.slice(env.start,env.end),new Uint8Array(audio()));assert.deepEqual(source,original);
+ const cleared=await writeMp3Tags(edited.bytes,{audioSourceUrl:''});assert.equal((await readMp3Tags(cleared.bytes)).fields.audioSourceUrl,'');assert.equal(MP3Tag.readBuffer(cleared.bytes.buffer).v2.WOAS,undefined);
+ const added=await writeMp3Tags(cleared.bytes,{audioSourceUrl:'ipfs://bafyexample/source'});assert.equal((await readMp3Tags(added.bytes)).fields.audioSourceUrl,'ipfs://bafyexample/source');
+ const retained=await writeMp3Tags(source,{title:'Unrelated title edit'});const originalFrame=inspectEnvelope(source).frameRanges.find(f=>f.id==='WOAS'),retainedFrame=inspectEnvelope(retained.bytes).frameRanges.find(f=>f.id==='WOAS');
+ assert.deepEqual(retained.bytes.slice(retainedFrame.start,retainedFrame.end),new Uint8Array(source.subarray(originalFrame.start,originalFrame.end)));
+});
+test('WOAS on an untagged MP3 is a standard v2.3 URL frame; legacy WAS remains readable',async()=>{
+ const result=await writeMp3Tags(audio(),{audioSourceUrl:'https://source.example/%E6%96%B0%E4%BD%9C'});
+ assert.equal(result.tagVersion,'ID3v2.3');assert.equal((await readMp3Tags(result.bytes)).fields.audioSourceUrl,'https://source.example/%E6%96%B0%E4%BD%9C');
+ const source=MP3Tag.writeBuffer(audio(),{v2:{WAS:'https://legacy.example/source'}},{id3v2:{version:2,padding:0}}),legacy=await readMp3Tags(source);
+ assert.equal(legacy.fields.audioSourceUrl,'https://legacy.example/source');assert.equal(legacy.readOnly,true);
+});
 test('front-cover replacement/removal keeps other pictures and does not alter audio',async()=>{
  const source=fixture(3,{APIC:[{format:'image/png',type:3,description:'Front',data:png},{format:'image/png',type:4,description:'Back',data:png}]});
  const removed=await writeMp3Tags(source,{}, {coverMode:'remove'});assert.deepEqual(MP3Tag.readBuffer(removed.bytes.buffer).v2.APIC.map(p=>p.type),[4]);

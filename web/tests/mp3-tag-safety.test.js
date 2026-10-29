@@ -34,3 +34,8 @@ test('tag worker completes once, cancels and times out without leaking parser er
   if(mode==='cancel')assert.equal(result,null);else if(mode==='complete')assert.equal(result.result.fields.album,'Album');else {assert.equal(result.ok,false);assert.doesNotMatch(result.error,/PRIVATE-DATA/);}
  }
 });
+test('WOAS preserves literal URL text and rejects values the standard frame cannot encode',()=>{
+ for(const value of ['', 'https://source.example/release?one=1&two=2#credits','ipfs://bafyexample/path','https://source.example/caf\u00e9','https://source.example/%E6%96%B0'])assert.equal(validateChanges({audioSourceUrl:value}).audioSourceUrl,value);
+ for(const value of ['https://source.example/新','https://source.example/🎵'])assert.throws(()=>validateChanges({audioSourceUrl:value}),/percent-encoded/);
+ for(const value of ['https://source.example/\0','https://source.example/\n','https://source.example/\t','x'.repeat(1025)])assert.throws(()=>validateChanges({audioSourceUrl:value}));
+});
