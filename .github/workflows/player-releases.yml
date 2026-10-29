@@ -110,6 +110,7 @@ jobs:
           node scripts/nft-cover-browser.cjs
           node scripts/player-library-browser.cjs
           node scripts/compact-bricks-browser.cjs
+          node scripts/licensing-browser.cjs
           node scripts/active-network-browser.cjs
           node scripts/settings-browser.cjs
           node scripts/tools-browser.cjs
