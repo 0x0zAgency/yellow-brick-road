@@ -90,7 +90,7 @@ async function main(){
   await player.locator('#playPause').click();
   await player.waitForFunction(()=>document.getElementById('audio').currentTime>0.2,{},{timeout:15000});
   const servedHash=await player.evaluate(async()=>{const response=await fetch(document.getElementById('audio').src);const bytes=await response.arrayBuffer();return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),n=>n.toString(16).padStart(2,'0')).join('');});
-  assert.equal(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/after-the-rain.wav'))),'Player must stream the selected Audio Preview, not the distinct Master Recording');
+  assert.equal(servedHash,digest(taggedMp3()),'Player must stream the selected Audio Preview, not the distinct Master Recording');
   assert.notEqual(servedHash,digest(fs.readFileSync(path.join(ROOT,'apps/ybr-player/media/golden-hour.wav'))));
   await player.screenshot({path:path.join(OUT,'uploaded-release.png'),fullPage:true});
   // Publish a WebVTT companion through the same local ingestion boundary.
