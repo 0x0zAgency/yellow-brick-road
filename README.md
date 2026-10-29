@@ -56,8 +56,15 @@ The dashboard shows the active factory address if needed. Without a wallet,
 Mint Studio runs a simulation.
 
 For stored uploads, enable encrypted IPFS storage and download the recovery backup.
-Publishing an NFT cover is a separate public-artwork opt-in after minting; Player
-playback permissions are separate again. Use development seeds only.
+Review and approve the public NFT thumbnail before minting to include it in the
+same transaction. Player playback permissions remain separate. Use development seeds only.
+
+For NFT artwork in a local MetaMask wallet, after [HTTPS setup](docs/LOCAL_HTTPS.md),
+run `npm run setup:wallet` once and `npm run wallet:gateway` to start immediately.
+Set MetaMask's **Settings → Privacy → IPFS gateway** to `https://localhost:8792`,
+then **Refresh list** in NFTs. Later `npm run dev` starts the gateway automatically.
+This wallet-wide setting serves YBR public PNG thumbnails on this computer only;
+see [wallet delivery and public-demo requirements](docs/NFT_COVERS.md#if-the-nft-has-the-right-image-uri-but-the-wallet-is-blank).
 
 [Full setup](docs/INTEGRATED_DEV_STACK.md) ·
 [Wallet profiles](docs/GANACHE_WALLETS.md) ·

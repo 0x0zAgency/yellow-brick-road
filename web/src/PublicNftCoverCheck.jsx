@@ -1,6 +1,7 @@
 import './nft-image-delivery.css';
 import {useEffect,useState} from 'react';
 import {readPublicNftCover,publicCoverPath} from './nft-cover-read.js';
+import CopyField from './CopyField.jsx';
 /** Read-only diagnosis of tokenURI.image; never reads Brick.metadataURI. */
 export default function PublicNftCoverCheck({imageURI}){
  const [retry,setRetry]=useState(0),[state,setState]=useState(null);
@@ -20,13 +21,21 @@ export default function PublicNftCoverCheck({imageURI}){
    {!state&&<p role="status">Checking public PNG bytes and image decoding…</p>}
    {state?.error&&<p role="alert">{state.error}</p>}
    {state?.info&&<>
-    <strong role="status">Verified public PNG · {state.info.width} × {state.info.height} · {state.info.size.toLocaleString()} bytes</strong>
+    <strong role="status">Verified public PNG through this YBR node · {state.info.width} × {state.info.height} · {state.info.size.toLocaleString()} bytes</strong>
     <img src={path} width={state.info.width} height={state.info.height} alt="Verified public NFT thumbnail" className="nft-cover-preview" referrerPolicy="no-referrer"/>
     <p>Thumbnail SHA-256: <code>{state.info.sha256}</code></p>
     <a href={path} target="_blank" rel="noreferrer">Open public thumbnail ↗</a>
    </>}
    <button type="button" className="ms-outline" onClick={()=>setRetry(n=>n+1)}>Check image again</button>
   </>}
+  {path&&<details><summary>Artwork works here but is blank in MetaMask?</summary>
+   <p>Wallets use their own IPFS gateway. A successful image check here does not test that gateway. A gateway returning an error or an HTML page cannot display your NFT.</p>
+   <p>For this computer’s local YBR development wallet, run <code>npm run setup:wallet</code> once after HTTPS setup, then <code>npm run wallet:gateway</code>. Later, <code>npm run dev</code> starts it automatically.</p>
+   <p>In MetaMask, open <strong>Settings → Privacy → IPFS gateway</strong> and paste the complete URL:</p>
+   <CopyField label="Local wallet IPFS gateway" value="https://localhost:8792"/>
+   <a href={'https://localhost:8792/ipfs/'+imageURI.slice(7)} target="_blank" rel="noreferrer">Test this cover through the wallet gateway ↗</a>
+   <p>Return to NFTs and choose <strong>Refresh list</strong>. The gateway must remain running. This wallet-wide setting serves YBR public PNG thumbnails only; use an appropriate general gateway again for other IPFS assets. Other computers need their own gateway or a reachable public provider.</p>
+  </details>}
   <p className="nft-cover-note">An image verified here may still be unreachable to an external wallet’s gateway. Its IPFS provider must stay reachable. A localhost Ganache chain is not visible to an external NFT indexer. Do not remint to repair image delivery.</p>
  </section>;
 }

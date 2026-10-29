@@ -5,6 +5,58 @@
 
 # Actual registration NFT covers
 
+## If the NFT has the right image URI but the wallet is blank
+
+Check the receipt's decoded `tokenURI.image` first. An `ipfs://` cover already
+stored there does not need another mint or `setCovers` transaction. The wallet
+must also retrieve that CID through its own IPFS gateway. A successful YBR image
+check only verifies delivery through YBR's node.
+
+In October 2026, the on-chain cover and local Kubo PNG were correct, but MetaMask
+13.54's configured `dweb.link` gateway returned HTTP 429 with a service-worker
+migration notice instead of image bytes. See the
+[IPFS gateway transition](https://blog.ipfs.tech/2026-08-beyond-sponsored-gateways/).
+This is a retrieval failure, separate from the old hardcoded-artwork contract bug.
+
+For a **local development wallet on this computer**, use YBR's read-only HTTPS
+thumbnail gateway:
+
+```sh
+nvm use 24
+npm run setup:https    # only if local HTTPS has not already been configured
+npm run setup:wallet   # once; reuse the existing mkcert CA, no trust-store change
+npm run wallet:gateway # start now without restarting Ganache or the app
+```
+
+In **MetaMask → Settings → Privacy → IPFS gateway**, enter the full URL
+**`https://localhost:8792`**, then return to NFTs and choose **Refresh list**.
+MetaMask's setting is wallet-wide: this local gateway only serves YBR's normalized
+public PNG thumbnails. Restore a suitable general IPFS gateway when using other
+NFT formats, ENS content, or IPFS token icons. It is not a general replacement for
+all IPFS content and does not make the images globally reachable.
+
+After the one-time setup, `npm run dev` starts the gateway automatically and stops
+its owned process on exit. A separately started gateway is reused and remains
+running until stopped in its own terminal. Kubo and the gateway must be running
+to load uncached covers. No certificates or private keys are committed to git.
+`setup:wallet` does not install a CA or alter the existing application certificates;
+if your browser does not trust the existing CA, complete the normal HTTPS setup.
+
+Both `/ipfs/<CID>` and `https://<CID>.ipfs.localhost:8792/` are supported. The
+wildcard TLS identity matters: the installed MetaMask converts image URIs to
+the latter form and stores only the gateway host. An HTTP-only Kubo URL or a
+localhost certificate without `*.ipfs.localhost` is insufficient for that flow.
+The endpoint binds to loopback and returns bounded, validated public PNGs only.
+It never exposes Kubo's admin API, upload methods, ciphertext, or recovery keys.
+The private bridge retains its same-origin restrictions.
+
+If an older imported card still caches the yellow-square metadata after refreshing,
+compare its exact collection and token ID with the live receipt. Re-importing the
+same NFT into the wallet can refresh its local record; that is not a new mint.
+If the live receipt itself has no cover, use the existing cover publisher instead.
+For other computers or production, keep the canonical `ipfs://` URI and provide
+reachable IPFS hosting plus a maintained gateway compatible with the target wallet.
+
 The receipt contract previously returned `defaultImage()` unconditionally. A cover
 shown in the Player or stored in an encrypted artwork Brick was never used by the
 NFT's `tokenURI`. Wallet refresh alone cannot fix that contract behavior.
@@ -113,6 +165,8 @@ undisclosed second registration.
 - `test/NftCovers.js`: real Solidity authorization, metadata, events, batch atomicity,
   fallback, URI validation, nontransferability and unchanged underlying commitments.
 - `web/tests/nft-cover-*.test.js`: source/transport and wallet adapter regressions.
+- `web/tests/wallet-gateway.test.js`: actual trusted HTTPS, wallet-style subdomains,
+  cross-origin PNG delivery, private-route refusal, and fail-closed certificates.
 - `scripts/nft-cover-smoke.cjs`: CI-only real Kubo/Vite/Ganache flow including the
   browser's transaction adapter, exact PNG retrieval and tokenURI read-back.
 - `scripts/nft-cover-browser.cjs`: Chromium component test with a mock wallet,

@@ -35,7 +35,7 @@ function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio=dashbo
  dashboard?.attach(label,proc);OWNED.set(proc.pid,{label,proc});
  proc.once('exit',(code,signal)=>{
   OWNED.delete(proc.pid);
-  if(!stopping&&['ganache','YBR Player','Road Explorer','YBR IPFS bridge'].includes(label))shutdown(label+' unexpectedly exited ('+(signal||code)+')',1);
+  if(!stopping&&['ganache','YBR Player','Road Explorer','YBR IPFS bridge','YBR wallet gateway'].includes(label))shutdown(label+' unexpectedly exited ('+(signal||code)+')',1);
  });
  proc.once('error',()=>OWNED.delete(proc.pid));
  return proc;
@@ -258,6 +258,7 @@ async function main(){
   const saved=selectPlayerAccess(ROOT,process.env,{generate:false});if(saved)dashboard.addSecrets(saved.listener,saved.artist);
   ensureDependencies();dashboard.update({phase:'STARTING IPFS',kuboRpc:process.env.YBR_KUBO_RPC});dashboard.service('ipfs','START');
   const ipfs=await ensureIpfs({run,spawnOwned,command,waitUntil,log,isStopping:()=>stopping});if(stopping)return;
+  await (await import('../web/scripts/wallet-gateway.mjs')).ensureWalletGateway({root:ROOT,spawnOwned,waitUntil,log});if(stopping)return;
   dashboard.service('ipfs','UP');dashboard.update({peerId:ipfs.peerId,phase:'VERIFYING '+activeProfile.name.toUpperCase()});dashboard.service('ganache','START');
   let source,factory;
   if(activeProfile.network==='ganache'){
