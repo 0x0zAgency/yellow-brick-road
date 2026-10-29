@@ -18,6 +18,7 @@
     "ipfs:up": "docker compose -f infra/ipfs/compose.yaml up -d",
     "ipfs:down": "docker compose -f infra/ipfs/compose.yaml down",
     "ipfs:status": "docker compose -f infra/ipfs/compose.yaml ps",
+    "ipfs:clean": "node scripts/dev-ipfs-cleanup.cjs",
     "ipfs:bridge": "node web/scripts/ipfs-bridge.mjs",
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
     "dev": "node scripts/dev.cjs",

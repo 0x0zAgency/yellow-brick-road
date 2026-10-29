@@ -8,6 +8,7 @@ const {StringDecoder}=require('node:string_decoder');
 const crypto=require('node:crypto');
 const {renderDashboard,URLS}=require('./dev-screen.cjs');
 const {MnemonicEditor}=require('./dev-mnemonic-menu.cjs');
+const {IpfsCleanupMenu}=require('./dev-ipfs-cleanup-menu.cjs');
 const {NetworkControl,readNetwork}=require('./dev-network.cjs');
 const LOG_LIMIT=1024*1024;
 const rpcLine=/^(?:eth|net|web3|debug|evm|miner|personal|txpool)_[A-Za-z0-9_]+$/;
@@ -39,7 +40,7 @@ function redact(text,secrets=[]){
  return clean(result);
 }
 class DevDashboard{
- constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null,networkActions={}}){
+ constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null,networkActions={},cleanupControl=null}){
   this.output=output;this.input=input;this.env=env;this.onQuit=onQuit;this.onRestartPlayer=onRestartPlayer;this.mnemonicControl=mnemonicControl;
   this.interactive=!!(output.isTTY&&input.isTTY&&env.TERM!=='dumb'&&!env.CI&&env.YBR_DEV_PLAIN!=='1'&&!args.includes('--plain'));
   this.showSecrets=this.interactive&&env.YBR_DEV_HIDE_SECRETS!=='1';
@@ -61,8 +62,21 @@ class DevDashboard{
   this.logFd=openLog(this.logFile);this.logBytes=0;
   this.lastEssential=null;this.lastDiagnostic=null;
   this.keyHandler=(_text,key={})=>{
+   if(this.cleanupMenu){this.cleanupMenu.handle(_text,key);return;}
    if(this.mnemonicEditor){this.mnemonicEditor.handle(_text,key);return;}
    if(this.networkControl.menu){this.networkControl.handle(_text,key);return;}
+   if(key.name==='c'&&!key.ctrl&&this.interactive){
+    try{
+     if(!['READY','DEGRADED'].includes(this.state.phase))throw Error('IPFS cleanup is available when READY or DEGRADED.');
+     if(!cleanupControl||!this.state.peerId)throw Error('The local IPFS node has not been identified.');
+     const cleaner=cleanupControl({peerId:this.state.peerId});
+     this.state.restartConfirm=false;
+     this.cleanupMenu=new IpfsCleanupMenu({cleaner,size:()=>({columns:this.output.columns||80,rows:this.output.rows||24}),
+      onComplete:result=>{this.log('launcher','IPFS cleanup: '+result.status+'; '+result.unpinned+' pins, '+result.removedFiles+' Desktop entries, '+result.removedBlocks+' blocks removed.');},
+      onChange:menu=>{this.state.cleanupMenu=menu;if(!menu)this.cleanupMenu=null;this.draw(true);}});
+     this.cleanupMenu.publish();
+    }catch(error){this.state.error=redact(error.message,this.secrets);this.draw(true);}return;
+   }
    if(key.name==='n'&&this.interactive){
     if(!['READY','DEGRADED','CONFIGURATION REQUIRED'].includes(this.state.phase)){this.state.error='Network selection is available when READY.';this.draw(true);return;}
     try{this.state.restartConfirm=false;this.networkControl.open();}catch(e){this.state.error=e.message;this.draw(true);}return;
@@ -127,7 +141,7 @@ class DevDashboard{
   if(!this.interactive||this.closed||this.paused&&!force)return;
   this.state.now=Date.now();
   const lines=renderDashboard(this.state,{columns:this.output.columns||100,rows:this.output.rows||32,color:this.color,showSecrets:this.showSecrets,view:this.view,offset:this.offset,motion:this.motion});
-  if(this.paused&&!this.state.mnemonicMenu&&!this.state.networkMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
+  if(this.paused&&!this.state.mnemonicMenu&&!this.state.networkMenu&&!this.state.cleanupMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
   // Repaint only changed rows; passwords and wallet text do not flicker with FX.
   let output='';
   for(let i=0;i<Math.max(lines.length,this.lastFrame.length);i++){

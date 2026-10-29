@@ -9,6 +9,7 @@ const {ethers}=require('ethers');
 const crypto=require('node:crypto');
 const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
 const {DevDashboard}=require('./dev-dashboard.cjs');
+const {createIpfsCleanup}=require('./dev-ipfs-cleanup.cjs');
 const {verifyReadRpc}=require('./dev-rpc-health.cjs');
 const {ensurePlayerSession,ensureDemoPublished,verifyDemoPlayback,DEMO_TITLE,DEMO_ARTIST}=require('./dev-player-ready.cjs');
 const {selectPlayerAccess,verifyPlayerAccess,restartCheckoutPlayer}=require('./dev-player-access.cjs');
@@ -240,6 +241,7 @@ async function main(){
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
   dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard'),onRestartPlayer:restartPlayerHere,
+   cleanupControl:({peerId})=>createIpfsCleanup({root:ROOT,expectedPeer:peerId}),
    networkActions:{onReview:reviewNetworkHere,onApply:applyNetworkHere},
    mnemonicControl:{check:()=>{if(activeProfile?.network!=='ganache')throw Error('Mnemonic control is only for local Ganache. Sepolia uses a separate test signer.');changeAllowed(mnemonicContext());},current:()=>readSelection(ROOT),
     generate:generateSelection,validate:describeMnemonic,onApply:changeMnemonicHere}});

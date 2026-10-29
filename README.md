@@ -28,6 +28,11 @@ Open [Road Explorer / Mint Studio](http://127.0.0.1:5173) or
 [YBR Player](http://127.0.0.1:4173). Press **s** in the startup dashboard to reveal
 the development wallet and Player login details.
 
+Press **c** in Dev Control for [IPFS cleanup](docs/IPFS_CLEANUP.md). It previews
+the local node before offering either a full wipe of its IPFS files or collection
+of unpinned cache. Full cleanup includes files from other apps on that node and
+requires a typed confirmation. `npm run ipfs:clean` provides a read-only preview.
+
 ### Prefer desktop apps?
 
 Download [Ganache](https://github.com/trufflesuite/ganache-ui/releases) and

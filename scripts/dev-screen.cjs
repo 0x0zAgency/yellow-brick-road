@@ -3,6 +3,7 @@
 const {stripVTControlCharacters:strip}=require('node:util');
 const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
 const {renderNetworkMenu}=require('./dev-network.cjs');
+const {renderIpfsCleanupMenu}=require('./dev-ipfs-cleanup-menu.cjs');
 const {FRAMED_YBR,FRAMED_YBR_WIDTH,FRAMED_YBR_COMPACT,COMPACT}=require('./dev-title.cjs');
 const URLS=require('./dev-https.cjs').localUrls();
 const clean=v=>strip(String(v??'')).replace(/[\t\r\n]+/g,' ').replace(/[^\x20-\x7e]/g,'?');
@@ -18,6 +19,7 @@ function secret(v,visible,fallback='waiting for Player'){
  return /^[\x20-\x7e]+$/.test(v)?v:'[configured non-printable value]';
 }
 function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=false,view='home',offset=0,motion=true}={}){
+ if(state.cleanupMenu)return renderIpfsCleanupMenu(state,{columns,rows,color});
  if(state.networkMenu)return renderNetworkMenu(state,{columns,rows,color});
  if(state.mnemonicMenu)return renderMnemonicMenu(state,{columns,rows,color});
  const w=Math.max(5,Math.min(144,columns-1)),h=Math.max(3,rows-1);
@@ -52,7 +54,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logMode=state.logMode==='VERBOSE'?'VERBOSE':'ESSENTIAL';
  const buttons=gold(clip(view==='logs'?'[l/Esc] home [v] verbose '+(logMode==='VERBOSE'?'ON':'OFF')+' [Up/Down] scroll [p] pause [q] quit':
-  '[n] net [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
+  '[c] clean [n] net [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip((remote?'SEPOLIA TESTNET / Signer key is never displayed / ':'LOCAL TEST KEYS ONLY / Never send real funds / ')+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
  if(view==='logs'&&(w<70||h<22)){
@@ -101,6 +103,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
     'File: .road-local/dev-stack.log (new session on restart)',
     'Start: npm run dev | Recovery: npm run dev -- --restart-player',
     'Kubo stop: npm run ipfs:down | NEVER down -v',
+    'IPFS cleanup: [c] review / npm run ipfs:clean',
     'q stops owned processes only. Kubo and its pins remain.'])];
   const room=h-head.length-3,start=Math.min(Math.max(0,offset),Math.max(0,detail.length-room));
   return [...head,bricks(),...detail.slice(start,start+room),warning,buttons];
