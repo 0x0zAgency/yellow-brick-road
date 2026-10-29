@@ -18,11 +18,11 @@ export default function CreatorDefaultsSettings(){
   </fieldset>
   <fieldset className="creator-default-fields" disabled={!value.enabled}>
    <legend>Licensing defaults</legend>
-   <label>Default AI training policy<select value={value.training} onChange={e=>change({training:e.target.value})}>{trainingModes.map(mode=><option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
+   <label>Default AI training policy<select aria-label="Default AI training policy" value={value.training} onChange={e=>change({training:e.target.value})}>{trainingModes.map(mode=><option key={mode.value} value={mode.value}>{mode.label}</option>)}</select></label>
    <label className="settings-toggle"><input type="checkbox" checked={value.composition} onChange={e=>change({composition:e.target.checked})}/><span>Create a separate songwriting Brick by default</span></label>
    <label>Default creator payout share (%)<input type="number" min="0" max="100" step="1" value={value.share/100} onChange={e=>change({share:Math.round(Number(e.target.value)*100)})}/></label>
-   <label>Default licensing currency<select value={value.currency} onChange={e=>change({currency:e.target.value})}><option>USDC</option><option>USD</option></select></label>
-   <label>Default use-fee unit<select value={value.unit} onChange={e=>change({unit:e.target.value})}><option value="per-1000-outputs">Per 1,000 outputs</option><option value="per-output">Per output</option><option value="per-model-deployment">Per model deployment</option></select></label>
+   <label>Default licensing currency<select aria-label="Default licensing currency" value={value.currency} onChange={e=>change({currency:e.target.value})}><option>USDC</option><option>USD</option></select></label>
+   <label>Default use-fee unit<select aria-label="Default use-fee unit" value={value.unit} onChange={e=>change({unit:e.target.value})}><option value="per-1000-outputs">Per 1,000 outputs</option><option value="per-output">Per output</option><option value="per-model-deployment">Per model deployment</option></select></label>
    {[["masterIngestionCents","Sound recording ingestion fee"],["masterUseCents","Sound recording use fee"],["writingIngestionCents","Songwriting ingestion fee"],["writingUseCents","Songwriting use fee"]].map(([key,label])=><label key={key}>{label} ({value.currency})<input type="number" min="0" max={key.includes('Ingestion')?'1000':'250'} step="0.01" value={value.fees[key]/100} onChange={e=>change({fees:{...value.fees,[key]:Math.round(Number(e.target.value)*100)}})}/></label>)}
    <p>These are proposed licensing terms. The mint review still requires confirmation.</p>
   </fieldset>
