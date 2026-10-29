@@ -30,13 +30,13 @@ saved layout into the composer; committing a changed copy creates a new immutabl
 object. An identical retry reuses the same object and original publication date.
 **Withdraw** removes a cover from the Player without deleting its source audio.
 
-## Your Buildings and upload groups
+## Your Buildings and Bricks
 
 **Your Buildings** lists the Buildings you deliberately created. Synthetic example
 Buildings are excluded. Existing browser-saved reference Buildings remain in this
 section of the Buildings page.
 
-**Created on upload** is a separate, initially collapsed category. Shared uploads
+**Bricks** is a separate, initially collapsed category. Shared uploads
 are grouped by their album title. When an upload has no album title, its track
 title supplies the grouping instead. Album tags are already read during upload;
 the reviewed metadata, including any creator edits, supplies the Player's album
