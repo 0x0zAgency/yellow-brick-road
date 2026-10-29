@@ -2,7 +2,7 @@
 
 ## Scope
 
-This is the first **real content-addressed upload** path for Yellow Brick Road. It is opt-in, local-first, and intended for small test assets only. Mint Studio hashes and encrypts original files in the browser and sends only the encrypted `0ZROAD01` container through the local YBR upload bridge into our own pinned Kubo node. New per-Brick metadata documents are likewise encrypted in the browser, pinned, and referenced by `ipfs://<CID>` in subsequent test-chain mints.
+This is the first **real content-addressed upload** path for Yellow Brick Road. It is opt-in, local-first, and intended for test assets up to 256 MiB per original. Mint Studio hashes and encrypts original files in the browser and sends only the encrypted `0ZROAD01` container through the local YBR upload bridge into our own pinned Kubo node. New per-Brick metadata documents are likewise encrypted in the browser, pinned, and referenced by `ipfs://<CID>` in subsequent test-chain mints.
 
 The pilot supports creator recovery with a locally imported private backup. It is not a production storage, custodial recovery, rights licensing, or durable global availability guarantee.
 
@@ -23,7 +23,7 @@ In terminal two, run the narrow upload bridge:
 npm run ipfs:bridge
 ```
 
-The bridge is bound to `127.0.0.1:8791`. It accepts encrypted binary `POST /api/road-ipfs/upload`, `GET /api/road-ipfs/content/<CID>` for locally pinned ciphertext, and a health read. Both upload and retrieval have a **32 MiB per encrypted container** limit. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. Reads require a direct or recursive local pin before fetching content. The pin and returned CID are authoritative only for the local node at that moment. Automated CI also restarts Kubo and recovers the original and metadata through the narrow bridge when the named Docker volume remains attached.
+The bridge is bound to `127.0.0.1:8791`. It accepts encrypted binary `POST /api/road-ipfs/upload`, `GET /api/road-ipfs/content/<CID>` for locally pinned ciphertext, and a health read. Upload and recovery support **256 MiB per original file**, matching browser encryption. The shared encrypted-container cap additionally reserves the full ROADENC v1 header and authentication-tag overhead (65,561 bytes), so an original exactly at 256 MiB is accepted. Encryption and recovery still buffer files in memory; larger files need a streaming design. Encrypted Kubo add/read operations allow up to three minutes each. It does not expose Kubo's administrative RPC API to the browser. It verifies upload SHA-256 by retrieving the CID from the node, then checks the Kubo pinset. Reads require a direct or recursive local pin before fetching content. The pin and returned CID are authoritative only for the local node at that moment. Automated CI also restarts Kubo and recovers the original and metadata through the narrow bridge when the named Docker volume remains attached.
 
 In terminal three:
 
@@ -40,6 +40,8 @@ To test a real upload and pinned ciphertext independently of the browser:
 ```sh
 npm run ipfs:smoke
 ```
+
+For the same larger-file regression used in CI, run `YBR_IPFS_SMOKE_MIB=40 npm run ipfs:smoke`; use the same value when running `web/scripts/ipfs-verify-persistence.mjs`.
 
 It prints a real CID but never prints a decryption key. Inspect Kubo locally with:
 
@@ -84,8 +86,8 @@ An early backup with no CIDs cannot locate content by itself. Use it with an IPF
 - Only bare CIDs are accepted. No arbitrary gateway URL, path suffix, query string, redirect, or generic Kubo RPC is exposed.
 - The bridge checks a local pin, bounds streamed response bytes, validates generic encrypted-container headers, and returns ciphertext with `no-store`, `nosniff`, and attachment headers.
 - The browser independently hashes the returned bytes against its imported or metadata-derived commitment. A bridge-provided hash alone is not the trust anchor.
-- Imported backups are capped at 1 MiB and 64 entries per list. Retrieval has a 30-second browser timeout and supports cancellation; stale operations cannot download after a new backup is imported or the panel closes.
-- The smoke test exercises real encrypted source and metadata upload, private-backup export/import, recovery, wrong-key rejection, and checksum mismatch rejection. The restart check recovers source bytes again through the same endpoint.
+- Imported backups are capped at 1 MiB and 64 entries per list. Retrieval has a five-minute browser timeout and supports cancellation; stale operations cannot download after a new backup is imported or the panel closes.
+- CI uses a 40 MiB original to catch regressions to the old 32 MiB cap, including recovery after restarting Kubo. The smoke test exercises real encrypted source and metadata upload, private-backup export/import, recovery, wrong-key rejection, and checksum mismatch rejection. The restart check recovers source bytes again through the same endpoint.
 
 ## Private data and recovery
 

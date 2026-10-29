@@ -1,4 +1,5 @@
 import {encryptAsset} from './road-encryption.js';
+import {MAX_ENCRYPTED_ASSET_BYTES,ENCRYPTED_ASSET_LIMIT_LABEL} from './asset-limits.js';
 /** Browser-side encrypted-only IPFS uploader. Never receives a plaintext File. */
 const CID_RE=/^(?:bafy|bafk|baga|Qm)[a-zA-Z0-9]{20,120}$/;
 const SHA_RE=/^[0-9a-f]{64}$/i;
@@ -15,6 +16,7 @@ export function validateUploadReceipt(receipt,expectedDigest,expectedLength){
 }
 export async function uploadEncryptedAsset({entry,fetchImpl=fetch}){
  if(!(entry?.bytes instanceof Uint8Array)||!entry.bytes.length)throw Error('Encrypted bytes must exist in memory for IPFS upload.');
+ if(entry.bytes.length>MAX_ENCRYPTED_ASSET_BYTES)throw Error('Encrypted file exceeds the '+ENCRYPTED_ASSET_LIMIT_LABEL+' limit.');
  if(!SHA_RE.test(entry.ciphertextSha256||''))throw Error('Encrypted digest not available.');
  const response=await fetchImpl(IPFS_UPLOAD_PATH,{
   method:'POST',headers:{'Content-Type':'application/octet-stream','X-Road-Encryption':'roadenc-v1'},

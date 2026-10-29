@@ -6,9 +6,9 @@ import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
 import {pathToFileURL} from 'node:url';
 import {MAX_NFT_COVER_BYTES,PUBLIC_COVER_CONSENT,validCoverCid,validateNftCoverPng} from '../src/nft-cover-format.js';
+import {MAX_ASSET_BYTES,MAX_ENCRYPTED_ASSET_BYTES,ENCRYPTED_ASSET_LIMIT_LABEL} from '../src/asset-limits.js';
 
-const MiB=1024*1024;
-export const MAX_CIPHERTEXT_BYTES=32*MiB;
+export const MAX_CIPHERTEXT_BYTES=MAX_ENCRYPTED_ASSET_BYTES;
 const MAX_RPC_REPLY_BYTES=64*1024;
 const allowedOrigins=new Set(['http://localhost:5173','http://127.0.0.1:5173','https://localhost:5173','https://127.0.0.1:5173']);
 const loopbackNames=new Set(['127.0.0.1','localhost','[::1]']);
@@ -51,7 +51,7 @@ export async function readBoundedBytes(response,{max=MAX_CIPHERTEXT_BYTES}={}){
  }
  if(declared!==null&&declared>max){
   await response.body?.cancel().catch(()=>{});
-  throw failure('Kubo response exceeds the permitted size limit (32 MiB for encrypted content).',413);
+  throw failure('Kubo response exceeds the permitted size limit ('+max+' bytes).',413);
  }
  if(!response.body){
   if(declared)throw failure('Kubo response ended before its declared content length.',502);
@@ -64,7 +64,7 @@ export async function readBoundedBytes(response,{max=MAX_CIPHERTEXT_BYTES}={}){
    const {done,value}=await reader.read();
    if(done)break;
    length+=value.byteLength;
-   if(length>max)throw failure('Kubo response exceeds the permitted size limit (32 MiB for encrypted content).',413);
+   if(length>max)throw failure('Kubo response exceeds the permitted size limit ('+max+' bytes).',413);
    chunks.push(value);
   }
   if(declared!==null&&length!==declared)throw failure('Kubo response length does not match Content-Length.',502);
@@ -80,7 +80,7 @@ export async function readBoundedBytes(response,{max=MAX_CIPHERTEXT_BYTES}={}){
  */
 export function validateEncryptedContainer(bytes){
  if(!(bytes instanceof Uint8Array)||!bytes.byteLength||bytes.byteLength>MAX_CIPHERTEXT_BYTES)
-  throw failure('IPFS pilot permits 1 byte to 32 MiB per encrypted asset.',413);
+  throw failure('Encrypted asset limit: '+ENCRYPTED_ASSET_LIMIT_LABEL+'.',413);
  const buffer=Buffer.isBuffer(bytes)?bytes:Buffer.from(bytes);
  // 0ZROAD01 is the authenticated encrypted-container magic from road-encryption.js.
  if(!buffer.subarray(0,8).equals(Buffer.from('0ZROAD01')))throw Error('Only 0ZROAD01 encrypted containers are permitted.');
@@ -92,7 +92,7 @@ export function validateEncryptedContainer(bytes){
  if(!header||typeof header!=='object'||Array.isArray(header)||
     Object.keys(header).some(key=>!PRIVATE_HEADER_FIELDS.has(key))||
     header.v!==1||header.alg!=='AES-256-GCM'||header.kdf!=='PBKDF2-SHA-256'||
-    header.iterations!==310000||!Number.isSafeInteger(header.bytes)||header.bytes<0||
+    header.iterations!==310000||!Number.isSafeInteger(header.bytes)||header.bytes<0||header.bytes>MAX_ASSET_BYTES||
     !/^[0-9a-f]{32}$/.test(header.salt||'')||!/^[0-9a-f]{24}$/.test(header.iv||'')||
     header.name!=='encrypted-work'&&header.name!=='brick-metadata')
   throw Error('Unsupported or potentially plaintext-leaking encrypted header.');
@@ -121,7 +121,7 @@ async function localPin(cid,{fetchImpl=fetch,missingStatus=502}={}){
 async function readCiphertext(cid,{fetchImpl=fetch}={}){
  // Ask for one extra byte so oversized content cannot masquerade as a valid
  // truncated response. The streamed reader independently enforces the cap.
- const response=await kuboCall('cat?arg='+encodeURIComponent(cid)+'&length='+(MAX_CIPHERTEXT_BYTES+1),{fetchImpl});
+ const response=await kuboCall('cat?arg='+encodeURIComponent(cid)+'&length='+(MAX_CIPHERTEXT_BYTES+1),{fetchImpl,timeout:180000});
  return readBoundedBytes(response);
 }
 export async function retrieveEncryptedBytes(cid,{fetchImpl=fetch}={}){
@@ -134,7 +134,7 @@ export async function storeEncryptedBytes(bytes,{fetchImpl=fetch}={}){
  const buffer=validateEncryptedContainer(bytes);
  const multipart=new FormData();
  multipart.append('file',new Blob([buffer],{type:'application/octet-stream'}),'ciphertext.roadenc');
- const added=await kuboCall('add?cid-version=1&pin=true&wrap-with-directory=false&progress=false',{fetchImpl,body:multipart});
+ const added=await kuboCall('add?cid-version=1&pin=true&wrap-with-directory=false&progress=false',{fetchImpl,body:multipart,timeout:180000});
  const cid=parseAddOutput((await readBoundedBytes(added,{max:MAX_RPC_REPLY_BYTES})).toString('utf8'));
  // Verify that the pinned Kubo node can actually serve exactly the submitted ciphertext.
  const remote=await readCiphertext(cid,{fetchImpl});
@@ -172,9 +172,10 @@ export async function retrieveNftCover(cid,{fetchImpl=fetch}={}){
  return {bytes,size:bytes.length};
 }
 async function bodyBytes(req,max=MAX_CIPHERTEXT_BYTES){
- if(Number(req.headers['content-length']||0)>max)throw Object.assign(Error(max===MAX_NFT_COVER_BYTES?'Public NFT cover exceeds 512 KiB limit.':'Encrypted payload exceeds 32 MiB limit.'),{status:413});
+ const message=max===MAX_NFT_COVER_BYTES?'Public NFT cover exceeds 512 KiB limit.':'Encrypted payload exceeds the '+ENCRYPTED_ASSET_LIMIT_LABEL+' limit.';
+ if(Number(req.headers['content-length']||0)>max)throw failure(message,413);
  const parts=[];let len=0;
- for await(const part of req){len+=part.length;if(len>max)throw Object.assign(Error(max===MAX_NFT_COVER_BYTES?'Public NFT cover exceeds 512 KiB limit.':'Encrypted payload exceeds 32 MiB limit.'),{status:413});parts.push(part);}
+ for await(const part of req){len+=part.length;if(len>max)throw failure(message,413);parts.push(part);}
  return Buffer.concat(parts,len);
 }
 const json=(res,status,obj)=>{res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'});res.end(JSON.stringify(obj))};

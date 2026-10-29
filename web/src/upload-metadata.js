@@ -3,7 +3,8 @@
  * No fetch, transcription, key collection, licensing inference, or GPS import.
  */
 import {normalizeMusicGenre} from './music-genres.js';
-export const MAX_UPLOAD_BYTES=256*1024*1024;
+export {MAX_ASSET_BYTES as MAX_UPLOAD_BYTES} from './asset-limits.js';
+import {MAX_ASSET_BYTES as MAX_UPLOAD_BYTES} from './asset-limits.js';
 export const FORM_FIELDS=Object.freeze(['title','artist','release','songwriters','genre','bpm','key','isrc','iswc','description','daw']);
 const AUDIO=/\.(mp3|mp2|wav|wave|bwf|flac|aif|aiff|aifc|ogg|oga|opus|m4a|m4b|mp4|aac|webm|mkv|wma|ape|wv|dsf|dff)$/i;
 const IMAGE=/\.(jpe?g|png|tiff?|heic|heif|avif)$/i;

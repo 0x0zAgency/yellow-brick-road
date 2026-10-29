@@ -53,7 +53,19 @@ async function main(){
   assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'','Applying an album must not overwrite other edits');
   assert.deepEqual(errors,[]);
   fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-autofill.png'),fullPage:true});
+  // A file above the old IPFS limit must advance through real browser encryption.
+  await page.reload();await page.getByRole('button',{name:'Mint Studio',exact:true}).click();
+  await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await attach('Choose Master recording','large-project.flp',Buffer.alloc(40*1024*1024,73),'application/octet-stream');
+  await page.getByLabel('Upload encrypted files to my local YBR IPFS node (experimental)',{exact:true}).check();
+  assert.match(await page.locator('.ms-ipfs-warning').innerText(),/256 MiB per original/);
+  const posts=[];page.on('request',request=>{if(request.method()==='POST')posts.push(request.url());});
+  await advance();
+  assert.match(await page.locator('.ms-ipfs-confirm').innerText(),/Files encrypted locally, pending creator approval/);
+  assert.deepEqual(posts,[],'Larger-file encryption must still wait for final approval before upload');
+  assert.deepEqual(errors,[]);
   console.log('PASS: worker MP3 extraction from master and preview, filename fallback for unknown formats, manual edits/clearing, replacement and preview metadata precedence.');
+  console.log('PASS: 40 MiB source advances through real browser encryption with IPFS selected.');
  }catch(e){fs.mkdirSync(OUT,{recursive:true});await page.screenshot({path:path.join(OUT,'metadata-failure.png'),fullPage:true}).catch(()=>{});throw e;}
  finally{await browser.close();}
 }

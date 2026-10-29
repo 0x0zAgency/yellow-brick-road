@@ -22,6 +22,7 @@ import {encryptDemoBatch,openDemoDownload} from './demo-vault.js';
 import {simulateMintReceipts} from './demo-mint.js';
 import {uploadEncryptedAsset,checkLocalIpfs,pinEncryptedBrickMetadata} from './ipfs-upload.js';
 import {buildRecoveryFile} from './ipfs-recovery.js';
+import {MAX_ASSET_BYTES,ASSET_LIMIT_LABEL} from './asset-limits.js';
 import {IP_CATEGORIES,SPATIAL_FIELDS,getIpCategory,groupedIpCategories} from './ip-catalog.js';
 import './mint-studio.css';
 import './mint-demo.css';
@@ -123,7 +124,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
   const record={name:file.name,type:file.type,size:file.size,status:'hashing'};
   setAssets(old=>({...old,[id]:record}));
   const extraction=autofill.inspect(id,file);
-  if(file.size>256*1048576){setAssets(old=>({...old,[id]:{...record,error:'Prototype limit 256 MB per file',status:'failed'}}));return}
+  if(file.size>MAX_ASSET_BYTES){setAssets(old=>({...old,[id]:{...record,error:'File limit: '+ASSET_LIMIT_LABEL+' per original',status:'failed'}}));return}
   const current=()=>generation===fileGeneration.current&&refs.current[id]===file;
   // Start the filename fallback immediately; worker tags and SHA-256 run locally.
   try{
@@ -140,12 +141,6 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
   if(!assets.master?.hash){setError('Attach a primary work file before continuing.');return}
   if(Object.values(assets).some(a=>a.status==='hashing'||a.error)){setError('Wait for files to finish hashing, or replace failed files.');return}
   const slots=visibleSlots.filter(x=>assets[x.id]?.hash);
-  // The encrypted container adds a small overhead; catch oversize WAV/project
-  // files before the creator invests time validating the full registration.
-  if(ipfsEnabled&&slots.some(slot=>assets[slot.id].size>32*1048576-4096)){
-   setError('YBR IPFS pilot limit is 32 MiB per encrypted asset. Choose smaller test media or use local-only encryption.');
-   return;
-  }
   const fresh=slots.filter(x=>!vault.current.encrypted.has(x.id));
   setBusy(true);setError('');
   try{
@@ -274,7 +269,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  <p>All originals are encrypted locally with AES-256-GCM. Choose whether to pin the encrypted files to your own YBR IPFS node, or use the offline demonstration.</p>
  <label className="ms-ipfs-option"><input type="checkbox" checked={ipfsEnabled} onChange={e=>{setIpfsEnabled(e.target.checked);setIpfsHealth('')}}/>
   Upload encrypted files to my local YBR IPFS node (experimental)</label>
- {ipfsEnabled&&<><p className="ms-ipfs-warning">Pilot limit: 32 MiB per encrypted file. IPFS is a publicly retrievable, content-addressed network. Only encrypted containers are sent, but ciphertext, approximate file sizes and CIDs can be copied indefinitely. Keep the recovery key private. This local pilot does not guarantee global availability or backup.</p>
+ {ipfsEnabled&&<><p className="ms-ipfs-warning">File limit: {ASSET_LIMIT_LABEL} per original; encryption overhead is included automatically. IPFS is a publicly retrievable, content-addressed network. Only encrypted containers are sent, but ciphertext, approximate file sizes and CIDs can be copied indefinitely. Keep the recovery key private. This local pilot does not guarantee global availability or backup.</p>
   <button type="button" className="ms-outline" disabled={busy} onClick={()=>void checkLocalIpfs().then(x=>setIpfsHealth('Connected YBR IPFS node: '+x.peerId)).catch(e=>setIpfsHealth(e.message))}>Test IPFS connection</button>
   {ipfsHealth&&<p role="status">{ipfsHealth}</p>}
  </>}

@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {encryptAsset} from '../src/road-encryption.js';
+import {MAX_ENCRYPTED_ASSET_BYTES} from '../src/asset-limits.js';
 import {uploadEncryptedAsset,validateUploadReceipt,pinEncryptedBrickMetadata,checkLocalIpfs} from '../src/ipfs-upload.js';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const CID='bafybei'+'a'.repeat(52);
@@ -58,4 +59,8 @@ test('offline bridge fails without false success, health must identify node',asy
  await assert.rejects(checkLocalIpfs(async()=>respond({ok:false},503)),/unavailable/);
  await assert.rejects(checkLocalIpfs(async()=>respond({ok:false})),/health/);
  await assert.rejects(uploadEncryptedAsset({entry:{bytes:new Uint8Array([1]),ciphertextSha256:hex},fetchImpl:async()=>respond({error:'Node offline'},503)}),/Node offline/);
+});
+test('oversized ciphertext is rejected before sending any upload request',async()=>{
+ await assert.rejects(uploadEncryptedAsset({entry:{bytes:new Uint8Array(MAX_ENCRYPTED_ASSET_BYTES+1),ciphertextSha256:hex},
+  fetchImpl:()=>assert.fail('Oversized ciphertext must not be posted')}),/256 MiB/);
 });
