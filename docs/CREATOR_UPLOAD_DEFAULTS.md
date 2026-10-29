@@ -53,3 +53,8 @@ YBR Player. Licensing values remain proposals.
 Content locking becomes permanent only when the reviewed mint is confirmed.
 Player playback permissions remain revocable. Public NFT image selection and
 collaborator authorizations retain their separate review controls.
+
+Licensor email is an optional default. Review it in Mint Studio Step 3; each new
+Brick stores the email publicly in its own contract. It is independent of encrypted
+metadata and Player delivery. Existing Bricks retain their current contact until
+the controller updates it. See [Brick licensing contacts](BRICK_LICENSING_CONTACT.md).

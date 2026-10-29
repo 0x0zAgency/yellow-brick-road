@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {YellowBrickContentPolicy} from "./YellowBrickContentPolicy.sol";
+import {LicensingEmail} from "./LicensingEmail.sol";
 
 /// @notice Per-work IP identity. Registration is not copyright adjudication.
 /// @dev Deployed as an EIP-1167 clone. Implementation instance is locked.
@@ -15,6 +16,27 @@ contract YellowBrick is YellowBrickContentPolicy {
     uint64 public metadataVersion;
     bool private initialized;
     bytes32 public metadataDigest; // SHA-256 or keccak256 commitment identified by off-chain schema
+    string private _licensingEmail;
+    uint64 private _licensingContactVersion;
+
+    event LicensingContactUpdated(uint64 indexed version, address indexed controller, string email);
+
+    /// @notice Public contact for approvals and agreements, not a license grant or verified mailbox.
+    function licensingContact() external view returns (string memory email, uint64 version, address authority) {
+        return (_licensingEmail, _licensingContactVersion, controller);
+    }
+
+    function setLicensingContact(string calldata email, uint64 expectedVersion) external onlyController {
+        require(expectedVersion == _licensingContactVersion, "Brick: stale contact review");
+        _setLicensingContact(email);
+    }
+
+    function _setLicensingContact(string memory email) internal {
+        require(LicensingEmail.valid(bytes(email)), "Brick: invalid licensing email");
+        _licensingEmail = email;
+        _licensingContactVersion++;
+        emit LicensingContactUpdated(_licensingContactVersion, controller, email);
+    }
 
     event MetadataCommitted(uint64 indexed version, bytes32 indexed digest);
 
@@ -54,6 +76,18 @@ contract YellowBrick is YellowBrickContentPolicy {
         metadataDigest = digest;
         emit MetadataCommitted(1, digest);
         _initializeContentPolicy(hash, policy);
+    }
+
+    /// @notice Initializes a public licensing contact in the same transaction as the work.
+    function initializeWithPolicyAndLicensingContact(bytes32 id, bytes32 hash, address creator, string calldata uri,
+        bytes32 digest, InitialPolicy calldata policy, string calldata email) external
+    {
+        require(digest != bytes32(0), "Brick: empty digest");
+        _initialize(id, hash, creator, uri);
+        metadataDigest = digest;
+        emit MetadataCommitted(1, digest);
+        _initializeContentPolicy(hash, policy);
+        _setLicensingContact(email);
     }
 
     function _policyController() internal view override returns (address) { return controller; }
@@ -110,6 +144,8 @@ contract YellowBrick is YellowBrickContentPolicy {
         pendingController = address(0);
         // A round-trip controller transfer must not revive an earlier grant.
         if (contentPolicyEnabled) _setPlayerPermissions(0);
+        // A new controller must publish its own contact, including on a round trip.
+        _setLicensingContact("");
         emit ControllerAccepted(msg.sender);
     }
 }

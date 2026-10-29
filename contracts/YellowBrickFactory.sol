@@ -24,6 +24,7 @@ contract YellowBrickFactory {
 
     /// @notice One creator-signed transaction, including initial ERC-721 artwork.
     function mintBatchVersion() external pure returns (uint8) { return 1; }
+    function licensingContactInterfaceVersion() external pure returns (uint8) { return 1; }
 
     event BrickDeployed(bytes32 indexed ipId, address indexed brick, address indexed originator, bytes32 contentHash);
 
@@ -99,39 +100,62 @@ contract YellowBrickFactory {
     function deployBricksWithPolicy(Registration[] calldata registrations, string calldata imageURI)
         external returns (address[] memory bricks)
     {
+        return _deployBricks(registrations, imageURI, new string[](0));
+    }
+
+    /// @notice Each new Brick carries its own controller-declared licensing email.
+    function deployBricksWithLicensingContact(Registration[] calldata registrations, string calldata imageURI,
+        string[] calldata licensingEmails) external returns (address[] memory bricks)
+    {
+        require(licensingEmails.length == registrations.length, "Factory: contact count");
+        return _deployBricks(registrations, imageURI, licensingEmails);
+    }
+
+    function _deployBricks(Registration[] calldata registrations, string calldata imageURI,
+        string[] memory licensingEmails) internal returns (address[] memory bricks)
+    {
         uint256 length = registrations.length;
         require(length > 0 && length <= MAX_MINT_BATCH, "Factory: batch limit");
         bricks = new address[](length);
         uint256[] memory tokenIds = new uint256[](length);
         bytes memory code = minimalProxyCode(implementation);
         for (uint256 i; i < length; ++i) {
-            Registration calldata r = registrations[i];
-            require(r.contentHash != bytes32(0) && bytes(r.uri).length > 0 &&
-                bytes(r.uri).length <= 8192 && r.metadataDigest != bytes32(0),
-                "Factory: invalid metadata registration");
-            bytes32 salt = deploymentSalt(msg.sender, r.contentHash, r.nonce);
-            address brick;
-            assembly { brick := create2(0, add(code, 32), mload(code), salt) }
-            require(brick != address(0), "Factory: duplicate or failed");
-            bytes32 id = ipIdentity(msg.sender, r.contentHash, r.nonce);
-            if (r.withPolicy) {
-                YellowBrick(brick).initializeWithPolicy(id, r.contentHash, msg.sender, r.uri, r.metadataDigest, r.policy);
-            } else {
-                require(r.policy.files.manifestDigest == bytes32(0) &&
-                    r.policy.files.previewHash == bytes32(0) &&
-                    r.policy.files.artworkHash == bytes32(0) &&
-                    r.policy.files.lyricsHash == bytes32(0) &&
-                    r.policy.permissions == 0 && !r.policy.locked, "Factory: unexpected policy");
-                YellowBrick(brick).initializeWithDigest(id, r.contentHash, msg.sender, r.uri, r.metadataDigest);
-            }
-            isBrick[brick] = true;
-            brickById[id] = brick;
+            (address brick, bytes32 id) = _register(registrations[i], code,
+                licensingEmails.length > 0 ? licensingEmails[i] : "", licensingEmails.length > 0);
             bricks[i] = brick;
             tokenIds[i] = uint256(id);
-            emit BrickDeployed(id, brick, msg.sender, r.contentHash);
         }
         // Invalid artwork or a failed receipt reverts ALL deployments and events above.
         YellowBrickReceipt(receiptToken).mintBatch(msg.sender, tokenIds, bricks, imageURI);
+    }
+
+    function _register(Registration calldata r, bytes memory code, string memory email, bool withContact)
+        internal returns (address brick, bytes32 id)
+    {
+        require(r.contentHash != bytes32(0) && bytes(r.uri).length > 0 &&
+            bytes(r.uri).length <= 8192 && r.metadataDigest != bytes32(0),
+            "Factory: invalid metadata registration");
+        bytes32 salt = deploymentSalt(msg.sender, r.contentHash, r.nonce);
+        assembly { brick := create2(0, add(code, 32), mload(code), salt) }
+        require(brick != address(0), "Factory: duplicate or failed");
+        id = ipIdentity(msg.sender, r.contentHash, r.nonce);
+        if (withContact) {
+            require(r.withPolicy, "Factory: contact requires policy");
+            YellowBrick(brick).initializeWithPolicyAndLicensingContact(id, r.contentHash, msg.sender,
+                r.uri, r.metadataDigest, r.policy, email);
+        } else if (r.withPolicy) {
+            YellowBrick(brick).initializeWithPolicy(id, r.contentHash, msg.sender, r.uri, r.metadataDigest, r.policy);
+        } else {
+            require(r.policy.files.manifestDigest == bytes32(0) &&
+                r.policy.files.previewHash == bytes32(0) &&
+                r.policy.files.artworkHash == bytes32(0) &&
+                r.policy.files.lyricsHash == bytes32(0) &&
+                r.policy.permissions == 0 && !r.policy.locked, "Factory: unexpected policy");
+            YellowBrick(brick).initializeWithDigest(id, r.contentHash, msg.sender, r.uri, r.metadataDigest);
+        }
+        isBrick[brick] = true;
+        brickById[id] = brick;
+        emit BrickDeployed(id, brick, msg.sender, r.contentHash);
     }
 
     function predictBrickAddress(address originator, bytes32 contentHash, bytes32 nonce)

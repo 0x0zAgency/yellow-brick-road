@@ -42,7 +42,7 @@ Both are provisional design schemas, not EVM token standards and not proof of ri
 | AI lineage | training permission, rights constraints, audit manifest, model/dataset version, usage events, attribution rules, generation royalty allocation |
 | Interoperability | JSON Schema, content-addressed manifests, DDEX RIN for sessions, ERN for releases, RDR where relevant, C2PA when applicable, extensions |
 
-A hash of a source file is not an encryption mechanism. Public fingerprints of unreleased files may leak membership information; use a reviewed commitment scheme appropriate to the threat model. Do not put contact info, legal agreements, rights evidence, secret URLs, decryption keys or plaintext unpublished works into public JSON.
+A hash of a source file is not an encryption mechanism. Public fingerprints of unreleased files may leak membership information; use a reviewed commitment scheme appropriate to the threat model. Only a designated public licensing email belongs in the licensing contact field. Keep private contacts, confidential legal agreements, rights evidence, secret URLs, decryption keys and plaintext unpublished works private. See [Brick licensing contacts](BRICK_LICENSING_CONTACT.md) for the current on-chain contact interface.
 
 **Recommended compatibility:** DDEX RIN describes recording sessions and contributor roles; DDEX ERN handles release metadata and deal terms. Mapping adapters may require DDEX's implementation license. [DDEX RIN](https://ddex.net/standards/recording-information-notification/) · [DDEX ERN](https://ddex.ddex.net/standards/release-delivery/) · [IPFS privacy](https://docs.ipfs.tech/how-to/privacy-best-practices/).
 

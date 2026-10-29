@@ -419,3 +419,12 @@ falling back to track title when no album is present. Arrange the audio
 on a cover. Audio Buildings unlock the composer; drag the audio pins, preview the
 mix, then **Commit Playable Cover** to add a separate item to YBR Player.
 [Creator workflow and permissions](docs/PLAYABLE_COVERS.md).
+
+### Licensor contacts
+
+Mint Studio Step 3 accepts an optional public **Licensor email**. Each new Brick
+stores it in its own contract so systems can request approvals or agreements
+without decrypting the work. Set a reusable email under **Settings → Creator defaults**.
+Read or update a Brick's contact from **IP Registry** or **My Bricks → Licensor contact**.
+The current controller can update it even while files are locked.
+[Contract interface, integration and factory compatibility](docs/BRICK_LICENSING_CONTACT.md).

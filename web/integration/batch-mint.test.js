@@ -8,6 +8,7 @@ import {privateKeyToAccount} from 'viem/accounts';
 import {mintOnChain,preflightPolicyMint,localConfig,requireBatchFactory} from '../src/chain-mint.js';
 import {DEFAULT_CONTENT_POLICY} from '../src/content-policy.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
+import {readBrickLicensingContact,updateBrickLicensingContact} from '../src/licensing-contact-chain.js';
 import {coverAbi,decodeReceiptMetadata} from '../src/nft-cover-chain.js';
 const imageURI='ipfs://bafy'+'a'.repeat(55);
 for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${network}: one write, full receipts, rejection and uncertainty`,{timeout:60000},async t=>{
@@ -34,7 +35,7 @@ for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${networ
  }};
  const packet=makeRegistrationPacket({metadata:{title:'Atomic release test',artist:'Creator',songwriters:'Creator'},
   assets:{master:{name:'master.wav',type:'audio/wav',size:4,hash:'ab'.repeat(32)},preview:{name:'preview.wav',type:'audio/wav',size:4,hash:'bc'.repeat(32)},artwork:{name:'cover.png',type:'image/png',size:4,hash:'cd'.repeat(32)}},
-  identity:{mode:'external',connected:true,address:account.address},composition:true,royalties:{creatorBps:10000},training:'not-authorized',storage:'demo-encrypted-in-browser',contentPolicy:DEFAULT_CONTENT_POLICY});
+  identity:{mode:'external',connected:true,address:account.address},composition:true,licensing:{email:'licensing@example.com'},royalties:{creatorBps:10000},training:'not-authorized',storage:'demo-encrypted-in-browser',contentPolicy:DEFAULT_CONTENT_POLICY});
  const options={packet,provider,rpcUrl,chainId,network,factoryAddress,initialImageURI:imageURI};
  await preflightPolicyMint(options);assert.equal(sends,0);
  await assert.rejects(requireBatchFactory({readContract:async()=>{throw Error('method absent');}},factoryAddress),/predates one-transaction/);
@@ -44,10 +45,19 @@ for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${networ
  assert.equal(new Set(result.receipts.map(r=>r.transactionHash)).size,1);
  assert.equal(result.transactionHash,result.receipts[0].transactionHash);
  for(const receipt of result.receipts){
+  assert.equal(receipt.licensingContact.email,'licensing@example.com');assert.equal(receipt.licensingContact.version,'1');
   assert.equal(receipt.status,'verified');assert.equal(receipt.gasScope,'batch');assert.equal(receipt.gasUsed,result.gasUsed);
   const metadata=decodeReceiptMetadata(await client.readContract({address:receipt.nftContractAddress,abi:coverAbi,functionName:'tokenURI',args:[BigInt(receipt.tokenId)]}));assert.equal(metadata.image,imageURI);
  }
  await assert.rejects(mintOnChain({...options,result}),/Do not remint/);assert.equal(sends,1);
+ // The same reader/editor used by My Bricks works against the real contract.
+ const contactOptions={provider,chainId,factoryAddress,brickAddress:result.receipts[0].contractAddress,walletAddress:account.address};
+ const review=await readBrickLicensingContact(contactOptions);assert.equal(review.email,'licensing@example.com');
+ const updated=await updateBrickLicensingContact({...contactOptions,review,email:'agreements+sync@example.com'});
+ assert.equal(updated.contact.email,'agreements+sync@example.com');assert.equal(updated.contact.version,'2');
+ const writesBeforeStale=sends;
+ await assert.rejects(updateBrickLicensingContact({...contactOptions,review,email:'stale@example.com'}),/changed since review/);assert.equal(sends,writesBeforeStale);
+ assert.equal((await readBrickLicensingContact({...contactOptions,brickAddress:result.receipts[1].contractAddress})).email,'licensing@example.com');
  // A wallet that returns another transaction must not cause false success.
  replace=true;const replaced={simulated:false,status:'pending',receipts:[]};
  await assert.rejects(mintOnChain({...options,result:replaced}),/replaced with a different operation/);

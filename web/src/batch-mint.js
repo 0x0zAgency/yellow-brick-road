@@ -2,7 +2,8 @@
  * registrations, policies and initial images. Never retry an uncertain write.
  */
 import {encodeAbiParameters,encodeFunctionData,getAddress,keccak256,parseEventLogs,sha256,stringToHex} from 'viem';
-import {connectChain,verifyFactory,requirePolicyFactory,requireBatchFactory,factoryAbi,policyAbi} from './chain-mint.js';
+import {connectChain,verifyFactory,requirePolicyFactory,requireBatchFactory,requireLicensingContactFactory,factoryAbi,policyAbi} from './chain-mint.js';
+import {packetLicensingEmails,licensingContactAbi} from './licensing-contact.js';
 import {initialPolicyFor} from './content-policy.js';
 import {validCoverCid} from './nft-cover-format.js';
 import {decodeReceiptMetadata,coverAbi} from './nft-cover-chain.js';
@@ -18,9 +19,11 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
  const sources=packet.bricks.map(b=>b?.localId);
  if(sources.some(id=>typeof id!=='string'||!id)||new Set(sources).size!==sources.length)throw Error('Every batch Brick needs a distinct source identity.');
  const account=packet.account?.address;
+ const licensingEmails=packetLicensingEmails(packet),withContact=licensingEmails.some(Boolean);
  const {client,wallet,chain,check}=await connectChain({provider,rpcUrl,chainId,account,network});
  const collection=await verifyFactory(client,factoryAddress);
  await requirePolicyFactory(client,factoryAddress);await requireBatchFactory(client,factoryAddress);
+ if(withContact)await requireLicensingContactFactory(client,factoryAddress);
  const genesis=await client.getBlock({blockNumber:0n});
  const prepared=[];
  for(const b of packet.bricks){
@@ -33,7 +36,7 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
   const id=keccak256(encodeAbiParameters([{type:'string'},{type:'address'},{type:'bytes32'},{type:'bytes32'}],['yellow-brick-road:ip:v1',account,contentHash,nonce]));
   prepared.push({b,metadataJson,predicted,id,registration:{contentHash,uri,metadataDigest,nonce,withPolicy:true,policy}});
  }
- const args=[prepared.map(p=>p.registration),initialImageURI],functionName='deployBricksWithPolicy';
+ const args=[prepared.map(p=>p.registration),initialImageURI,...(withContact?[licensingEmails]:[])],functionName=withContact?'deployBricksWithLicensingContact':'deployBricksWithPolicy';
  const parameters={account,address:factoryAddress,abi:factoryAbi,functionName,args};
  await check();
  const {request}=await client.simulateContract(parameters);
@@ -93,10 +96,16 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
   const tokenId=BigInt(id);
   if(!same(await read(collection,coverAbi,'ownerOf',[tokenId]),account)||!same(await read(collection,coverAbi,'brickForToken',[tokenId]),address))throw Error('Batch NFT holder or Brick link is incorrect.');
   const tokenURI=await read(collection,coverAbi,'tokenURI',[tokenId]);
+  let licensingContact;
+  if(withContact){
+   const [email,version,authority]=await read(address,licensingContactAbi,'licensingContact');
+   if(email!==licensingEmails[i]||Number(version)!==1||!same(authority,account))throw Error('Batch licensing contact differs from the reviewed contact.');
+   licensingContact={email,version:String(version),authority};
+  }
   const actualImage=receiptCoverImage(tokenURI,{brickAddress:address,ipId:id}); // validates both identity attributes
   if(initialImageURI?actualImage!==initialImageURI:actualImage!==null)throw Error('Initial NFT image does not match the approved batch.');
   metadata.push(decodeReceiptMetadata(tokenURI));
-  verified.push({status:'verified',contractAddress:address,nftContractAddress:collection,tokenId:tokenId.toString(),blockNumber:blockNumber.toString(),gasUsed:receipt.gasUsed.toString()});
+  verified.push({status:'verified',contractAddress:address,nftContractAddress:collection,tokenId:tokenId.toString(),blockNumber:blockNumber.toString(),gasUsed:receipt.gasUsed.toString(),...(licensingContact?{licensingContact}:{})});
  }
  // Do not label a partially checked or replaced history as a verified batch.
  await check();
