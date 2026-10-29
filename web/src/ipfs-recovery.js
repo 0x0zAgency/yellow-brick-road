@@ -3,12 +3,13 @@
  */
 import {decryptAsset} from './road-encryption.js';
 import {validCid} from './ipfs-upload.js';
+import {MAX_ASSET_BYTES,MAX_ENCRYPTED_ASSET_BYTES,ASSET_LIMIT_LABEL,ENCRYPTED_ASSET_LIMIT_LABEL} from './asset-limits.js';
 
 export const RECOVERY_V1='0x-road-ipfs-recovery-v1';
 export const RECOVERY_V2='0x-road-ipfs-recovery-v2';
 export const MAX_RECOVERY_FILE_BYTES=1024*1024;
-export const MAX_RECOVERY_CIPHERTEXT_BYTES=32*1024*1024;
-export const IPFS_RECOVERY_TIMEOUT_MS=30000;
+export const MAX_RECOVERY_CIPHERTEXT_BYTES=MAX_ENCRYPTED_ASSET_BYTES;
+export const IPFS_RECOVERY_TIMEOUT_MS=5*60*1000;
 const MAX_ENTRIES=64;
 const textEncoder=new TextEncoder();
 const SHA=/^(?:0x)?[0-9a-f]{64}$/i;
@@ -33,8 +34,8 @@ function checkedSize(value,{required=false,ciphertext=false}={}){
   if(required)throw Error('Recovery entry is missing its file size.');
   return null;
  }
- if(!Number.isSafeInteger(value)||value<(ciphertext?1:0)||value>MAX_RECOVERY_CIPHERTEXT_BYTES)
-  throw Error('Recovery entry exceeds the 32 MiB pilot limit or has an invalid file size.');
+ if(!Number.isSafeInteger(value)||value<(ciphertext?1:0)||value>(ciphertext?MAX_RECOVERY_CIPHERTEXT_BYTES:MAX_ASSET_BYTES))
+  throw Error('Recovery entry exceeds the '+(ciphertext?ENCRYPTED_ASSET_LIMIT_LABEL:ASSET_LIMIT_LABEL)+' limit or has an invalid file size.');
  return value;
 }
 function checkedLabel(value,fallback){
@@ -153,7 +154,7 @@ async function readBounded(response,{expectedSize,signal}){
  const lengthHeader=response.headers.get('content-length');
  if(lengthHeader!==null&&(!/^(?:0|[1-9][0-9]*)$/.test(lengthHeader)||Number(lengthHeader)>MAX_RECOVERY_CIPHERTEXT_BYTES)){
   await response.body?.cancel();
-  throw Error('Encrypted IPFS response exceeds the 32 MiB pilot limit or has an invalid length.');
+  throw Error('Encrypted IPFS response exceeds the '+ENCRYPTED_ASSET_LIMIT_LABEL+' limit or has an invalid length.');
  }
  if(!response.body?.getReader)throw Error('IPFS did not return a readable encrypted file.');
  const reader=response.body.getReader(),parts=[];
@@ -165,7 +166,7 @@ async function readBounded(response,{expectedSize,signal}){
    if(next.done){done=true;break;}
    if(!(next.value instanceof Uint8Array))throw Error('IPFS returned an invalid encrypted body.');
    size+=next.value.byteLength;
-   if(size>MAX_RECOVERY_CIPHERTEXT_BYTES||(expectedSize!==null&&size>expectedSize))throw Error('Encrypted IPFS file exceeds its expected size or the 32 MiB pilot limit.');
+   if(size>MAX_RECOVERY_CIPHERTEXT_BYTES||(expectedSize!==null&&size>expectedSize))throw Error('Encrypted IPFS file exceeds its expected size or the '+ENCRYPTED_ASSET_LIMIT_LABEL+' limit.');
    parts.push(next.value);
   }
   if(!size||(expectedSize!==null&&size!==expectedSize))throw Error('Encrypted IPFS file size does not match the recovery file.');

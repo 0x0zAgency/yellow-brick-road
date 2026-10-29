@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {webcrypto} from 'node:crypto';
 import {encryptAsset} from '../src/road-encryption.js';
+import {MAX_ASSET_BYTES} from '../src/asset-limits.js';
 import {MAX_CIPHERTEXT_BYTES,parseAddOutput,checkedKuboUrl,storeEncryptedBytes,retrieveEncryptedBytes,readBoundedBytes,validateEncryptedContainer,handleUploadRequest,startBridge,sha256} from '../scripts/ipfs-bridge.mjs';
 import {Readable} from 'node:stream';
 import {createServer,request as httpRequest} from 'node:http';
@@ -52,7 +53,31 @@ test('reject plaintext, invalid containers, and mismatched Kubo bytes',async()=>
   if(url.includes('/cat?'))return new Response('corrupt');
   throw Error('unexpected');
  }}),/differs/);
- await assert.rejects(storeEncryptedBytes(Buffer.alloc(MAX_CIPHERTEXT_BYTES+1)),/32 MiB/);
+ await assert.rejects(storeEncryptedBytes(Buffer.alloc(MAX_CIPHERTEXT_BYTES+1)),/256 MiB/);
+});
+test('a full 256 MiB original fits with its container header and authentication tag',()=>{
+ const header=Buffer.from(JSON.stringify({v:1,alg:'AES-256-GCM',kdf:'PBKDF2-SHA-256',iterations:310000,
+  salt:'a'.repeat(32),iv:'b'.repeat(24),name:'encrypted-work',mime:'application/octet-stream',bytes:MAX_ASSET_BYTES}));
+ // Structural boundary fixture; authentication is exercised by real encryption/recovery tests.
+ const container=Buffer.alloc(MAX_ASSET_BYTES+10+header.length+16);
+ container.write('0ZROAD01');container.writeUInt16BE(header.length,8);header.copy(container,10);
+ assert.ok(container.length>256*1024*1024);
+ assert.equal(validateEncryptedContainer(container),container);
+ const oversizeHeader=Buffer.from(header.toString().replace(String(MAX_ASSET_BYTES),String(MAX_ASSET_BYTES+1)));
+ oversizeHeader.copy(container,10);
+ assert.throws(()=>validateEncryptedContainer(container),/Unsupported/,'Header cannot claim an original beyond the encryption limit.');
+});
+test('upload handler bounds advertised and streamed bodies before calling storage',async()=>{
+ const headers={'content-type':'application/octet-stream','x-road-encryption':'roadenc-v1'};
+ const store=()=>assert.fail('An oversized body must not reach Kubo');
+ const advertised=await callHandler({method:'POST',url:'/api/road-ipfs/upload',headers:{...headers,'content-length':String(MAX_CIPHERTEXT_BYTES+1)}},{store});
+ assert.equal(advertised.status,413);
+ // Reuse one chunk to exercise the real cap without allocating hundreds of MiB.
+ const chunk=Buffer.alloc(1024*1024),body=Array(Math.ceil((MAX_CIPHERTEXT_BYTES+1)/chunk.length)).fill(chunk);
+ for(const length of [undefined,'1']){
+  const streamed=await callHandler({method:'POST',url:'/api/road-ipfs/upload',headers:{...headers,...(length?{'content-length':length}:{})},body},{store});
+  assert.equal(streamed.status,413);assert.match(JSON.parse(streamed.body).error,/256 MiB/);
+ }
 });
 test('HTTP handler rejects non-encrypted content and foreign browser origins',async()=>{
  const one=await callHandler({method:'POST',url:'/api/road-ipfs/upload',

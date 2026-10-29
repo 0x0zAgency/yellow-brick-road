@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHash,webcrypto} from 'node:crypto';
 import {encryptAsset} from '../src/road-encryption.js';
+import {MAX_ASSET_BYTES,MAX_ENCRYPTED_ASSET_BYTES} from '../src/asset-limits.js';
 import {pinEncryptedBrickMetadata,uploadEncryptedAsset} from '../src/ipfs-upload.js';
 import {
  RECOVERY_V1,RECOVERY_V2,MAX_RECOVERY_FILE_BYTES,MAX_RECOVERY_CIPHERTEXT_BYTES,IPFS_RECOVERY_TIMEOUT_MS,
@@ -120,6 +121,17 @@ test('imports reject malformed, oversized, duplicate or incomplete records witho
  assert.throws(()=>parseRecoveryFile(JSON.stringify(kit([{...asset,mime:'text/html; boundary=bad'}]))),/media type/);
  assert.throws(()=>parseRecoveryFile(JSON.stringify(kit([{...asset,originalSize:-1}]))),/size/);
 });
+test('recovery backups accept full-size originals plus encryption overhead and reject larger entries',()=>{
+ const full={...asset,originalSize:256*1024*1024,encryptedSize:256*1024*1024+300};
+ const exported=buildRecoveryFile({secret:key,assets:{master:{name:full.name,type:full.mime,hash:full.originalSha256,size:full.originalSize,
+  ipfsUpload:{cid:CID,sha256:full.encryptedSha256,size:full.encryptedSize,verified:true}}}});
+ const imported=parseRecoveryFile(JSON.stringify(exported));
+ assert.equal(imported.assets[0].originalSize,full.originalSize);
+ assert.equal(imported.assets[0].encryptedSize,full.encryptedSize);
+ assert.equal(MAX_RECOVERY_CIPHERTEXT_BYTES,MAX_ENCRYPTED_ASSET_BYTES);
+ for(const entry of [{...full,originalSize:MAX_ASSET_BYTES+1},{...full,encryptedSize:MAX_RECOVERY_CIPHERTEXT_BYTES+1}])
+  assert.throws(()=>parseRecoveryFile(JSON.stringify(kit([entry]))),/256 MiB/);
+});
 
 test('download names are safe basenames and do not treat imported media as executable markup',()=>{
  const entry=parseRecoveryFile(JSON.stringify(kit([{...asset,name:'../../<script>bad</script>.html'}]))).assets[0];
@@ -152,10 +164,10 @@ test('untrusted bridge responses cannot override local integrity checks or redir
 
 test('download limits bound advertised and streamed sizes, including dishonest headers',async()=>{
  const legacy={kind:'metadata',role:'metadata',cid:CID,legacy:true};
- await assert.rejects(recoverIpfsEntry({entry:legacy,key,fetchImpl:async()=>new Response('x',{headers:{'Content-Type':'application/octet-stream','Content-Length':String(MAX_RECOVERY_CIPHERTEXT_BYTES+1)}})}),/32 MiB/);
+ await assert.rejects(recoverIpfsEntry({entry:legacy,key,fetchImpl:async()=>new Response('x',{headers:{'Content-Type':'application/octet-stream','Content-Length':String(MAX_RECOVERY_CIPHERTEXT_BYTES+1)}})}),/256 MiB/);
  let canceled=false;
  const stream=new ReadableStream({start(controller){controller.enqueue(new Uint8Array(MAX_RECOVERY_CIPHERTEXT_BYTES+1));},cancel(){canceled=true}});
- await assert.rejects(recoverIpfsEntry({entry:legacy,key,fetchImpl:async()=>new Response(stream,{headers:{'Content-Type':'application/octet-stream','Content-Length':'1'}})}),/32 MiB/);
+ await assert.rejects(recoverIpfsEntry({entry:legacy,key,fetchImpl:async()=>new Response(stream,{headers:{'Content-Type':'application/octet-stream','Content-Length':'1'}})}),/256 MiB/);
  assert.equal(canceled,true);
  await assert.rejects(recoverIpfsEntry({entry:asset,key,fetchImpl:async()=>new Response(encrypted.bytes,{headers:{'Content-Type':'application/octet-stream','Content-Length':'1'}})}),/length/);
 });

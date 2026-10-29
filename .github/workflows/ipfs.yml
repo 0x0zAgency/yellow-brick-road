@@ -16,6 +16,9 @@ jobs:
   ipfs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    env:
+      # Regression: upload and recover a file larger than the former 32 MiB cap.
+      YBR_IPFS_SMOKE_MIB: '40'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
