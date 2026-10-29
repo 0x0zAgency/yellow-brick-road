@@ -6,9 +6,10 @@ tracks. Listener controls move the listening point and blend the sounds; the
 composition tools live in the creator workspace.
 
 1. In Mint Studio, share the Audio Previews and cover artwork you want to use with
-   the Player. Existing Mint Studio release associations provide an audio Building
-   in the tool. You can also open **Buildings → New Building** to group uploaded
-   audio into a new local audio Building.
+   the Player. Open **Buildings → New Building**, choose **Single**, **EP**,
+   **Album** or **Compilation**, name the Building and select its uploaded audio.
+   The type is saved with the Building; existing Buildings without a type remain
+   available as Audio Buildings.
 2. Open that Building's **Cover Art Studio**, or use **Tools → Cover Art Studio**.
    The composer is locked until an audio Building exists.
 3. Name the Playable Cover and choose shared artwork. Add up to eight sounds from
@@ -29,6 +30,27 @@ saved layout into the composer; committing a changed copy creates a new immutabl
 object. An identical retry reuses the same object and original publication date.
 **Withdraw** removes a cover from the Player without deleting its source audio.
 
+## Your Buildings and upload groups
+
+**Your Buildings** lists the Buildings you deliberately created. Synthetic example
+Buildings are excluded. Existing browser-saved reference Buildings remain in this
+section of the Buildings page.
+
+**Created on upload** is a separate, initially collapsed category. Shared uploads
+are grouped by their album title. When an upload has no album title, its track
+title supplies the grouping instead. Album tags are already read during upload;
+the reviewed metadata, including any creator edits, supplies the Player's album
+field. Whitespace, case and equivalent Unicode spellings do not create duplicate
+groups. An album and an untagged track with the same name remain separate groups,
+as do distinct chains, factories and controller profiles.
+
+Upload groups do not receive an inferred Single/EP/Album/Compilation type. Their
+cards say whether they were grouped by album or track title. Group identity stays
+stable as more matching tracks arrive, and pre-existing per-upload Playable Covers
+can still be opened and edited without rewriting their saved layouts. Unavailable
+uploads are omitted from automatic groups; each cover's own source permissions
+are still checked independently.
+
 ## Existing rights and storage
 
 This extends the local creator-preview workflow. The local publishing API requires
@@ -39,9 +61,9 @@ encrypted upload. The tool never reads recovery keys or substitutes masters for
 Audio Previews.
 
 Audio Buildings and Playable Covers are app presentation objects stored under
-`.road-local/playable-covers/`. Mint Studio release associations are contextual
-Buildings derived from the release's existing Brick references; no Building
-contract is deployed. Manually created Buildings have their own stored member
+`.road-local/playable-covers/`. Upload groups are contextual Buildings derived
+from local preview metadata; no Building contract is deployed. They do not change
+the protocol's receipt-based release associations. Manually created Buildings have their own stored member
 references. These groupings do not claim copyright or grant a license.
 
 Every source is checked through the existing Player permission service on commit
@@ -59,7 +81,8 @@ protocol's rights records.
 
 ## Verification
 
-`npm --prefix apps/ybr-player test` includes Building unlock, durable commits,
+`npm --prefix apps/ybr-player test` includes album/title grouping, release types,
+legacy cover compatibility, Building unlock, durable commits,
 idempotency, permissions, HTTP boundaries, withdrawal and pin movement tests.
 After building the web app, `node scripts/playable-cover-browser.cjs` exercises
 the production React bundle and an isolated Player with synthetic media:

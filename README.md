@@ -413,6 +413,9 @@ The same integrated workflow runs from `cd web && npm run dev`. Main web: `http:
 ### Playable Covers
 
 Open **Buildings** or **Tools → Cover Art Studio** to arrange your uploaded audio
+into a **Single**, **EP**, **Album** or **Compilation**. Your own Buildings appear
+first; **Created on upload** stays collapsed and groups uploads by album title,
+falling back to track title when no album is present. Arrange the audio
 on a cover. Audio Buildings unlock the composer; drag the audio pins, preview the
 mix, then **Commit Playable Cover** to add a separate item to YBR Player.
 [Creator workflow and permissions](docs/PLAYABLE_COVERS.md).

@@ -1,6 +1,6 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
-const {createPlayableCovers}=require('../playable-covers'),{createStudioLibrary,sha256}=require('../studio-releases'),{createApp}=require('../server');
+const {createPlayableCovers,uploadBuildings,AUDIO_RELEASE_TYPES}=require('../playable-covers'),{createStudioLibrary,sha256}=require('../studio-releases'),{createApp}=require('../server');
 const {playableNewest}=require('../public/library-model'),M=require('../public/artwork-model');
 const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jKxkAAAAASUVORK5CYII=','base64');
 const encode=(bytes,name,mime)=>({name,mime,sha256:sha256(bytes),base64:bytes.toString('base64')});
@@ -16,9 +16,9 @@ function fixture(t){
 }
 test('audio Building unlock, any uploaded sound, immutable commit, restart and withdrawal',async t=>{
  const f=fixture(t),{covers,studio,a,b,payload}=f;
- assert.equal((await covers.catalog()).buildings.length,0);assert.deepEqual(await covers.playable(),[]);
+ assert.equal((await covers.catalog()).buildings.filter(b=>b.source==='creator').length,0);assert.deepEqual(await covers.playable(),[]);
  await assert.rejects(covers.commit(payload('BUILDING-'+'0'.repeat(64))),/Create an audio Building/);
- const {record:building}=await covers.createBuilding({title:'My audio Building',members:[a.id]});
+ const {record:building}=await covers.createBuilding({title:'My audio Building',releaseType:'Album',members:[a.id]});
  const body=payload(building.id);body.recoveryKey='NEVER-SERIALIZE';body.layout.mediaUrl='https://example.invalid/private';
  const first=await covers.commit(body),again=await covers.commit(body);
  assert.equal(first.created,true);assert.equal(again.created,false);assert.equal(again.record.id,first.record.id);
@@ -33,7 +33,7 @@ test('audio Building unlock, any uploaded sound, immutable commit, restart and w
  assert.equal(reopened.remove(cover.id),true);assert.equal(reopened.remove(cover.id),false);assert.equal(studio.list().length,2);
 });
 test('all source and artwork permissions are rechecked on commit, listing and reopening',async t=>{
- const {covers,studio,blocked,a,b,payload}=fixture(t),{record:building}=await covers.createBuilding({title:'Audio Building',members:[a.id]});
+ const {covers,studio,blocked,a,b,payload}=fixture(t),{record:building}=await covers.createBuilding({title:'Audio Building',releaseType:'EP',members:[a.id]});
  const body=payload(building.id);await covers.commit(body);
  for(const key of [b.id+':audio',a.id+':audio',a.id+':artwork']){
   blocked.add(key);assert.equal((await covers.playable()).length,0);await assert.rejects(covers.commit(body),/permission changed/);blocked.delete(key);assert.equal((await covers.playable()).length,1);
@@ -42,9 +42,9 @@ test('all source and artwork permissions are rechecked on commit, listing and re
 });
 test('invalid sources, duplicate pins, untrusted URLs, invalid geometry, missing artwork and consent cannot publish',async t=>{
  const {covers,studio,a,b,payload}=fixture(t);
- await assert.rejects(covers.createBuilding({title:'Fake',members:['BRK-AUD-001']}),/uploaded audio/);
- await assert.rejects(covers.createBuilding({title:'Fake',members:[a.id,a.id]}),/distinct/);
- const {record}=await covers.createBuilding({title:'Real',members:[a.id]});
+ await assert.rejects(covers.createBuilding({title:'Fake',releaseType:'Single',members:['BRK-AUD-001']}),/uploaded audio/);
+ await assert.rejects(covers.createBuilding({title:'Fake',releaseType:'Single',members:[a.id,a.id]}),/distinct/);
+ const {record}=await covers.createBuilding({title:'Real',releaseType:'Single',members:[a.id]});
  const body=payload(record.id),change=fn=>{const v=structuredClone(body);fn(v);return v;};
  await assert.rejects(covers.commit(change(v=>delete v.consent)),/Confirm/);
  await assert.rejects(covers.commit(change(v=>v.layout.regions[1].brickId=a.id)),/distinct/);
@@ -57,7 +57,59 @@ test('invalid sources, duplicate pins, untrusted URLs, invalid geometry, missing
 });
 test('existing Mint Studio release Buildings unlock the composer without changing receipts',async t=>{
  const {covers,studio}=fixture(t),input=publication('Minted release');input.bricks=[{role:'Sound recording',title:'Minted release'}];
- const release=studio.publish(input).brick,catalog=await covers.catalog();assert.equal(catalog.buildings.length,1);assert.deepEqual(catalog.buildings[0].members,[release.id]);assert.equal(catalog.buildings[0].source,'mint-studio');
+ const release=studio.publish(input).brick,catalog=await covers.catalog(),group=catalog.buildings.find(b=>b.members.includes(release.id));assert.deepEqual(group.members,[release.id]);assert.equal(group.source,'mint-studio');assert.equal(group.groupBy,'track');
+});
+test('uploaded audio groups by album first, then track title, while manual Buildings stay separate',async t=>{
+ const {covers,studio,a}=fixture(t);
+ const publish=(name,album='',creator='Fixture artist')=>studio.publish({...publication(name),album,creator}).brick;
+ const one=publish('Album opener','  Night  Garden  '),two=publish('Album closer','night garden','Guest artist');
+ const untagged=publish('Shared title'),alsoUntagged=publish('Shared title','','Guest artist');
+ const namedAlbum=publish('Different work','Shared title');
+ const manual=(await covers.createBuilding({title:'Night Garden',releaseType:'Compilation',members:[a.id,one.id]})).record;
+ let catalog=await covers.catalog(),group=catalog.buildings.find(b=>b.source==='mint-studio'&&b.members.includes(one.id));
+ assert.deepEqual(new Set(group.members),new Set([one.id,two.id]));assert.equal(group.groupBy,'album');
+ assert.equal(catalog.buildings.find(b=>b.members.includes(untagged.id)).groupBy,'track');
+ assert.deepEqual(new Set(catalog.buildings.find(b=>b.members.includes(untagged.id)).members),new Set([untagged.id,alsoUntagged.id]));
+ assert.equal(catalog.buildings.find(b=>b.members.includes(namedAlbum.id)).members.length,1,'An album and a fallback track with the same label are distinct');
+ assert.deepEqual(catalog.buildings.find(b=>b.id===manual.id).members,manual.members);
+ assert.equal(catalog.uploads.find(b=>b.id===one.id).album,'Night  Garden');
+ const third=publish('Late addition','Night Garden');catalog=await covers.catalog();
+ assert.deepEqual(new Set(catalog.buildings.find(b=>b.id===group.id).members),new Set([one.id,two.id,third.id]),'Group ID survives later album uploads');
+});
+test('album grouping retains chain and controller boundaries and normalizes Unicode titles',()=>{
+ const auth={chainId:1337,factoryAddress:'0xABC',genesisHash:'0xDEF',sources:{audio:{controller:'0x123'}}};
+ const base={id:'one',title:'Track',album:'Cafe\u0301',authorization:auth};
+ const rows=[base,{...base,id:'two',album:'CAFÉ'}, {...base,id:'three',authorization:{...auth,chainId:11155111}},
+  {...base,id:'four',authorization:{...auth,sources:{audio:{controller:'0x456'}}}},
+  {...base,id:'five',authorization:{...auth,genesisHash:'0xAAA'}},{...base,id:'six',authorization:null}];
+ const groups=uploadBuildings(rows);assert.equal(groups.length,5);assert.deepEqual(groups.find(g=>g.members.includes('one')).members,['one','two']);
+});
+test('audio release type is required, validated, persisted and part of manual Building identity',async t=>{
+ const {covers,a,directory,studio,checkPermission}=fixture(t);
+ for(const releaseType of [undefined,'','Podcast','album',null,{}])await assert.rejects(covers.createBuilding({title:'Typed release',members:[a.id],releaseType}),/Choose an audio Building type/);
+ const records=[];for(const releaseType of AUDIO_RELEASE_TYPES)records.push((await covers.createBuilding({title:'Typed release',members:[a.id],releaseType})).record);
+ assert.equal(new Set(records.map(b=>b.id)).size,4);
+ const reopened=createPlayableCovers({directory,studio,checkPermission});
+ assert.deepEqual(new Set((await reopened.catalog()).buildings.filter(b=>b.source==='creator').map(b=>b.releaseType)),new Set(AUDIO_RELEASE_TYPES));
+ // Pre-selector user-created Buildings remain usable without assigning a type.
+ const old=records[0];delete old.releaseType;fs.writeFileSync(path.join(directory,old.id+'.json'),JSON.stringify(old));
+ assert.equal((await reopened.catalog()).buildings.find(b=>b.id===old.id).releaseType,undefined);
+});
+test('legacy per-upload covers resolve to stable album groups and unrelated revoked members cannot hide them',async t=>{
+ const {covers,studio,blocked,directory,payload,a}=fixture(t);
+ const parent=studio.publish({...publication('Album source'),album:'Together'}).brick;
+ const sibling=studio.publish({...publication('Other album member'),album:'Together'}).brick;
+ const legacyId='BUILDING-'+sha256('release:'+parent.id);
+ const result=await covers.commit(payload(legacyId));
+ const {id,publishedAt,...data}=result.record;data.buildingId=legacyId;
+ const old={...data,id:'COVER-'+sha256(JSON.stringify(data)),publishedAt};covers.remove(id);
+ const file=path.join(directory,old.id+'.json');fs.writeFileSync(file,JSON.stringify(old));
+ const original=fs.readFileSync(file,'utf8');
+ blocked.add(sibling.id+':audio');let catalog=await covers.catalog();
+ const group=catalog.buildings.find(b=>b.members.includes(parent.id));assert.deepEqual(group.members,[parent.id]);
+ assert.equal(catalog.covers[0].buildingId,group.id);assert.equal(catalog.covers[0].id,old.id);assert.equal(fs.readFileSync(file,'utf8'),original,'Saved cover identity and layout are not rewritten');
+ const draft={...payload(catalog.covers[0].buildingId),title:'Edited legacy cover'};await covers.commit(draft);
+ blocked.add(a.id+':audio');assert.equal((await covers.playable()).length,0,'Source permissions still protect every cover');
 });
 test('moving pins preserves their sizes and clamps the whole sound region inside the cover',()=>{
  const original={brickId:'source',x:.2,y:.3,width:.25,height:.4};
@@ -76,7 +128,8 @@ test('creator HTTP gate, separate Player item, authenticated sources and revocat
  assert.equal((await fetch(base+'/api/player-publish/cover-studio')).status,403);
  assert.equal((await fetch(base+'/api/player-publish/cover-studio',{headers:{...headers,Origin:'https://attacker.invalid'}})).status,403);
  assert.equal((await fetch(base+'/api/player-publish/assets/'+a.id+'/audio')).status,403);
- const creating=await post('/api/player-publish/audio-buildings',{title:'HTTP Building',members:[a.id]});assert.equal(creating.status,201);const building=(await creating.json()).record;
+ assert.equal((await post('/api/player-publish/audio-buildings',{title:'Missing type',members:[a.id]})).status,400);
+ const creating=await post('/api/player-publish/audio-buildings',{title:'HTTP Building',releaseType:'Single',members:[a.id]});assert.equal(creating.status,201);const building=(await creating.json()).record;assert.equal(building.releaseType,'Single');
  assert.equal((await post('/api/player-publish/playable-covers',payload(building.id),{'X-YBR-Publish-Token':'0'.repeat(64)})).status,403);
  const published=await post('/api/player-publish/playable-covers',payload(building.id));assert.equal(published.status,201);const cover=(await published.json()).record;
  assert.equal((await fetch(base+'/api/bricks')).status,401);
