@@ -27,6 +27,7 @@ test('factory receipt reader does not invent a deployment',()=>{
 
 // Include IPFS lifecycle regressions in npm run test:dev-stack.
 require('./dev-ipfs.test.cjs');
+require('./dev-ipfs-cleanup.test.cjs');
 require('./dev-dashboard.test.cjs');
 require('./dev-player-ready.test.cjs');
 

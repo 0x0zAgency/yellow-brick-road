@@ -8,11 +8,11 @@ const {DevDashboard,renderDashboard,playerCredentials,redact,clean}=require('./d
 const mnemonic='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const privateKey='0x'+'a'.repeat(64);
 const state=()=>({startedAt:0,now:90000,phase:'READY',nodeVersion:'v24.0.0',services:{web:'UP',player:'UP',ipfs:'UP',ganache:'UP'},ganache:{source:'owned',account:'0x'+'1'.repeat(40),balance:'999.999',block:7,mnemonic,privateKey},access:{source:'owned',verified:true,listener:'listener-fixture',artist:'artist-fixture'},factory:'0x'+'2'.repeat(40),peerId:'fixture-peer',logs:['12:00:01 launcher | Ready for minting.']});
-function harness({tty=false,env={},args=[]}={}){
+function harness({tty=false,env={},args=[],cleanupControl=null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-dashboard-test-'));
  const output=new PassThrough();let captured='';output.on('data',b=>captured+=b.toString());Object.assign(output,{isTTY:tty,columns:80,rows:24});
  const input=new PassThrough();input.isTTY=tty;input.isRaw=false;input.setRawMode=v=>{input.isRaw=v;};let quits=0,restarts=0;
- const dashboard=new DevDashboard({root,output,input,env,args,onQuit:()=>quits++,onRestartPlayer:async()=>restarts++});
+ const dashboard=new DevDashboard({root,output,input,env,args,cleanupControl,onQuit:()=>quits++,onRestartPlayer:async()=>restarts++});
  return {dashboard,input,output,root,captured:()=>captured,quits:()=>quits,restarts:()=>restarts,close:()=>{dashboard.close();fs.rmSync(root,{recursive:true,force:true});}};
 }
 test('80x24 keeps ASCII logo, full wallet addresses, both logins and whole mnemonic',()=>{
@@ -68,6 +68,21 @@ test('TTY supports neon frame, keys, pause, reduced motion, and terminal restora
  const h=harness({tty:true});try{h.dashboard.start();h.dashboard.update(state());assert.equal(h.input.isRaw,true);assert.match(h.captured(),/\x1b\[38;5;220m/);assert.ok(h.captured().includes('\x1b[?1049h'));
  for(const [k,field,value] of [['s','showSecrets',false],['a','motion',false],['d','view','details'],['l','view','logs'],['p','paused',true]]){h.input.emit('keypress',k,{name:k});assert.equal(h.dashboard[field],value);}
  const before=h.captured();h.dashboard.draw();assert.equal(h.captured(),before);h.input.emit('keypress','q',{name:'q'});assert.equal(h.quits(),1);h.dashboard.close();assert.equal(h.input.isRaw,false);assert.equal(h.input.isPaused(),true);assert.equal(h.input.listenerCount('keypress'),0);assert.equal(h.output.listenerCount('resize'),0);assert.ok(h.captured().includes('\x1b[?25h\x1b[?1049l'));
+ }finally{h.close();}
+});
+test('Dev Control cleanup key binds the observed peer and keeps cancel/quit routing separate',async()=>{
+ const scans=[],peers=[];
+ const h=harness({tty:true,cleanupControl:({peerId})=>{peers.push(peerId);return {scan:async mode=>{scans.push(mode);return {};}};}});
+ try{
+  h.dashboard.start();h.input.emit('keypress','c',{name:'c'});assert.equal(h.dashboard.cleanupMenu,undefined);
+  h.dashboard.update(state());h.dashboard.paused=true;h.input.emit('keypress','c',{name:'c'});
+  assert.deepEqual(peers,['fixture-peer']);assert.equal(h.dashboard.state.cleanupMenu.stage,'menu');
+  assert.ok(h.dashboard.lastFrame.join('\n').includes('Remove ALL local IPFS files'));
+  assert.ok(!h.dashboard.lastFrame.join('\n').includes('DISPLAY PAUSED'));
+  h.input.emit('keypress','n',{name:'n'});assert.equal(h.dashboard.networkControl.menu,null);
+  h.input.emit('keypress','q',{name:'q'});assert.equal(h.quits(),0);
+  h.input.emit('keypress','c',{name:'c',ctrl:true});assert.equal(h.dashboard.cleanupMenu,null);assert.deepEqual(scans,[]);
+  h.input.emit('keypress','c',{name:'c',ctrl:true});assert.equal(h.quits(),1);
  }finally{h.close();}
 });
 test('Player restart requires two r presses and Escape cancels',async()=>{

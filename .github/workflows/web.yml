@@ -54,6 +54,15 @@ jobs:
           npm --prefix web run dev -- --check-node
       - name: Pull Kubo image before timing stack readiness
         run: docker compose -f infra/ipfs/compose.yaml pull kubo
+      - name: Test cleanup against a disposable offline Kubo repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          CLEANUP_IMAGE=$(docker create ipfs/kubo:v0.43.1)
+          trap 'docker rm "$CLEANUP_IMAGE" >/dev/null; rm -f /tmp/ybr-cleanup-kubo' EXIT
+          docker cp "$CLEANUP_IMAGE:/usr/local/bin/ipfs" /tmp/ybr-cleanup-kubo
+          chmod +x /tmp/ybr-cleanup-kubo
+          YBR_IPFS_TEST_BINARY=/tmp/ybr-cleanup-kubo node --test scripts/dev-ipfs-cleanup.integration.cjs
       - name: Repair legacy Player automatically and test the complete Road stack
         shell: bash
         env:

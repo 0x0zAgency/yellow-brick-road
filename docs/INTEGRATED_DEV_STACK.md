@@ -67,6 +67,10 @@ When you press **Ctrl+C**, the launcher terminates the local processes it starte
 
 ## Manual / focused development
 
+For storage maintenance, press **c** in Dev Control. [IPFS cleanup](IPFS_CLEANUP.md)
+offers an inventory preview and typed confirmation before removing all local IPFS
+files or only unpinned cache. `npm run ipfs:clean` is the standalone read-only preview.
+
 - `cd web && npm run dev:web` runs **only Vite**, without the integrated Ganache/player bootstrap.
 - `cd apps/ybr-player && npm start` runs **only the YBR Player**.
 - `npm run test:dev-stack` validates startup readiness and synthetic fixture invariants.
