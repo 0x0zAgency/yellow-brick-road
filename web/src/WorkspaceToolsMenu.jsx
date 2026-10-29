@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {ChevronDown,Wrench} from 'lucide-react';
 import {WorkspaceIcon} from './AppearanceContext.jsx';
 import './tools.css';
-export const TOOL_PAGES=[['settings','Settings','settings'],['recovery','Recover files','recovery'],['mp3-tags','MP3 Tags','audio']];
+export const TOOL_PAGES=[['settings','Settings','settings'],['recovery','Recover files','recovery'],['mp3-tags','MP3 Tags','audio'],['cover-art','Cover Art Studio','audio']];
 export default function WorkspaceToolsMenu({page,onNavigate}){
  const [open,setOpen]=useState(false),trigger=useRef(null);
  const active=TOOL_PAGES.some(([id])=>id===page);

@@ -12,13 +12,13 @@
  const download=make('button','Export metadata snapshot');download.type='button';download.className='text-button';download.disabled=true;
  panel.append(title,note,role,stats,capture,refresh,download);document.getElementById('inspector').append(panel);
  let selected=null,snapshot=null,revision=0,busy=false;
- function clear(){capture.textContent='';revision++;snapshot=null;download.disabled=true;busy=false;refresh.disabled=!selected;stats.textContent=selected?'Request a snapshot for this file.':'Select a track to inspect its interaction data.';}
+ function clear(){capture.textContent='';revision++;snapshot=null;download.disabled=true;busy=false;refresh.disabled=!selected||selected.source==='playable-cover';role.disabled=selected?.source==='playable-cover';stats.textContent=selected?.source==='playable-cover'?'Interactions stay with each source track. Select a source track to inspect its data.':selected?'Request a snapshot for this file.':'Select a track to inspect its interaction data.';}
  window.addEventListener('ybr:selection',event=>{const next=event.detail.brick;if(JSON.stringify([next?.id,next?.media?.sha256,next?.artwork?.sha256,next?.lyrics?.sha256])!==JSON.stringify([selected?.id,selected?.media?.sha256,selected?.artwork?.sha256,selected?.lyrics?.sha256])){selected=next;clear();}});
  role.addEventListener('change',clear);
  window.addEventListener('ybr:interaction-error',()=>{capture.textContent='Interaction capture is unavailable or limited. Playback continues.';});
  window.addEventListener('ybr:interaction-recorded',()=>{capture.textContent='Interaction capture active · stored locally';});
  refresh.addEventListener('click',async()=>{
-  if(!selected||busy)return;busy=true;refresh.disabled=true;download.disabled=true;snapshot=null;const id=++revision;
+  if(!selected||selected.source==='playable-cover'||busy)return;busy=true;refresh.disabled=true;download.disabled=true;snapshot=null;const id=++revision;
   try{
    const response=await fetch('/api/bricks/'+encodeURIComponent(selected.id)+'/interactions?role='+role.value,{credentials:'same-origin',cache:'no-store'});
    const data=await response.json();if(!response.ok)throw Error(data.error||'Interaction data unavailable.');

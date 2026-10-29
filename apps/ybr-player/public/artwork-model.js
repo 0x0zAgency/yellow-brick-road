@@ -6,6 +6,7 @@
   const x=clamp(value.x,0,.98),y=clamp(value.y,0,.98);
   return {brickId:String(value.brickId||''),x,y,width:clamp(value.width,.02,1-x),height:clamp(value.height,.02,1-y)};
  }
+ function moveRegion(value,x,y){const p=region(value);return {...p,x:clamp(x,0,1-p.width),y:clamp(y,0,1-p.height)};}
  function gain(pixel,cursor,sensitivity=.25){
   const p=region(pixel),x=clamp(cursor.x),y=clamp(cursor.y);
   const distance=Math.hypot(Math.max(p.x-x,0,x-p.x-p.width),Math.max(p.y-y,0,y-p.y-p.height));
@@ -32,6 +33,7 @@
   const diagonal=[box[0],box[2],box[1],box[3],{x:.5,y:.5}];
   return pattern==='box'?box[step%4]:pattern==='diagonal'?diagonal[step%5]:{x:.1+random()*.8,y:.1+random()*.8};
  }
- const api={clamp,region,gain,gains,decode,waypoint};
- if(typeof module==='object'&&module.exports)module.exports=api;else root.YBRArtworkModel=api;
+ const api={clamp,region,moveRegion,gain,gains,decode,waypoint};
+ if(typeof module==='object'&&module.exports)module.exports=api;
+ if(typeof window!=='undefined')root.YBRArtworkModel=api;
 })(globalThis);

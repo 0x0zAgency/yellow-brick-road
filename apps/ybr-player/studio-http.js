@@ -13,15 +13,15 @@ function trustedLocalRequest(req){
  if(req.headers.origin&&req.headers.origin!==host.origin)return false;
  return !['cross-site','none'].includes(req.headers['sec-fetch-site']);
 }
-async function readPublication(req){
+async function readPublication(req,limit=MAX_REQUEST_BYTES){
  if(req.headers['content-type']?.split(';')[0].trim()!=='application/json')throw Object.assign(Error('Expected application/json.'),{status:415});
  const length=req.headers['content-length'];
- if(length&&(!/^\d+$/.test(length)||Number(length)>MAX_REQUEST_BYTES))throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});
+ if(length&&(!/^\d+$/.test(length)||Number(length)>limit))throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});
  const chunks=[];let count=0;
- for await(const chunk of req){count+=chunk.length;if(count>MAX_REQUEST_BYTES)throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});chunks.push(chunk);}
+ for await(const chunk of req){count+=chunk.length;if(count>limit)throw Object.assign(Error('Preview request exceeds the size limit.'),{status:413});chunks.push(chunk);}
  try{return JSON.parse(Buffer.concat(chunks,count).toString('utf8'));}catch{throw Object.assign(Error('Invalid preview JSON.'),{status:400});}
 }
-function createStudioHttp({library,sendJson,requireSession,parseRange,checkPermission=async()=>({allowed:true})}){
+function createStudioHttp({library,covers,sendJson,requireSession,parseRange,checkPermission=async()=>({allowed:true})}){
  const token=crypto.randomBytes(32).toString('hex');
  const validToken=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value)&&crypto.timingSafeEqual(Buffer.from(value,'hex'),Buffer.from(token,'hex'));
  async function deliver(req,res,id,role){
@@ -48,6 +48,18 @@ function createStudioHttp({library,sendJson,requireSession,parseRange,checkPermi
     sendJson(res,200,{mode:'local-creator-preview',token,limits:LIMITS});return true;
    }
    if(!validToken(req.headers['x-ybr-publish-token'])){sendJson(res,403,{error:'Local publishing token required.'});return true;}
+   if(covers&&route==='/api/player-publish/cover-studio'&&req.method==='GET'){
+    sendJson(res,200,await covers.catalog());return true;
+   }
+   if(covers&&['/api/player-publish/audio-buildings','/api/player-publish/playable-covers'].includes(route)&&req.method==='POST'){
+    const body=await readPublication(req,32768);
+    const result=await (route.endsWith('audio-buildings')?covers.createBuilding(body):covers.commit(body));
+    sendJson(res,result.created?201:200,result);return true;
+   }
+   const coverRemoval=/^\/api\/player-publish\/playable-covers\/(COVER-[a-f0-9]{64})$/.exec(route);
+   if(covers&&coverRemoval&&req.method==='DELETE'){sendJson(res,200,{removed:covers.remove(coverRemoval[1])});return true;}
+   const preview=/^\/api\/player-publish\/assets\/(STUDIO-[a-f0-9]{64})\/(audio|artwork)$/.exec(route);
+   if(preview&&(req.method==='GET'||req.method==='HEAD')){await deliver(req,res,preview[1],preview[2]);return true;}
    if(route==='/api/player-publish/releases'&&req.method==='POST'){
     const body=await readPublication(req);
     for(const role of Object.keys(body.assets||{}))if(!(await checkPermission(body,role)).allowed){sendJson(res,403,{error:'Current on-chain Player permission or file commitment does not match this release.'});return true;}

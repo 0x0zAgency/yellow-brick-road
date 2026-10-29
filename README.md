@@ -404,3 +404,10 @@ npm run dev
 ```
 
 The same integrated workflow runs from `cd web && npm run dev`. Main web: `http://127.0.0.1:5173` • YBR Player: `http://127.0.0.1:4173` • Public Road Music: `http://127.0.0.1:5173/road/api/music`. Only our generated test recording is automatically published on disposable local Ganache; private IPFS and other creator assets remain private. For standalone Vite, use `cd web && npm run dev:web`. Read [integrated setup and safety guidance](docs/INTEGRATED_DEV_STACK.md).
+
+### Playable Covers
+
+Open **Buildings** or **Tools → Cover Art Studio** to arrange your uploaded audio
+on a cover. Audio Buildings unlock the composer; drag the audio pins, preview the
+mix, then **Commit Playable Cover** to add a separate item to YBR Player.
+[Creator workflow and permissions](docs/PLAYABLE_COVERS.md).

@@ -47,5 +47,6 @@
   get duration(){const d=this.entries.map(e=>e.audio.duration).filter(d=>Number.isFinite(d)&&d>0);return d.length?Math.min(...d):0;}
   get currentTime(){return this.entries[0]?.audio.currentTime||0;}
  }
- if(typeof module==='object'&&module.exports)module.exports=ArtworkEngine;else root.YBRArtworkEngine=ArtworkEngine;
+ if(typeof module==='object'&&module.exports)module.exports=ArtworkEngine;
+ if(typeof window!=='undefined')root.YBRArtworkEngine=ArtworkEngine;
 })(globalThis);
