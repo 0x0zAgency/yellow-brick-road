@@ -6,7 +6,7 @@ import {json} from '../../src/licensing/protocol.js';
 export function licensingPlugin(root){
  let service;
  const load=()=>service ||= (async()=>{const profile=profileTools.readActiveProfile(root);return createLicensingService({root,profile,client:createPublicClient({transport:http(profile.rpcUrl,{retryCount:0,timeout:10000})})});})().catch(error=>{service=null;throw error;});
- const install=server=>server.middlewares.use(async(req,res,next)=>{
+ const install=server=>{server.middlewares.use(async(req,res,next)=>{
   if(!req.url?.startsWith('/api/licensing/'))return next();
   res.setHeader('Content-Type','application/json');res.setHeader('Cache-Control','no-store');res.setHeader('X-Content-Type-Options','nosniff');
   try{
@@ -24,6 +24,6 @@ export function licensingPlugin(root){
    const api=await load(),result=await api.dispatch({method:req.method,path:req.url.slice('/api/licensing'.length),body,origin,authorization:req.headers.authorization?.replace(/^Bearer /,''),csrfToken:req.headers['x-ybr-csrf']});
    res.statusCode=200;res.end(json(result));
   }catch(error){res.statusCode=error.status||400;const safe=error.shortMessage?'Chain request failed. Check Dev Control and refresh.':error.code?'Licensing storage or network is unavailable. Check the local deployment.':String(error.message).split('\n')[0];res.end(json({error:safe.slice(0,400)}));}
- });
+ });};
  return {name:'ybr-project-licensing',configureServer:install,configurePreviewServer:install};
 }

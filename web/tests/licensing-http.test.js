@@ -21,3 +21,8 @@ test('licensing HTTP rejects foreign origins, DNS rebinding, non-JSON and oversi
  assert.equal((await request({method:'DELETE'})).status,405);
  assert.deepEqual(await request({url:'/ordinary-page'}),{next:true});
 });
+
+test('Vite configure hooks register middleware without returning the Connect app as a post hook',()=>{
+ const plugin=licensingPlugin('/unused-profile'),server={middlewares:{use:()=>function connect(){}}};
+ assert.equal(plugin.configureServer(server),undefined);assert.equal(plugin.configurePreviewServer(server),undefined);
+});

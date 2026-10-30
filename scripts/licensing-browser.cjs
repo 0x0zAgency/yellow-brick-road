@@ -32,7 +32,7 @@ createRoot(document.getElementById('root')).render(<main style={{maxWidth:1150,m
 `,{flag:'wx'});
  let browser;try{
   browser=await chromium.launch({headless:true,args:['--no-sandbox']});const page=await browser.newPage({viewport:{width:1280,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
-  await page.goto('http://127.0.0.1:5173/'+stem+'.html');await page.getByRole('button',{name:'Connect licensing wallet'}).click();await page.getByRole('button',{name:'Sign in to offer inbox'}).click();
+  await page.goto((process.env.YBR_LICENSING_TEST_ORIGIN||'http://127.0.0.1:5173')+'/'+stem+'.html');await page.getByRole('button',{name:'Connect licensing wallet'}).click();await page.getByRole('button',{name:'Sign in to offer inbox'}).click();
   await page.getByRole('heading',{name:'Film publishing project'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Approve terms',exact:true}).count(),0);
   await page.getByRole('button',{name:'Review & accept license'}).click();await page.getByRole('dialog',{name:'Review license payment'}).waitFor();
