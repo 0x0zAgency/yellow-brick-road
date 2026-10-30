@@ -26,7 +26,7 @@ export async function openStore(root,profile){
  if(data.version!==1||!Array.isArray(data.offers)||data.offers.length>1000||!data.policies||typeof data.policies!=='object')throw Error('Invalid licensing ledger.');
  let tail=Promise.resolve();
  return {walletAddress,snapshot:()=>structuredClone(data),mutate(fn){
-  const task=tail.then(async()=>{const next=structuredClone(data),result=await fn(next),temp=file+'.'+randomBytes(8).toString('hex')+'.tmp';await writeFile(temp,json(next),{flag:'wx',mode:0o600});await rename(temp,file);data=next;return result;});
+  const task=tail.then(async()=>{const next=structuredClone(data),result=await fn(next),content=json(next);if(Buffer.byteLength(content)>32*1024*1024)throw Error('This deployment inbox has reached its 32 MiB storage limit. Archive the ledger before adding more offers.');const temp=file+'.'+randomBytes(8).toString('hex')+'.tmp';await writeFile(temp,content,{flag:'wx',mode:0o600});await rename(temp,file);data=next;return result;});
   tail=task.catch(()=>{});return task;
  }};
 }

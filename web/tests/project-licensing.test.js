@@ -28,6 +28,7 @@ test('deployment wallets persist privately, isolate network history and serializ
   for(const dir of dirs){const stat=await fs.stat(path.join(root,'.road-local','licensing',dir,'wallet.json'));assert.equal(stat.mode&0o777,0o600);}
   const clone=store.snapshot();clone.offers.push({id:50});assert.equal(store.snapshot().offers.length,10);
   await assert.rejects(store.mutate(()=>{throw Error('rollback');}),/rollback/);assert.equal((await openStore(root,profile)).snapshot().offers.length,10);
+  await assert.rejects(store.mutate(data=>{data.policies.oversized='x'.repeat(32*1024*1024);}),/32 MiB storage limit/);assert.equal((await openStore(root,profile)).snapshot().offers.length,10);
  }finally{await fs.rm(root,{recursive:true,force:true});}
 });
 test('storage refuses symlink directories instead of reading another deployment wallet',async()=>{
