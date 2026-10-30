@@ -82,7 +82,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
   <h3>Put your cover on the registration NFTs.</h3>
   <button type="button" className="ms-outline" disabled={busy} onClick={()=>void inspect()}>Inspect actual NFT metadata</button>
   {inspection&&<div className="nft-cover-inspection">{inspection.map(item=><div key={item.tokenId}><strong>{item.hasCover?'PUBLIC COVER SET':'DEFAULT ARTWORK'}</strong><p>Token {item.tokenId}</p><p>Name: {item.name}</p><p>Image: <code>{item.hasCover?item.image:'Embedded fallback image (not a public cover)'}</code></p></div>)}<p>The metadata name may still be “Yellow Brick Registration”. The image field determines the artwork.</p>{[...new Set(inspection.filter(item=>item.hasCover).map(item=>item.image))].map(imageURI=><PublicNftCoverCheck key={imageURI} imageURI={imageURI}/>)}</div>}
-  <p>This updates the actual NFT <code>tokenURI</code>, not just the Player image. The same cover can be applied to this batch’s {mint.receipts?.length||0} registration receipt(s), without minting new Bricks.</p>
+  <p>This updates the actual NFT <code>tokenURI</code>. The same cover can be applied to this batch’s {mint.receipts?.length||0} registration receipt(s), without minting new Bricks.</p>
   <p>{file?'Selected: '+file.name:canUseAttached?'Attached cover: '+existing.name:'Choose a cover image to prepare a public display copy.'}</p>
   <label>Use another cover (PNG, JPEG or WebP; up to 8 MiB)<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||pendingTransaction} onChange={e=>{if(!e.target.files?.[0])return;setFile(e.target.files[0]);setTxHash('');setPendingTransaction(false);setInspection(null);setStatus('');setPrepared(null);setConsent(false);setPinned(null);setSaved(null);setError('');}}/></label>
   {!prepared&&<button type="button" className="ms-outline" disabled={busy||(!file&&!canUseAttached)||pendingTransaction} onClick={()=>void prepare()}>{busy?'Preparing…':'Prepare NFT cover'}</button>}
@@ -91,8 +91,8 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
    <label className="nft-cover-consent"><input type="checkbox" checked={consent} disabled={busy||pendingTransaction} onChange={e=>setConsent(e.target.checked)}/> I have permission to publish this display copy as public NFT artwork. Anyone may retrieve or retain it from IPFS.</label>
    <button type="button" className="ms-primary" disabled={!consent||busy||pendingTransaction} onClick={()=>void publish()}>{busy?'Applying cover…':'Publish cover to NFTs'}</button>
   </>}
-  <p className="nft-cover-note">Only a resized PNG display copy is published. Masters, project files, source metadata and recovery keys stay private. Original signatures are not represented as signatures of this derived thumbnail. A local IPFS pin does not guarantee worldwide availability.</p>
-  <p className="nft-cover-note">Publishing artwork does not authorize publication or streaming of the underlying work. Player playback permissions remain separate.</p>
+  <p className="nft-cover-note">Only a resized PNG display copy is published. Original source files, metadata and recovery keys stay private. Original signatures are not represented as signatures of this derived thumbnail. A local IPFS pin does not guarantee worldwide availability.</p>
+  <p className="nft-cover-note">Publishing a thumbnail does not grant permission to distribute or license the original work.</p>
   {status&&<p role="status">{status}</p>}
   {pinned&&<p>Public image: <code>{pinned.imageURI}</code>{!saved?' · May already be public even if the wallet transaction is canceled.':''}</p>}
   {txHash&&<p>Artwork transaction: <code>{txHash}</code>{pendingTransaction?' · Review this transaction in your wallet before attempting another update.':''}</p>}

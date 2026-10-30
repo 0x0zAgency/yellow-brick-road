@@ -17,6 +17,12 @@ export function matchesReusableFiles(candidate,part,media){
  const anchor=part==='master'?candidate.contentHash:part==='artwork'?candidate.contentPolicy.files.artworkHash:candidate.contentPolicy.files.lyricsHash;
  return !!file&&same(anchor,file.integrity.digest)&&(part!=='artwork'||same(candidate.contentHash,file.integrity.digest))&&same(digest(media),candidate.contentPolicy.files.manifestDigest);
 }
+/** Changing a composition option does not turn an existing cover into a new
+ * registration. Retain every selection whose owning file set still matches. */
+export function retainMatchingReuse(selections,assets,{composition=true}={}){
+ return Object.fromEntries(Object.entries(selections).filter(([part,candidate])=>
+  (part!=='composition'||composition)&&matchesReusableFiles(candidate,part,reuseMedia(assets,part,{composition}))));
+}
 async function readPolicy(client,address){
  const read=name=>client.readContract({address,abi:policyAbi,functionName:name});
  const [enabled,revision,current,locked,permissions,permissionVersion,files]=await Promise.all(['contentPolicyEnabled','contentRevision','currentContentHash','contentLocked','effectivePlayerPermissions','playerPermissionVersion','fileCommitments'].map(read));

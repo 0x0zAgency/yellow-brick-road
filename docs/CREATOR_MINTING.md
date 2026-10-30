@@ -113,3 +113,16 @@ Regression checks: `node --test web/tests/reuse-bricks.test.js web/tests/songwri
 `node --test web/integration/batch-mint.test.js` after compilation, and
 `node scripts/reuse-bricks-browser.cjs` with Playwright Chromium installed. The
 browser check starts its own disposable chain and web server.
+
+## Image and graphic Bricks
+
+Image, illustration and other non-music registrations show content protection,
+licensing and NFT artwork controls. Player permissions and delivery are absent
+from Rights, Review, confirmation and results; saved music defaults cannot grant
+Player access to these works. The content-lock preference still applies.
+
+Review and receipts distinguish **new Bricks** from **existing Brick references**.
+Choosing an existing cover keeps its original Brick and NFT identity; changing
+the composition option preserves that choice. Existing references are excluded
+from minting, repeated IPFS uploads and this batch's NFT appearance updates. A
+Building made entirely from existing references requires no mint transaction.

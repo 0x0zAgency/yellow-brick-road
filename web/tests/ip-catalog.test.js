@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {IP_CATEGORIES,SPATIAL_FIELDS,getIpCategory,groupedIpCategories,spatialEvidence} from '../src/ip-catalog.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
+import {initialPolicyFor} from '../src/content-policy.js';
 const base={metadata:{artist:'Original claimant',title:'My work'},assets:{master:{name:'original.spatial',hash:'a'.repeat(64),size:10,type:'application/octet-stream'}},identity:{mode:'assisted',connected:false,address:''},royalties:{creatorBps:10000},training:'separate-license',composition:true,storage:'demo-encrypted-in-browser'};
 test('category IDs are unique and extend far beyond music',()=>{
  assert.equal(IP_CATEGORIES.length,35);
@@ -36,4 +37,15 @@ test('unknown categories fall back to the default instead of inventing a legal t
  assert.equal(result.claimsNotVerified,true);
  assert.equal(result.secretField,undefined);
  assert.equal(result.frameRate,'60');
+});
+test('image and graphic registrations retain file locking without inheriting music Player grants',async()=>{
+ for(const ipCategory of ['photograph','illustration','painting','digital-art','brand-identity','interface-design']){
+  const packet=makeRegistrationPacket({...base,metadata:{...base.metadata,ipCategory},assets:{master:{name:'original.png',hash:'b'.repeat(64),size:10,type:'image/png'}},contentPolicy:{locked:true,preview:true,artwork:true,lyrics:true}});
+  assert.equal(packet.bricks.length,1,ipCategory);
+  const metadata=packet.bricks[0].metadata,policy=await initialPolicyFor(metadata);
+  assert.equal(metadata.music,undefined,ipCategory);
+  assert.equal(policy.permissions,0,ipCategory);
+  assert.equal(policy.locked,true,ipCategory);
+  assert.equal(metadata.media.length,1,ipCategory);
+ }
 });

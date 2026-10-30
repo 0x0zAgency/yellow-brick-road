@@ -34,7 +34,7 @@ export default function NftCoverReview({getPacket,vault,sourceDigest,value,onCha
    {value?.bytes&&<label className="nft-cover-consent"><input type="checkbox" checked={value.consent===true} onChange={e=>onChange({...value,consent:e.target.checked})}/> Publish this reviewed thumbnail publicly on IPFS and include it in my registration NFTs at mint.</label>}
    <p role="status">{value?.consent?'NFT cover selected. It will be included in the single mint transaction.':'NFT artwork is NOT selected. Minting now will leave the yellow-square fallback.'}</p>
   </>}
-  <p className="nft-cover-note">Anyone may retrieve or retain the public thumbnail. Only the display copy is published, not your masters, source metadata or recovery key. Canceling the mint does not remove a thumbnail already pinned to public IPFS. Changing the image later is optional and requires a new transaction.</p>
+  <p className="nft-cover-note">Anyone may retrieve or retain the public thumbnail. Only the display copy is published, not your original source files, metadata or recovery key. Canceling the mint does not remove a thumbnail already pinned to public IPFS. Changing the image later is optional and requires a new transaction.</p>
   {error&&<p role="alert" className="ms-error">{error}</p>}
  </section>;
 }

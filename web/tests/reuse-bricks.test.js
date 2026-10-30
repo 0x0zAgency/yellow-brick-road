@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {sha256,stringToHex} from 'viem';
 import {makeRegistrationPacket} from '../src/mint-model.js';
 import {initialPolicyFor,DEFAULT_CONTENT_POLICY} from '../src/content-policy.js';
-import {matchesReusableFiles,reuseMedia,newUploadRoles,applyBrickReuse} from '../src/reuse-bricks.js';
+import {matchesReusableFiles,reuseMedia,newUploadRoles,applyBrickReuse,retainMatchingReuse} from '../src/reuse-bricks.js';
 import {pinEncryptedBrickMetadata} from '../src/ipfs-upload.js';
 import {buildingFromPacket,exportBuildingGraph} from '../src/release-buildings.js';
 const address=n=>'0x'+String(n).repeat(40),hash=n=>'0x'+String(n).repeat(64);
@@ -34,6 +34,13 @@ test('same artwork is an explicit existing member; new recording commits its ide
  const art=packet.bricks.find(b=>b.localId==='artwork');assert.equal(art.reuse,candidate);
  assert.equal(art.metadata.rights.player.status,'existing-onchain-policy');
  assert.throws(()=>makeRegistrationPacket({...input,assets:{...input.assets,artwork:{...input.assets.artwork,hash:hash(8).slice(2)}},reusedBricks:{artwork:candidate}}),/same files/);
+});
+test('changing the composition option preserves the selected cover reference, but changed bytes invalidate it',async()=>{
+ const {candidate}=await fixture(),selections={artwork:candidate,composition:candidate};
+ assert.deepEqual(retainMatchingReuse(selections,input.assets,{composition:false}),{artwork:candidate});
+ assert.deepEqual(retainMatchingReuse({artwork:candidate},input.assets,{composition:true}),{artwork:candidate});
+ assert.deepEqual(retainMatchingReuse(selections,{...input.assets,artwork:{...input.assets.artwork,hash:hash(9).slice(2)}},{composition:false}),{});
+ assert.deepEqual(Object.keys(selections),['artwork','composition']);
 });
 test('an existing Brick retains its policy and is never repinned as new encrypted metadata',async()=>{
  const {packet,candidate}=await fixture();candidate.contentPolicy.permissions=0;candidate.contentPolicy.locked=true;
