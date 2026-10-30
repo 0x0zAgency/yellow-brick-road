@@ -428,3 +428,9 @@ without decrypting the work. Set a reusable email under **Settings → Creator d
 Read or update a Brick's contact from **IP Registry** or **My Bricks → Licensor contact**.
 The current controller can update it even while files are locked.
 [Contract interface, integration and factory compatibility](docs/BRICK_LICENSING_CONTACT.md).
+
+### Project licensing and IP funds
+
+The licensing workspace supports signed ingestion/publishing offers, creator approvals and counter-offers, per-Brick automatic acceptance rules, and collaborator shares. Each IP’s Brick contract retains its native/token revenue until the entitled recipients withdraw. Every app deployment has a persistent offer-inbox wallet; IP payments go directly to the Brick.
+
+[Workflow, custody, deployment compatibility and API](docs/PROJECT_LICENSING.md).

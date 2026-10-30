@@ -47,6 +47,7 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
       </div>
      </div>
      <div className="br-record-footer"><small title={r.brickAddress}>{shortId(r.brickAddress)}</small>{brick.streamAllowed?<a className="text-action" href="//127.0.0.1:4173/" target="_blank" rel="noreferrer">Open YBR Player ↗</a>:<span className="br-heading-count">Registration ≠ playback permission</span>}</div>
+     <button className="text-action" onClick={()=>window.dispatchEvent(new CustomEvent('ybr:license-brick',{detail:{brickAddress:r.brickAddress}}))}>License this IP / manage offers →</button>
      <details><summary>Licensor contact</summary><div className="br-details"><LicensingContactEditor wallet={wallet} client={client} chainId={r.chainId} factoryAddress={r.factoryAddress} brickAddress={r.brickAddress}/></div></details>
      <details><summary>On-chain details &amp; commitments</summary><div className="br-details">
       <p>{brick.source==='road-registry'?'A title and work type cannot be inferred from a commitment or encrypted metadata. The contract below is the authoritative identity.':brick.description}</p>

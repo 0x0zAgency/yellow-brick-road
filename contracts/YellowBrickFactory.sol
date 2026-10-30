@@ -24,6 +24,7 @@ contract YellowBrickFactory {
 
     /// @notice One creator-signed transaction, including initial ERC-721 artwork.
     function mintBatchVersion() external pure returns (uint8) { return 1; }
+    function projectLicensingVersion() external pure returns (uint8) { return 1; }
     function licensingContactInterfaceVersion() external pure returns (uint8) { return 1; }
 
     event BrickDeployed(bytes32 indexed ipId, address indexed brick, address indexed originator, bytes32 contentHash);
@@ -48,7 +49,7 @@ contract YellowBrickFactory {
         assembly { brick := create2(0, add(code, 32), mload(code), salt) }
         require(brick != address(0), "Factory: duplicate or failed");
         bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
-        YellowBrick(brick).initialize(id, contentHash, msg.sender, uri);
+        YellowBrick(payable(brick)).initialize(id, contentHash, msg.sender, uri);
         isBrick[brick] = true;
         brickById[id] = brick;
         YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
@@ -67,7 +68,7 @@ contract YellowBrickFactory {
         assembly { brick := create2(0, add(code, 32), mload(code), salt) }
         require(brick != address(0), "Factory: duplicate or failed");
         bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
-        YellowBrick(brick).initializeWithDigest(id, contentHash, msg.sender, uri, metadataDigest);
+        YellowBrick(payable(brick)).initializeWithDigest(id, contentHash, msg.sender, uri, metadataDigest);
         isBrick[brick] = true;
         brickById[id] = brick;
         YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
@@ -87,7 +88,7 @@ contract YellowBrickFactory {
         assembly { brick := create2(0, add(code, 32), mload(code), salt) }
         require(brick != address(0), "Factory: duplicate or failed");
         bytes32 id = ipIdentity(msg.sender, contentHash, nonce);
-        YellowBrick(brick).initializeWithPolicy(id, contentHash, msg.sender, uri, metadataDigest, policy);
+        YellowBrick(payable(brick)).initializeWithPolicy(id, contentHash, msg.sender, uri, metadataDigest, policy);
         isBrick[brick] = true;
         brickById[id] = brick;
         YellowBrickReceipt(receiptToken).mint(msg.sender, uint256(id), brick);
@@ -141,17 +142,17 @@ contract YellowBrickFactory {
         id = ipIdentity(msg.sender, r.contentHash, r.nonce);
         if (withContact) {
             require(r.withPolicy, "Factory: contact requires policy");
-            YellowBrick(brick).initializeWithPolicyAndLicensingContact(id, r.contentHash, msg.sender,
+            YellowBrick(payable(brick)).initializeWithPolicyAndLicensingContact(id, r.contentHash, msg.sender,
                 r.uri, r.metadataDigest, r.policy, email);
         } else if (r.withPolicy) {
-            YellowBrick(brick).initializeWithPolicy(id, r.contentHash, msg.sender, r.uri, r.metadataDigest, r.policy);
+            YellowBrick(payable(brick)).initializeWithPolicy(id, r.contentHash, msg.sender, r.uri, r.metadataDigest, r.policy);
         } else {
             require(r.policy.files.manifestDigest == bytes32(0) &&
                 r.policy.files.previewHash == bytes32(0) &&
                 r.policy.files.artworkHash == bytes32(0) &&
                 r.policy.files.lyricsHash == bytes32(0) &&
                 r.policy.permissions == 0 && !r.policy.locked, "Factory: unexpected policy");
-            YellowBrick(brick).initializeWithDigest(id, r.contentHash, msg.sender, r.uri, r.metadataDigest);
+            YellowBrick(payable(brick)).initializeWithDigest(id, r.contentHash, msg.sender, r.uri, r.metadataDigest);
         }
         isBrick[brick] = true;
         brickById[id] = brick;

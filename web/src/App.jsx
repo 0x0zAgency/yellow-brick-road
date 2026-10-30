@@ -10,6 +10,7 @@ import {filterBricks,members,feeCap,split,money,makeDraft} from './model.js';
 import MintStudio from './MintStudioDemo.jsx';
 import WalletBricks from './WalletBricks.jsx';
 import LiveRegistry from './LiveRegistry.jsx';
+import LicensingWorkspace from './licensing/LicensingWorkspace.jsx';
 import IpfsRecovery from './IpfsRecovery.jsx';
 import Manifesto from './Manifesto.jsx';
 import {useEnsIdentity} from './useEnsIdentity.js';
@@ -64,6 +65,8 @@ function Governance(){
 }
 function RoadNetwork(){return <><section className="network-hero"><div className="eyebrow">THE NETWORK IS NOT THE ASSET</div><h2>Bricks hold intellectual property.<br/>Nodes keep the Road open.</h2><p>Real node operators would maintain underlying-chain access and offer proven Road services. Operating a brick contract is not running a network node.</p><RadioTower size={54}/></section><SectionTitle title="Road operators" note="Example profiles, not verified live infrastructure" extra={<span className="pill">3 synthetic operators</span>}/><div className="cards-3">{seedNodes.map(n=><Panel extra="node-card" key={n.name}><div className="node-icon"><RadioTower size={24}/></div><span className="status">{n.status}</span><h3>{n.name}</h3><p>{n.region}</p><div className="card-bottom"><span>Example uptime</span><strong>{n.uptime}</strong></div></Panel>)}</div><div className="two-col"><Panel><ShieldCheck size={25} color="var(--road-accent,#edc86c)"/><h3>Proof before compensation</h3><p className="muted">Node ownership, service quality and challenge procedures must be independently verifiable before operational payouts.</p></Panel><Panel><Globe2 size={25} color="var(--road-accent,#edc86c)"/><h3>Open standards for the commons</h3><p className="muted">Independent indexes and verifiable use records can link IP while leaving creators in control of their rights.</p></Panel></div></>}
 function WorkspaceApp(){
+ const [licensingBrick,setLicensingBrick]=useState('');
+ useEffect(()=>{const open=e=>{setLicensingBrick(e.detail?.brickAddress||'');setPage('royalties');setSidebar(false);};window.addEventListener('ybr:license-brick',open);return()=>window.removeEventListener('ybr:license-brick',open);},[]);
  const [page,setPage]=useState('manifesto'),[sidebar,setSidebar]=useState(false),[modal,setModal]=useState(null),[wallet,setWallet]=useState(null),[notice,setNotice]=useState('');
  const [tagEditorVisited,setTagEditorVisited]=useState(false),[coverStudioVisited,setCoverStudioVisited]=useState(false);
  const identity=useEnsIdentity(wallet);
@@ -96,7 +99,7 @@ function WorkspaceApp(){
  {page==='recovery'&&<IpfsRecovery/>}
  {page==='bricks'&&<LiveRegistry wallet={wallet} onMint={()=>navTo('mint')} onWallet={()=>navTo('wallet-bricks')}><Registry bricks={bricks} open={open} newBrick={()=>open({kind:'newBrick'})}/></LiveRegistry>}
  {coverStudioVisited&&<CoverArtStudio active={page==='cover-art'||page==='buildings'} view={page==='buildings'?'buildings':'studio'} onOpen={()=>navTo('cover-art')} onMint={()=>navTo('mint')} referenceBuildings={page==='buildings'&&createdBuildings.length?<Buildings buildings={createdBuildings} bricks={bricks} open={open}/>:null}/>}
- {page==='royalties'&&<Royalties bricks={bricks} open={open}/>}
+ {page==='royalties'&&<LicensingWorkspace initialBrick={licensingBrick}/>}
  {page==='governance'&&<Governance/>}{page==='network'&&<RoadNetwork/>}
  <footer className="foot"><span className="footer-demo-warning">FOR DEMO PURPOSES</span> · Built by: <a href="https://github.com/0x0zAgency" target="_blank" rel="noreferrer">0x0z</a> ❤️ · Public IP infrastructure <a href="https://github.com/0x0zAgency/yellow-brick-road/blob/main/docs/CONSTITUTION.md" target="_blank" rel="noreferrer">Draft constitution <ArrowUpRight size={13}/></a></footer></main></div>{notice&&<div className="toast-note" role="status"><CheckCircle2 size={17}/>{notice}<button onClick={()=>setNotice('')}><X size={14}/></button></div>}{modal&&<Modal item={modal} close={()=>setModal(null)} saveBrick={saveBrick} saveBuilding={saveBuilding} bricks={bricks} buildings={buildings}/>}</div>;
 }

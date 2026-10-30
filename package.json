@@ -14,7 +14,7 @@
     "ganache:test": "hardhat test --network ganache",
     "sepolia:check": "hardhat run scripts/sepolia-check.js --network sepolia",
     "ganache:deploy": "hardhat run scripts/deploy-local.js --network ganache",
-    "test:wallet": "npm run compile && node --test web/integration/ganache-wallet.test.js web/integration/chain-history.test.js web/integration/content-policy.test.js web/integration/batch-mint.test.js web/integration/licensing-contact.test.js",
+    "test:wallet": "npm run compile && node --test web/integration/ganache-wallet.test.js web/integration/chain-history.test.js web/integration/content-policy.test.js web/integration/batch-mint.test.js web/integration/licensing-contact.test.js web/integration/project-licensing.test.js",
     "ipfs:up": "docker compose -f infra/ipfs/compose.yaml up -d",
     "ipfs:down": "docker compose -f infra/ipfs/compose.yaml down",
     "ipfs:status": "docker compose -f infra/ipfs/compose.yaml ps",

@@ -3,10 +3,11 @@ pragma solidity ^0.8.24;
 
 import {YellowBrickContentPolicy} from "./YellowBrickContentPolicy.sol";
 import {LicensingEmail} from "./LicensingEmail.sol";
+import {YellowBrickLicensing} from "./YellowBrickLicensing.sol";
 
 /// @notice Per-work IP identity. Registration is not copyright adjudication.
 /// @dev Deployed as an EIP-1167 clone. Implementation instance is locked.
-contract YellowBrick is YellowBrickContentPolicy {
+contract YellowBrick is YellowBrickContentPolicy, YellowBrickLicensing {
     bytes32 public ipId;
     bytes32 public contentHash;
     address public originator;
@@ -91,6 +92,7 @@ contract YellowBrick is YellowBrickContentPolicy {
     }
 
     function _policyController() internal view override returns (address) { return controller; }
+    function _licensingController() internal view override returns (address) { return controller; }
     function _policyMetadataVersion() internal view override returns (uint64) { return metadataVersion; }
     function _policyCommitMetadata(string memory uri, bytes32 digest) internal override {
         metadataURI = uri;
@@ -108,6 +110,7 @@ contract YellowBrick is YellowBrickContentPolicy {
         contentHash = hash;
         originator = creator;
         controller = creator;
+        _initializeProjectLicensing(id);
         metadataURI = uri;
         metadataVersion = 1;
         emit BrickInitialized(id, creator, hash);
@@ -146,6 +149,7 @@ contract YellowBrick is YellowBrickContentPolicy {
         if (contentPolicyEnabled) _setPlayerPermissions(0);
         // A new controller must publish its own contact, including on a round trip.
         _setLicensingContact("");
+        _resetProjectLicensing();
         emit ControllerAccepted(msg.sender);
     }
 }
