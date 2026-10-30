@@ -41,6 +41,7 @@ export async function pinEncryptedBrickMetadata({packet,secret,onProgress=()=>{}
  const bricks=[];
  for(let i=0;i<packet.bricks.length;i++){
   const brick=packet.bricks[i];
+  if(brick.reuse){bricks.push(brick);continue;}
   onProgress('Pinning encrypted Brick metadata '+(i+1)+' / '+packet.bricks.length+'…');
   // Preserve the exact bytes committed by chain-mint.js (JSON.stringify order).
   const plaintext=new TextEncoder().encode(JSON.stringify(brick.metadata));
@@ -54,7 +55,7 @@ export async function pinEncryptedBrickMetadata({packet,secret,onProgress=()=>{}
  }
  return {...packet,bricks,
   storage:{...packet.storage,mode:'ipfs-encrypted-pinned',uploaded:true,encrypted:true,
-   metadataCids:bricks.map(b=>({localId:b.localId,cid:b.metadataCipherCid})),
+   metadataCids:bricks.filter(b=>!b.reuse).map(b=>({localId:b.localId,cid:b.metadataCipherCid})),
    provider:'ybr-local-kubo',approvedProvider:false},
   notices:[...(packet.notices||[]).filter(n=>!n.startsWith('All demo upload receipts')),
    'Ciphertext and encrypted metadata were pinned to a local IPFS node. This pilot does not guarantee remote replication or availability.',

@@ -9,7 +9,7 @@ test('Workspace and Building editor use Buildings while retaining existing local
  assert.ok(app.includes('road:structures:v1'),'Retain the legacy storage key, do not lose drafts.');
 });
 test('mint confirmation describes the single transaction and no post-mint initial-artwork prompt',()=>{
- const ui=read('MintStudioDemo.jsx');assert.ok(ui.includes('Confirm one transaction for this entire batch'));
+ const ui=read('MintStudioDemo.jsx');assert.ok(ui.includes('Confirm one transaction for the new Bricks'));
  assert.ok(!ui.includes('one additional cover transaction'));assert.ok(ui.includes('Request mint transaction'));
  assert.ok(read('NftCoverReview.jsx').includes('same transaction as the Bricks'));
 });

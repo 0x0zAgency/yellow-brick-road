@@ -26,7 +26,7 @@ export async function preflightMintCover(options){
  await check();
 }
 export async function mintWithReviewedCover(options,dependencies={}){
- const selection=reviewedMintCover(options.packet,options.nftCover);
+ const selection=options.packet.bricks.every(b=>b.reuse)?null:reviewedMintCover(options.packet,options.nftCover);
  const mint=dependencies.mint||((...args)=>import('./chain-mint.js').then(module=>module.mintOnChain(...args)));
  const result=options.result||{simulated:false,status:'pending',receipts:[]};
  if(result.receipts.length||result.transactionHash||result.submissionAttempted)throw Error('Review the existing registration transaction before retrying. Do not remint to repair artwork.');

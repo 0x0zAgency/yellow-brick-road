@@ -2,6 +2,7 @@
  * PROV-O is the export vocabulary; Road fields supply application roles/order.
  * A proposal is not a deployed YellowBrickBuilding contract.
  */
+import {sha256,stringToHex} from 'viem';
 export const BUILDING_TYPES=Object.freeze(['music-release','work-bundle','album','compilation']);
 export const PART_LABELS=Object.freeze({master:'Recording / primary work',artwork:'Cover artwork',composition:'Songwriting / composition'});
 export const FILE_LABELS=Object.freeze({master:'Master recording',preview:'Audio Preview',artwork:'Artwork file',lyrics:'Lyrics',project:'Project file',metadata:'Metadata sidecar'});
@@ -63,9 +64,10 @@ export function scopeKey(scope){
  return `${Number(scope.chainId)}:${lower(scope.genesisHash)}:${lower(scope.factoryAddress)}`;
 }
 function recordId(scope,root){return 'urn:ybr:building:'+scopeKey(scope)+':'+lower(root);}
+function packetRecordId(packet,mint,root){const id=recordId(mint,root);return packet.bricks.some(b=>b.localId==='master'&&b.reuse)?id+':'+sha256(stringToHex(packet.building.id)):id;}
 function cleanRecord(record){
  if(!record||record.format!=='ybr-release-group/1'||!scopeKey(record)||!address(record.root)||
-  !['music-release','work-bundle'].includes(record.type)||record.id!==recordId(record,record.root)||
+  !['music-release','work-bundle'].includes(record.type)||!(record.id===recordId(record,record.root)||record.id?.startsWith(recordId(record,record.root)+':')&&hash(record.id.slice(recordId(record,record.root).length+1)))||
   !Array.isArray(record.members)||record.members.length<1||record.members.length>16)return null;
  const seen=new Set(),roles=new Set(),members=[];
  for(const m of record.members){
@@ -112,6 +114,12 @@ export async function buildingFromPacket(packet,mint=packet?.onChainMint){
   need(packet.building.members.filter(m=>m.ref===b.localId).length===1,'Release membership does not match its parts.');
   const receipts=mint.receipts.filter(r=>r.sourceId===b.localId),r=receipts[0];
   need(receipts.length===1&&r.status==='verified'&&Number(r.chainId)===Number(mint.chainId)&&address(r.contractAddress)&&hash(r.id)&&hash(r.transactionHash)&&hash(r.metadataDigest),'Invalid member receipt.');
+  if(b.reuse){
+   const c=b.reuse;
+   need(r.reused===true&&scopeKey(c)===scopeKey(mint)&&lower(c.address)===lower(r.contractAddress)&&lower(c.ipId)===lower(r.id)&&lower(c.metadataDigest)===lower(r.metadataDigest)&&lower(c.transactionHash)===lower(r.transactionHash),'Existing Brick reference does not match its verified receipt.');
+   members.push({address:r.contractAddress,ipId:r.id,transactionHash:r.transactionHash,metadataDigest:r.metadataDigest,part:b.localId,files:[...new Set((b.metadata.media||[]).map(f=>f.role).filter(role=>Object.hasOwn(FILE_LABELS,role)))]});
+   continue;
+  }
   need(typeof r.metadataJson==='string'&&r.metadataJson.length<=1024*1024,'Original committed metadata is missing. Use the complete JSON packet.');
   need(lower(await digest(r.metadataJson))===lower(r.metadataDigest),'Packet metadata does not match its receipt commitment.');
   let metadata;try{metadata=JSON.parse(r.metadataJson);}catch{throw Error('Invalid committed metadata.');}
@@ -128,7 +136,7 @@ export async function buildingFromPacket(packet,mint=packet?.onChainMint){
  for(const part of ['artwork','composition'])if(roles.has(part))need(primary.metadata.relationships?.some(r=>r.target===part),'The primary work does not reference this release part.');
  const root=members.find(m=>m.part==='master').address;
  const type=packet.building.type==='music-release'||packet.building.type==='recording-session'?'music-release':'work-bundle';
- const record=cleanRecord({...mint,format:'ybr-release-group/1',id:recordId(mint,root),type,root,members});
+ const record=cleanRecord({...mint,format:'ybr-release-group/1',id:packetRecordId(packet,mint,root),type,root,members});
  need(record,'Invalid release identity.');return record;
 }
 export function rowIdentity(row){
@@ -164,7 +172,7 @@ export function exportBuildingGraph(packet,mint){
  const building=packet.building;if(!building)return null;
  const known=new Map((mint?.receipts||[]).map(r=>[r.sourceId,r]));
  const scope=scopeKey(mint),root=known.get('master')?.contractAddress;
- const id=scope&&address(root)?recordId(mint,root):building.id||'urn:ybr:unregistered-release';
+ const id=scope&&address(root)?packetRecordId(packet,mint,root):building.id||'urn:ybr:unregistered-release';
  const members=packet.bricks.map(b=>({kind:'brick',ref:scope&&address(known.get(b.localId)?.contractAddress)?
   'urn:ybr:brick:'+scope+':'+lower(known.get(b.localId).contractAddress):id+'#'+b.localId,role:b.localId}));
  return {...createBuilding({id,type:building.type==='music-release'||building.type==='recording-session'?'music-release':'work-bundle',name:building.name,members}),

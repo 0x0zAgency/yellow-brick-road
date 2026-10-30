@@ -101,7 +101,8 @@ export async function preflightPolicyMint(options){
  await verifyFactory(client,options.factoryAddress);
  await requirePolicyFactory(client,options.factoryAddress);
  await requireBatchFactory(client,options.factoryAddress);
- if(packetLicensingEmails(options.packet).some(Boolean))await requireLicensingContactFactory(client,options.factoryAddress);
+ await (await import('./reuse-bricks.js')).verifyPacketReuse(options.packet,options,{client});
+ if(packetLicensingEmails({...options.packet,bricks:options.packet.bricks.filter(b=>!b.reuse)}).some(Boolean))await requireLicensingContactFactory(client,options.factoryAddress);
 }
 export async function requireLicensingContactFactory(client,factoryAddress){
  let version;

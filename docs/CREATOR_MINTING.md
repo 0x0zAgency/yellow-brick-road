@@ -71,3 +71,45 @@ It supports local encrypted exports but **does not** upload to IPFS, allocate wa
 ## Local file encryption and Session Blueprints
 
 A **Session Blueprint** is the saved native project file from the creator's DAW, not a stems export. The demo supports an optional local `.roadenc` AES-256-GCM download with PBKDF2-SHA-256 passphrase derivation, a random salt, and a fresh IV per file. The encryption container is authenticated. Neither upload nor licensed remote access is implemented. Users must retain the passphrase and original file; there is no recovery system. Production needs independent cryptographic review, token-based key delivery, large-file streaming, and an approved storage provider registry.
+
+
+## Reusing files across an album or EP
+
+Mint Studio checks the connected creator’s recent factory registrations while files
+are attached. Exact SHA-256 file and role-manifest matches offer **Use previous
+Brick**. Renaming a file does not prevent a match; matching filenames or album tags
+are insufficient. Choose reuse explicitly or continue creating a new Brick.
+
+A shared cover can belong to several release Buildings without another artwork
+Brick or another encrypted IPFS upload. Reusing a recording requires the same
+associated file set, including its preview and supporting files. Source bytes are
+still encrypted locally for optional Player delivery. Existing metadata, credits,
+licensor contact, permissions and payout configuration remain unchanged. Current
+controller, factory, chain history, file commitments and permissions are checked
+again before uploading and minting. The lookup covers the latest 200 registrations
+within 100,000 blocks of the selected factory; older or separate-wallet references
+remain available in the collapsed **Reference existing Bricks** tool.
+
+Only new Bricks are registered and pinned. Reused receipts retain their original
+transaction and NFT identity. A Building made entirely from reused file-backed
+Bricks needs no mint transaction. These Buildings remain contextual associations,
+not on-chain Building deployments or implicit licensing grants.
+
+## Songwriter splits
+
+For a new composition with multiple songwriter credits, **Set songwriter splits**
+opens a dialog with percentages, recipient wallets, equal splitting and a total.
+Continuing without reviewed shares opens the same dialog. Shares must be positive
+and total 100%; wallet mints require distinct, nonzero recipient addresses and a
+declaration of authority to register the composition. Changing the writer list
+requires a fresh review. Shares stay separate from recording payouts.
+
+The composition metadata records these as proposed songwriter shares, not signed
+collaborator approvals or active payment rules. After minting, the controller can
+activate them in **Licenses → Acceptance & collaborators** using the existing
+Brick payout transaction. Existing accrued balances are unaffected.
+
+Regression checks: `node --test web/tests/reuse-bricks.test.js web/tests/songwriter-splits.test.js`,
+`node --test web/integration/batch-mint.test.js` after compilation, and
+`node scripts/reuse-bricks-browser.cjs` with Playwright Chromium installed. The
+browser check starts its own disposable chain and web server.
