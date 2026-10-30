@@ -6,12 +6,15 @@ import ganache from 'ganache';
 import {createPublicClient,createWalletClient,http} from 'viem';
 import {privateKeyToAccount} from 'viem/accounts';
 import {mintOnChain,preflightPolicyMint,localConfig,requireBatchFactory} from '../src/chain-mint.js';
+import {findReusableBricks,matchesReusableFiles} from '../src/reuse-bricks.js';
+import {buildingFromPacket} from '../src/release-buildings.js';
+import {policyAbi} from '../src/chain-mint.js';
 import {DEFAULT_CONTENT_POLICY} from '../src/content-policy.js';
 import {makeRegistrationPacket} from '../src/mint-model.js';
 import {readBrickLicensingContact,updateBrickLicensingContact} from '../src/licensing-contact-chain.js';
 import {coverAbi,decodeReceiptMetadata} from '../src/nft-cover-chain.js';
 const imageURI='ipfs://bafy'+'a'.repeat(55);
-for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${network}: one write, full receipts, rejection and uncertainty`,{timeout:60000},async t=>{
+for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${network}: one write, full receipts, rejection and uncertainty`,{timeout:90000},async t=>{
  const chainId=network==='sepolia'?11155111:1337;
  const server=ganache.server({logging:{quiet:true},chain:{chainId},wallet:{deterministic:true}});
  await server.listen(0,'127.0.0.1');t.after(()=>server.close());
@@ -33,9 +36,10 @@ for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${networ
   }
   return server.provider.request({method,params});
  }};
- const packet=makeRegistrationPacket({metadata:{title:'Atomic release test',artist:'Creator',songwriters:'Creator'},
+ const input={metadata:{title:'Atomic release test',artist:'Creator',songwriters:'Creator'},
   assets:{master:{name:'master.wav',type:'audio/wav',size:4,hash:'ab'.repeat(32)},preview:{name:'preview.wav',type:'audio/wav',size:4,hash:'bc'.repeat(32)},artwork:{name:'cover.png',type:'image/png',size:4,hash:'cd'.repeat(32)}},
-  identity:{mode:'external',connected:true,address:account.address},composition:true,licensing:{email:'licensing@example.com'},royalties:{creatorBps:10000},training:'not-authorized',storage:'demo-encrypted-in-browser',contentPolicy:DEFAULT_CONTENT_POLICY});
+  identity:{mode:'external',connected:true,address:account.address},composition:true,licensing:{email:'licensing@example.com'},royalties:{creatorBps:10000},training:'not-authorized',storage:'demo-encrypted-in-browser',contentPolicy:DEFAULT_CONTENT_POLICY};
+ const packet=makeRegistrationPacket(input);
  const options={packet,provider,rpcUrl,chainId,network,factoryAddress,initialImageURI:imageURI};
  await preflightPolicyMint(options);assert.equal(sends,0);
  await assert.rejects(requireBatchFactory({readContract:async()=>{throw Error('method absent');}},factoryAddress),/predates one-transaction/);
@@ -75,4 +79,29 @@ for(const network of ['ganache','sepolia'])test(`atomic artwork mint on ${networ
  assert.equal(sends,before+1);assert.equal(pending.receipts.length,3);assert.ok(pending.receipts.every(r=>r.status==='pending'));
  assert.equal(new Set(pending.receipts.map(r=>r.transactionHash)).size,1);
  await assert.rejects(mintOnChain({...options,result:pending}),/Do not remint/);assert.equal(sends,before+1);
+ // Reusing album artwork registers only the other parts and preserves the original NFT.
+ await server.provider.request({method:'miner_start',params:[1]});
+ const found=await findReusableBricks({...options,wallet:account.address});
+ const art=found.candidates.find(c=>c.address.toLowerCase()===result.receipts.find(r=>r.sourceId==='artwork').contractAddress.toLowerCase());
+ assert.ok(art);assert.ok(matchesReusableFiles(art,'artwork',packet.bricks.find(b=>b.localId==='artwork').metadata.media));
+ const second=makeRegistrationPacket({...input,metadata:{...input.metadata,title:'Second album track'},assets:{...input.assets,master:{...input.assets.master,hash:'de'.repeat(32)}},reusedBricks:{artwork:art}});
+ const beforeReuse=sends,nextImage='ipfs://bafy'+'b'.repeat(55);
+ const reused=await mintOnChain({...options,packet:second,initialImageURI:nextImage});
+ assert.equal(sends,beforeReuse+1);assert.equal(reused.receipts.length,3);assert.equal(reused.receipts.filter(r=>!r.reused).length,2);
+ const retained=reused.receipts.find(r=>r.reused);assert.equal(retained.contractAddress.toLowerCase(),art.address.toLowerCase());assert.equal(retained.transactionHash,art.transactionHash);
+ const oldMetadata=decodeReceiptMetadata(await client.readContract({address:art.nftContractAddress,abi:coverAbi,functionName:'tokenURI',args:[BigInt(art.tokenId)]}));assert.equal(oldMetadata.image,imageURI);
+ const grouping=await buildingFromPacket(second,reused);assert.equal(grouping.members.find(m=>m.part==='artwork').address,art.address.toLowerCase());
+ // Entirely reused file-backed parts need no mint transaction.
+ const master=found.candidates.find(c=>c.address.toLowerCase()===result.receipts.find(r=>r.sourceId==='master').contractAddress.toLowerCase());
+ const reuseOnly=makeRegistrationPacket({...input,composition:false,reusedBricks:{master,artwork:art}});
+ const beforeOnly=sends,only=await mintOnChain({...options,packet:reuseOnly});assert.equal(sends,beforeOnly);assert.equal(only.transactionCount,0);assert.equal(only.receipts.length,2);assert.ok(only.receipts.every(r=>r.reused));
+ const originalGrouping=await buildingFromPacket(packet,result),reusedGrouping=await buildingFromPacket(reuseOnly,only);assert.notEqual(reusedGrouping.id,originalGrouping.id,'A reused primary work must not overwrite the earlier Building');
+ // A stale chain history, changed file set or revoked policy cannot authorize reuse.
+ await assert.rejects(preflightPolicyMint({...options,packet:makeRegistrationPacket({...input,reusedBricks:{artwork:{...art,genesisHash:'0x'+'f'.repeat(64)}}})}),/previous chain history/);
+ const changed=structuredClone(second);changed.bricks.find(b=>b.reuse).metadata.media[0].integrity.digest='0x'+'ef'.repeat(32);
+ await assert.rejects(preflightPolicyMint({...options,packet:changed}),/Files changed/);
+ const revoked=await wallet.writeContract({address:art.address,abi:policyAbi,functionName:'setPlayerPermissions',args:[0,1n,1n]});await client.waitForTransactionReceipt({hash:revoked});
+ await assert.rejects(preflightPolicyMint({...options,packet:second}),/permissions or files changed/);
+ assert.equal(sends,beforeOnly,'No signing on failed reuse checks');
+
 });

@@ -59,3 +59,7 @@
 .ms-ipfs-confirm strong{color:#e9d594;font-size:13px}
 .ms-ipfs-confirm p{margin:0;color:#c7d2c9;font-size:11px;line-height:1.7;overflow-wrap:anywhere}
 .ms-ipfs-confirm .road-copy-value{font-size:11px;overflow-wrap:anywhere}
+
+.ms-reference-tools>summary{cursor:pointer;font-weight:700;padding:8px 0}.ms-reference-tools[open]>summary{margin-bottom:12px}
+.ms-reuse-match{border-top:1px solid #665b32;padding:14px 0}.ms-reuse-match code{display:block;overflow-wrap:anywhere;margin:10px 0}
+.ms-splits-dialog{color:var(--text,#f4eedd);background:var(--panel,#171b20);border:1px solid #665b32;max-width:760px;width:calc(100% - 32px);max-height:85dvh;overflow:auto}.ms-splits-dialog::backdrop{background:#000a}.ms-split-rows>.ms-fields{border-bottom:1px solid #665b32;padding:14px 0}.ms-splits-dialog input{max-width:100%;min-width:0}.ms-splits-dialog .ms-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}.ms-splits-dialog .ms-fields>strong{grid-column:1/-1}@media(max-width:600px){.ms-splits-dialog .ms-fields{grid-template-columns:1fr}}

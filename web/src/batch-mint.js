@@ -1,6 +1,7 @@
 /** Native factory batching, not a wallet multicall shim. One transaction owns all
  * registrations, policies and initial images. Never retry an uncertain write.
  */
+import {verifyPacketReuse} from './reuse-bricks.js';
 import {encodeAbiParameters,encodeFunctionData,getAddress,keccak256,parseEventLogs,sha256,stringToHex} from 'viem';
 import {connectChain,verifyFactory,requirePolicyFactory,requireBatchFactory,requireLicensingContactFactory,factoryAbi,policyAbi} from './chain-mint.js';
 import {packetLicensingEmails,licensingContactAbi} from './licensing-contact.js';
@@ -19,14 +20,17 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
  const sources=packet.bricks.map(b=>b?.localId);
  if(sources.some(id=>typeof id!=='string'||!id)||new Set(sources).size!==sources.length)throw Error('Every batch Brick needs a distinct source identity.');
  const account=packet.account?.address;
- const licensingEmails=packetLicensingEmails(packet),withContact=licensingEmails.some(Boolean);
+ const newBricks=packet.bricks.filter(b=>!b.reuse);
+ const licensingEmails=packetLicensingEmails({...packet,bricks:newBricks}),withContact=licensingEmails.some(Boolean);
  const {client,wallet,chain,check}=await connectChain({provider,rpcUrl,chainId,account,network});
  const collection=await verifyFactory(client,factoryAddress);
  await requirePolicyFactory(client,factoryAddress);await requireBatchFactory(client,factoryAddress);
  if(withContact)await requireLicensingContactFactory(client,factoryAddress);
  const genesis=await client.getBlock({blockNumber:0n});
+ const reused=await verifyPacketReuse(packet,{provider,rpcUrl,chainId,factoryAddress,network},{client});
+ if(!newBricks.length){await check();return Object.assign(result,{simulated:false,status:'confirmed',chainId:chain.id,factoryAddress:getAddress(factoryAddress),genesisHash:genesis.hash,reusedOnly:true,transactionCount:0,receipts:reused});}
  const prepared=[];
- for(const b of packet.bricks){
+ for(const b of newBricks){
   const policy=await initialPolicyFor(b.metadata);
   if(!policy)throw Error('Every Brick in an atomic batch must contain its reviewed file policy.');
   const metadataJson=JSON.stringify(b.metadata),metadataDigest=sha256(stringToHex(metadataJson));
@@ -47,6 +51,7 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
  Object.assign(result,{simulated:false,status:'pending',chainId:chain.id,factoryAddress:getAddress(factoryAddress),genesisHash:genesis.hash,atomic:true,transactionCount:1,estimatedGas:estimate.toString()});
  onUpdate('Approve one transaction for '+prepared.length+' Brick(s), permissions'+(initialImageURI?' and NFT artwork':'')+'.');
  await check();
+ await verifyPacketReuse(packet,{provider,rpcUrl,chainId,factoryAddress,network},{client});
  if(initialImageURI&&!result.nftCover)result.nftCover={imageURI:initialImageURI,status:'selected',atMint:true};
  // Keep all predicted identities before the write: a transport failure can occur
  // after a wallet broadcast. Only explicit user rejection permits a clean retry.
@@ -113,6 +118,7 @@ export async function mintBatchOnChain({packet,provider,rpcUrl,chainId,factoryAd
  for(let i=0;i<verified.length;i++)Object.assign(result.receipts[i],verified[i]);
  Object.assign(result,{status:'confirmed',gasUsed:receipt.gasUsed.toString(),blockNumber:blockNumber.toString()});
  if(result.nftCover&&initialImageURI)Object.assign(result.nftCover,{status:'verified',transactionHash:receipt.transactionHash,collection,tokenIds:result.receipts.map(r=>r.tokenId),metadata,atMint:true});
+ result.receipts.push(...await verifyPacketReuse(packet,{provider,rpcUrl,chainId,factoryAddress,network},{client}));
  onUpdate('Verified '+prepared.length+' Bricks'+(initialImageURI?' and their NFT artwork':'')+' in one transaction.');
  return result;
 }

@@ -21,6 +21,7 @@ on:
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/album-cover-browser.cjs'
+      - 'scripts/reuse-bricks-browser.cjs'
       - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
@@ -46,6 +47,7 @@ on:
       - 'scripts/mint-setup-browser.cjs'
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/album-cover-browser.cjs'
+      - 'scripts/reuse-bricks-browser.cjs'
       - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
@@ -114,6 +116,11 @@ jobs:
           node scripts/active-network-browser.cjs
           node scripts/settings-browser.cjs
           node scripts/tools-browser.cjs
+      - name: Exercise duplicate Brick reuse and songwriter splits on an isolated chain
+        run: |
+          npm install --no-audit --no-fund
+          npm run compile
+          node scripts/reuse-bricks-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -17,6 +17,7 @@ import MintStudioDemo from './MintStudioDemo.jsx';
 import {parseAbi,decodeFunctionData,encodeFunctionResult} from 'viem';
 const abi=parseAbi(['function ipId() view returns (bytes32)','function receiptToken() view returns (address)','function factory() view returns (address)','function ownerOf(uint256) view returns (address)','function brickForToken(uint256) view returns (address)','function tokenURI(uint256) view returns (string)']);
 window.writes=0;window.ethereum={request:async({method,params=[]})=>{
+ if(method==='eth_getCode')return '0x'; // No registry in this artwork-only fixture.
  if(method==='eth_chainId')return '0xaa36a7';if(method==='eth_accounts')return ['${wallet}'];
  if(method==='eth_getBlockByNumber')return {number:params[0]==='0x0'?'0x0':'0x1',hash:'${genesis}',parentHash:'${genesis}',timestamp:'0x1',transactions:[],gasLimit:'0x1c9c380',gasUsed:'0x0',baseFeePerGas:'0x1'};
  if(method==='eth_call'){

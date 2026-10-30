@@ -1,3 +1,5 @@
+import {applyBrickReuse} from './reuse-bricks.js';
+import {songwriterNames,validateSongwriterSplits,songwritingPayout} from './songwriter-splits.js';
 import {normalizeLicensingEmail} from './licensing-contact.js';
 import {releaseProposal,bindBuildingToBricks} from './release-buildings.js';
 import {addContentPolicy} from './content-policy.js';
@@ -41,14 +43,14 @@ export function assetRecord(slot,item){
   cid:item.ipfsUpload?.verified?item.ipfsUpload.cid:null,
   ...(item.extracted?{extractedMetadata:{title:item.extracted.fields.title,technical:item.extracted.technical,source:item.extracted.parser,status:'unverified-file-metadata'}}:{})};
 }
-export function validateMintInput({metadata,assets,identity,royalties,licensing={},cover={},linkedBricks=[]}){
+export function validateMintInput({metadata,assets,identity,royalties,licensing={},cover={},linkedBricks=[],songwriterSplits=null,composition=true,reusedBricks={}}){
  const errors=[];
  try{normalizeLicensingEmail(licensing.email);}catch(e){errors.push(e.message);}
  if(getIpCategory(metadata.ipCategory||'sound-recording').group==='Music & audio'&&normalizeMusicGenre(metadata.genre)===null)errors.push('Select an approved music genre, Other, or leave genre blank.');
  if(!(metadata.title||'').trim())errors.push('Work title is required.');
  if(!(metadata.artist||'').trim())errors.push('Artist / claimant is required.');
  if(!assets.master?.hash)errors.push('A hashed primary work file is required.');
- if(assets.artwork?.hash){
+ if(assets.artwork?.hash&&!reusedBricks.artwork){
   // The recording artist creates their own cover by default. An explicit separate
   // artist is only required after opting out of that default.
   const selfCover=cover.useMainArtist===true||(cover.useMainArtist!==false&&!String(cover.artist||'').trim());
@@ -65,8 +67,10 @@ export function validateMintInput({metadata,assets,identity,royalties,licensing=
   if(!String(link.scope||'').trim())errors.push('Specify the requested usage scope for every linked Brick.');
  }
  if(availableAssetSlots(metadata.ipCategory).some(slot=>slot.id==='lyrics')&&assets.lyrics?.hash&&linkedBricks.some(l=>l.relation==='embodies-composition'||l.relation==='lyrics'))errors.push('A separate writer Brick owns linked lyrics evidence. Remove the local lyrics attachment or use a new writing Brick.');
- if(identity.mode==='external'&&metadata.ipCategory==='sound-recording'&&metadata.songwriters?.trim()&&!linkedBricks.some(l=>l.relation==='embodies-composition')){
-  const writers=metadata.songwriters.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);
+ const writers=songwriterNames(metadata.songwriters);
+ const writing=composition&&getIpCategory(metadata.ipCategory||'sound-recording').musical&&!reusedBricks.composition&&!linkedBricks.some(l=>l.relation==='embodies-composition');
+ if(writing&&writers.length>1)errors.push(...validateSongwriterSplits(songwriterSplits,writers,{walletRequired:identity.mode==='external'}));
+ if(identity.mode==='external'&&writing&&writers.length===1){
   if(writers.some(name=>name.toLowerCase()!==String(metadata.artist||'').trim().toLowerCase()))
    errors.push('Another songwriter is credited. Link their composition Brick with signed approval rather than minting their work from this wallet.');
  }
@@ -78,7 +82,7 @@ export function validateMintInput({metadata,assets,identity,royalties,licensing=
  if(!Number.isInteger(Number(royalties.creatorBps))||Number(royalties.creatorBps)<0||Number(royalties.creatorBps)>10000)errors.push('Royalty share must be between 0 and 100%.');
  return errors;
 }
-export function makeRegistrationPacket({metadata,assets,identity,royalties,training,composition,storage,licensing={},cover={},linkedBricks=[],contentPolicy=null},now='2026-01-01T00:00:00.000Z'){
+export function makeRegistrationPacket({metadata,assets,identity,royalties,training,composition,storage,licensing={},cover={},linkedBricks=[],contentPolicy=null,songwriterSplits=null,reusedBricks={}},now='2026-01-01T00:00:00.000Z'){
  const category=getIpCategory(metadata.ipCategory||'sound-recording');
  if(category.group==='Music & audio'&&normalizeMusicGenre(metadata.genre)===null)throw Error('Select an approved music genre before creating the registration packet.');
  const files=availableAssetSlots(category.id).map(slot=>assetRecord(slot,assets[slot.id])).filter(Boolean);
@@ -119,9 +123,9 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
  }
  if(localComposition){
   // Writing is separate IP. A performing artist is not assumed to be the songwriter.
-  const songwriters=String(metadata.songwriters||'').split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean).slice(0,64);
+  const songwriters=songwriterNames(metadata.songwriters).slice(0,64);
   const writingCreators=songwriters.map(name=>({name,role:'songwriter',wallet:null,alias:null,claimStatus:'unverified'}));
-  bricks.push({localId:'composition',role:'Songwriting / musical work',metadata:{...common,creators:writingCreators,rights:{...common.rights,ownershipStatus:songwriters.length?'self-declared-not-verified':'attribution-pending'},objectType:'musical-work',title:metadata.title.trim(),identifiers:{iswc:metadata.iswc||null},proposedAiLicense:licenseQuote('writing'),payout:{type:'songwriter-split-pending',shares:[]},media:files.filter(x=>x.role==='lyrics'),relationships:[]}});
+  bricks.push({localId:'composition',role:'Songwriting / musical work',metadata:{...common,creators:writingCreators,rights:{...common.rights,ownershipStatus:songwriters.length?'self-declared-not-verified':'attribution-pending'},objectType:'musical-work',title:metadata.title.trim(),identifiers:{iswc:metadata.iswc||null},proposedAiLicense:licenseQuote('writing'),payout:songwriters.length>1&&songwriterSplits&&!reusedBricks.composition?songwritingPayout(songwriterSplits,songwriters):{type:'songwriter-split-pending',shares:[]},media:files.filter(x=>x.role==='lyrics'),relationships:[]}});
   master.relationships.push({type:'embodies-composition',target:'composition',context:'recording-embodies-work',authorization:'rights-review'});
  }
  // Cross-wallet references are approval requests until the owner's EIP-712 signature
@@ -132,5 +136,5 @@ export function makeRegistrationPacket({metadata,assets,identity,royalties,train
  }
  const building={...releaseProposal(bricks,{music:category.group==='Music & audio',name:metadata.title.trim(),createdAt:now,account:identity.address}),
   context:{daw:category.musical?(metadata.daw||'Unknown DAW'):null,purpose:category.musical?'creation-and-release':'creative-registration',rightsEvidence:'requires-signed-authorizations'}};
- return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,linkAuthorizations:linkedBricks.map(l=>({id:l.id,relation:l.relation,request:l.request||null,response:l.response||null})),account:{mode:identity.mode,alias:aliasFor(metadata.artist),ensName:(isEvmAddress(identity.address)&&identity.ensName)||null,address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:files.some(f=>f.access.storageStatus==='ipfs-pinned-ciphertext'),encrypted:files.some(f=>f.access.storageStatus==='ipfs-pinned-ciphertext'),encryptedLocally:files.some(f=>!!f.access.ciphertextDigest),demoUploadSimulated:files.some(f=>!!f.access.demoReceipt),encryptedIpfsReceipts:files.filter(f=>f.cid).map(f=>({role:f.role,cid:f.cid,digest:f.access.ciphertextDigest,provider:'ybr-local-kubo'})),demoUploadReceipts:files.filter(f=>f.access.demoReceipt).map(f=>({role:f.role,receipt:f.access.demoReceipt,provider:'none',cid:null})),clientSideEncryptedAssets:files.filter(f=>f.access.ciphertextDigest).map(f=>({role:f.role,digest:f.access.ciphertextDigest}))},bricks:addContentPolicy(bindBuildingToBricks(bricks,building),contentPolicy),building,notices:['All demo upload receipts are simulated in-browser only. No files are transmitted or hosted; no token-gated access exists.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
+ return {packetType:'LOCAL_PREVIEW_NOT_MINTED',createdAt:now,linkAuthorizations:linkedBricks.map(l=>({id:l.id,relation:l.relation,request:l.request||null,response:l.response||null})),account:{mode:identity.mode,alias:aliasFor(metadata.artist),ensName:(isEvmAddress(identity.address)&&identity.ensName)||null,address:isEvmAddress(identity.address)?identity.address:null,assistedBatchStatus:identity.mode==='assisted'?'not-requested':null},storage:{mode:storage,approvedProvider:false,uploaded:files.some(f=>f.access.storageStatus==='ipfs-pinned-ciphertext'),encrypted:files.some(f=>f.access.storageStatus==='ipfs-pinned-ciphertext'),encryptedLocally:files.some(f=>!!f.access.ciphertextDigest),demoUploadSimulated:files.some(f=>!!f.access.demoReceipt),encryptedIpfsReceipts:files.filter(f=>f.cid).map(f=>({role:f.role,cid:f.cid,digest:f.access.ciphertextDigest,provider:'ybr-local-kubo'})),demoUploadReceipts:files.filter(f=>f.access.demoReceipt).map(f=>({role:f.role,receipt:f.access.demoReceipt,provider:'none',cid:null})),clientSideEncryptedAssets:files.filter(f=>f.access.ciphertextDigest).map(f=>({role:f.role,digest:f.access.ciphertextDigest}))},bricks:applyBrickReuse(addContentPolicy(bindBuildingToBricks(bricks,building),contentPolicy),reusedBricks),building,notices:['All demo upload receipts are simulated in-browser only. No files are transmitted or hosted; no token-gated access exists.','No wallets created, contracts deployed, or licenses granted.','IP registration is not evidence of legal title.','Signing and royalty recipient verification required before production.']};
 }

@@ -46,8 +46,8 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
  const copy=async(value)=>{
   try{await navigator.clipboard.writeText(value);setNotice('Copied to clipboard.');setError('')}catch{setError('Clipboard unavailable. Select and copy the JSON manually.')}
  };
- return <section className="ms-link-panel">
-  <h3>Reference existing Bricks · separate-wallet authorization</h3>
+ return <details className="ms-link-panel ms-reference-tools">
+  <summary>Reference existing Bricks · separate-wallet authorization</summary>
   <p>Link an existing cover artwork, composition, lyrics or other Brick. The referenced Brick's controller must approve the specific work relationship. Addresses alone never count as permission.</p>
   {!wallet&&<button type="button" className="ms-outline" onClick={onConnect}>Connect artist wallet to request authorization</button>}
   {links.map(link=><article className="ms-link" key={link.id}>
@@ -65,7 +65,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   <button type="button" className="ms-outline" onClick={add}>+ Add existing Brick reference</button>
   <p className="ms-link-note">For a Safe or other contract wallet controller, obtain an ERC-1271-compatible signature externally and paste its signed response. EIP-712 verifies a narrowly scoped approval, not all collaborators' rights; enforcement and licensing remain separate.</p>
   {error&&<p className="ms-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
- </section>;
+ </details>;
 }
 export function BrickOwnerApprovals({wallet,onConnect}){
  const [text,setText]=useState(''),[result,setResult]=useState(''),[error,setError]=useState(''),[working,setWorking]=useState(false),[ack,setAck]=useState(false);

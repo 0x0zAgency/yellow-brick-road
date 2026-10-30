@@ -33,8 +33,8 @@ export default function MintResults({packet,mint,vault,preparedCover,delivery,on
   <div className="br-hero">
    <ArtworkTile imageURI={imageURI} localUrl={localUrl} title={title} caption={imageURI?'NFT cover':'Local preview'}/>
    <div className="br-hero-copy"><span className="br-kicker">YOUR WORK / YOUR ROAD</span><h3>{title}</h3>
-    <div className="br-badges"><StatusPill tone={overview.tone}>{overview.label}</StatusPill><StatusPill>{overview.total} of {overview.expected} Brick receipts</StatusPill>{mint?.atomic&&<StatusPill>1 mint transaction</StatusPill>}{!overview.simulated&&<StatusPill>{mint?.network||'Chain'} {mint?.chainId}</StatusPill>}</div>
-    <p>{overview.simulated?'Preview only. No NFTs or blockchain transactions were created.':overview.complete?(mint?.nftCover?.atMint?'Your Bricks and their NFT images are confirmed together. Changing the artwork below is optional.':'Your registrations are confirmed. Customize their appearance below.'):'Keep these receipts. Check outstanding transactions before attempting any new mint.'}</p>
+    <div className="br-badges"><StatusPill tone={overview.tone}>{overview.label}</StatusPill><StatusPill>{overview.total} of {overview.expected} Brick receipts</StatusPill>{mint?.atomic&&<StatusPill>1 mint transaction</StatusPill>}{mint?.receipts?.some(r=>r.reused)&&<StatusPill>{mint.receipts.filter(r=>r.reused).length} reused Bricks</StatusPill>}{!overview.simulated&&<StatusPill>{mint?.network||'Chain'} {mint?.chainId}</StatusPill>}</div>
+    <p>{overview.simulated?'Preview only. No NFTs or blockchain transactions were created.':overview.complete?(mint?.reusedOnly?'Existing Bricks verified and associated with this Building. No new NFTs were minted.':mint?.nftCover?.atMint?'Your Bricks and their NFT images are confirmed together. Changing the artwork below is optional.':'Your registrations are confirmed. Customize their appearance below.'):'Keep these receipts. Check outstanding transactions before attempting any new mint.'}</p>
    </div>
   </div>
   {!overview.simulated&&!overview.complete&&<p className="br-warning" role="alert"><strong>Incomplete registration.</strong> {overview.verified} verified; {overview.outstanding} still need review. Pending or unverified transactions may still be mined. Do not mint duplicates.</p>}
@@ -58,7 +58,7 @@ export default function MintResults({packet,mint,vault,preparedCover,delivery,on
   <div className="br-grid br-grid--receipts">
    {(mint?.receipts||[]).map((r,i)=><article className="br-record" key={r.id||r.transactionHash||i}>
     <div className="br-record-header"><ArtworkTile imageURI={imageURI} localUrl={localUrl} title={r.title||title} caption={imageURI?'NFT cover':'Release preview'}/>
-     <div className="br-record-copy"><span className="br-kicker">{r.role||'IP registration'}</span><h4>{r.title||title}</h4><StatusPill tone={overview.simulated?'neutral':r.status==='verified'?'success':'warning'}>{overview.simulated?'Simulated':r.status==='verified'?'Verified on chain':r.status||'Unverified'}</StatusPill></div>
+     <div className="br-record-copy"><span className="br-kicker">{r.role||'IP registration'}{r.reused?' · reused':''}</span><h4>{r.title||title}</h4><StatusPill tone={overview.simulated?'neutral':r.status==='verified'?'success':'warning'}>{overview.simulated?'Simulated':r.status==='verified'?'Verified on chain':r.status||'Unverified'}</StatusPill></div>
     </div>
     <FileRoleChips roles={(packet.bricks?.find(b=>b.localId===r.sourceId)?.metadata?.media||[]).map(f=>f.role)}/>
     {!overview.simulated&&r.status==='verified'&&<details><summary>Licensor contact</summary><LicensingContactEditor wallet={packet.account?.address} chainId={r.chainId} factoryAddress={mint.factoryAddress} brickAddress={r.contractAddress}/></details>}
