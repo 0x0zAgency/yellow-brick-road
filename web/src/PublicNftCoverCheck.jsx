@@ -30,11 +30,12 @@ export default function PublicNftCoverCheck({imageURI}){
   </>}
   {path&&<details><summary>Artwork works here but is blank in MetaMask?</summary>
    <p>Wallets use their own IPFS gateway. A successful image check here does not test that gateway. A gateway returning an error or an HTML page cannot display your NFT.</p>
-   <p>For this computer’s local YBR development wallet, run <code>npm run setup:wallet</code> once after HTTPS setup, then <code>npm run wallet:gateway</code>. Later, <code>npm run dev</code> starts it automatically.</p>
+   <p>With local HTTPS configured, <code>npm run dev</code> restores missing wallet-gateway certificates after a clean reinstall and starts the gateway. If startup reports that wallet artwork needs setup, run <code>npm run setup:wallet</code>, then <code>npm run wallet:gateway</code>.</p>
    <p>In MetaMask, open <strong>Settings → Privacy → IPFS gateway</strong> and paste the complete URL:</p>
    <CopyField label="Local wallet IPFS gateway" value="https://localhost:8792"/>
    <a href={'https://localhost:8792/ipfs/'+imageURI.slice(7)} target="_blank" rel="noreferrer">Test this cover through the wallet gateway ↗</a>
-   <p>Return to NFTs and choose <strong>Refresh list</strong>. The gateway must remain running. This wallet-wide setting serves YBR public PNG thumbnails only; use an appropriate general gateway again for other IPFS assets. Other computers need their own gateway or a reachable public provider.</p>
+   <p>Return to NFTs and choose <strong>Refresh list</strong>. If MetaMask itself was reinstalled, check this setting again and make sure NFT media is enabled. If the local chain was replaced, compare the card’s NFT contract and token ID with <strong>My Bricks → On-chain details &amp; wallet import</strong>; an old wallet card may refer to the previous chain.</p>
+   <p>The gateway must remain running. This wallet-wide setting serves YBR public PNG thumbnails only; use an appropriate general gateway again for other IPFS assets. Other computers need their own gateway or a reachable public provider.</p>
   </details>}
   <p className="nft-cover-note">An image verified here may still be unreachable to an external wallet’s gateway. Its IPFS provider must stay reachable. A localhost Ganache chain is not visible to an external NFT indexer. Do not remint to repair image delivery.</p>
  </section>;
