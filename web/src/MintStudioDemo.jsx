@@ -108,6 +108,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  const execution=mintMode(wallet,network);
  const reuseScope=JSON.stringify([wallet,chainId,factoryAddress,rpcUrl,network,ipCategoryId,composition]);
  useEffect(()=>{setReusedBricks({});},[reuseScope]);
+ useEffect(()=>{setSongwriterSplits(value=>value?{...value,confirmed:false}:null);},[wallet]);
  const album=previewAlbum(assets);
  const albumScope=JSON.stringify([album,assets.preview?.hash,wallet,chainId,factoryAddress,rpcUrl,network]);
  useEffect(()=>{setNftCover(current=>current?.kind==='album'?null:current);},[albumScope]);

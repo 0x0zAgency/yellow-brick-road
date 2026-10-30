@@ -15,7 +15,7 @@ export function matchesReusableFiles(candidate,part,media){
  if(!media.length||!candidate?.contentPolicy)return false;
  const file=media.find(f=>f.role===(part==='composition'?'lyrics':part));
  const anchor=part==='master'?candidate.contentHash:part==='artwork'?candidate.contentPolicy.files.artworkHash:candidate.contentPolicy.files.lyricsHash;
- return !!file&&same(anchor,file.integrity.digest)&&same(digest(media),candidate.contentPolicy.files.manifestDigest);
+ return !!file&&same(anchor,file.integrity.digest)&&(part!=='artwork'||same(candidate.contentHash,file.integrity.digest))&&same(digest(media),candidate.contentPolicy.files.manifestDigest);
 }
 async function readPolicy(client,address){
  const read=name=>client.readContract({address,abi:policyAbi,functionName:name});

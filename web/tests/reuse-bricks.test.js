@@ -48,4 +48,6 @@ test('Building packet resolves reused receipt identities without pretending thei
  const record=await buildingFromPacket(packet,mint);assert.equal(record.members.find(m=>m.part==='artwork').address,candidate.address);
  const graph=exportBuildingGraph(packet,mint);assert.ok(graph.members.some(m=>m.role==='artwork'&&m.ref.endsWith(candidate.address)));
  const wrong=structuredClone(mint);wrong.receipts.find(r=>r.reused).contractAddress=address(9);await assert.rejects(buildingFromPacket(packet,wrong),/reference does not match/);
+ const forged=structuredClone(packet);forged.bricks.find(b=>b.reuse).reuse.address=address(9);
+ await assert.rejects(buildingFromPacket(forged,wrong),/committed Building reference/);
 });

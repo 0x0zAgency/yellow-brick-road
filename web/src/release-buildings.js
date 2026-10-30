@@ -127,6 +127,10 @@ export async function buildingFromPacket(packet,mint=packet?.onChainMint){
   const building=metadata.extensions?.building;
   if(building){need(building.id===packet.building.id&&building.type===packet.building.type&&building.part===b.localId&&building.root==='master'&&
    JSON.stringify(building.members?.map(m=>m.ref))===JSON.stringify(packet.bricks.map(p=>p.localId)),'Conflicting committed building membership.');}
+  for(const existing of packet.bricks.filter(part=>part.reuse)){
+   const member=building?.members?.find(m=>m.ref===existing.localId),c=existing.reuse;
+   need(member&&lower(member.brickAddress)===lower(c.address)&&lower(member.ipId)===lower(c.ipId)&&lower(member.metadataDigest)===lower(c.metadataDigest),'Reused member differs from the committed Building reference.');
+  }
   members.push({address:r.contractAddress,ipId:r.id,transactionHash:r.transactionHash,metadataDigest:r.metadataDigest,part:b.localId,
    files:[...new Set((metadata.media||[]).map(f=>f.role).filter(role=>Object.hasOwn(FILE_LABELS,role)))]});
  }
