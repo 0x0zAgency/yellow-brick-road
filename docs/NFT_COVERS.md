@@ -24,8 +24,10 @@ thumbnail gateway:
 ```sh
 nvm use 24
 npm run setup:https    # only if local HTTPS has not already been configured
-npm run setup:wallet   # once; reuse the existing mkcert CA, no trust-store change
-npm run wallet:gateway # start now without restarting Ganache or the app
+npm run dev           # restores a missing wallet gateway with the existing HTTPS CA
+# Or, with the app already running:
+npm run setup:wallet  # explicit setup, reusing mkcert; no trust-store change
+npm run wallet:gateway
 ```
 
 In **MetaMask → Settings → Privacy → IPFS gateway**, enter the full URL
@@ -35,12 +37,24 @@ public PNG thumbnails. Restore a suitable general IPFS gateway when using other
 NFT formats, ENS content, or IPFS token icons. It is not a general replacement for
 all IPFS content and does not make the images globally reachable.
 
-After the one-time setup, `npm run dev` starts the gateway automatically and stops
-its owned process on exit. A separately started gateway is reused and remains
+`npm run dev` prepares missing wallet-gateway certificates when this checkout
+already has valid local HTTPS and mkcert still uses the same CA. This includes
+a clean reinstall which restored app HTTPS but lost the separate wallet-gateway
+directory. It starts the gateway automatically and stops its owned process on exit. A separately started gateway is reused and remains
 running until stopped in its own terminal. Kubo and the gateway must be running
 to load uncached covers. No certificates or private keys are committed to git.
 `setup:wallet` does not install a CA or alter the existing application certificates;
 if your browser does not trust the existing CA, complete the normal HTTPS setup.
+Automatic restoration never installs a CA, changes trust stores or replaces existing
+certificates. If HTTPS/mkcert is missing or its CA differs, startup gives an explicit
+setup message and continues without a wallet gateway. Invalid existing wallet TLS
+still fails validation. Certificates remain private, local files, never git content.
+
+A reinstall of MetaMask can reset its gateway/media preferences and custom network.
+Recheck those separately; an app cannot silently change wallet settings. A reset of
+the Ganache database can leave old wallet cards pointing to a previous chain even
+when the chain ID is still 1337. Compare the NFT contract and decimal token ID with
+**My Bricks → On-chain details & wallet import** before refreshing/re-importing.
 
 Both `/ipfs/<CID>` and `https://<CID>.ipfs.localhost:8792/` are supported. The
 wildcard TLS identity matters: the installed MetaMask converts image URIs to

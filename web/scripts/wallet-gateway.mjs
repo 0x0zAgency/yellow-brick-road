@@ -32,7 +32,7 @@ export function loadWalletTls(root=ROOT){
  try{fs.lstatSync(directory(root));}catch(e){if(e.code==='ENOENT')return null;throw e;}
  return validateTls(directory(root));
 }
-export function setupWalletGateway(root=ROOT,{run=spawnSync,log=console.log}={}){
+export function setupWalletGateway(root=ROOT,{run=spawnSync,log=console.log,expectedCa}={}){
  if(loadWalletTls(root)){log('[YBR] Wallet gateway certificates are ready.');return;}
  const version=run('mkcert',['-version'],{encoding:'utf8'});
  if(version.error||version.status!==0)throw Error('Install mkcert and run npm run setup:https first.');
@@ -43,6 +43,8 @@ export function setupWalletGateway(root=ROOT,{run=spawnSync,log=console.log}={})
  const stat=fs.lstatSync(caFile);
  if(!stat.isFile()||stat.size>1024*1024)throw Error('Invalid mkcert CA certificate.');
  const ca=fs.readFileSync(caFile);if(!new X509Certificate(ca).ca)throw Error('Invalid mkcert CA certificate.');
+ if(expectedCa&&new X509Certificate(ca).fingerprint256!==new X509Certificate(expectedCa).fingerprint256)
+  throw Error('The current mkcert CA differs from this checkout’s HTTPS CA. Run npm run setup:wallet explicitly after checking local certificate trust.');
  const local=path.join(root,'.road-local');privateDirectory(local,{create:true});
  const temp=fs.mkdtempSync(path.join(local,'wallet-tls-'));fs.chmodSync(temp,0o700);
  try{
@@ -57,6 +59,29 @@ export function setupWalletGateway(root=ROOT,{run=spawnSync,log=console.log}={})
  }finally{fs.rmSync(temp,{recursive:true,force:true});}
  log('[YBR] Wallet gateway ready. Start npm run wallet:gateway, or restart npm run dev.');
  log('[YBR] In MetaMask Settings > Privacy > IPFS gateway, enter https://'+WALLET_GATEWAY_HOST+'.');
+}
+
+/** A clean checkout can retain app HTTPS while losing its separate wallet leaf.
+ * Reissue only that missing leaf with the same existing CA. Never install trust,
+ * replace an existing wallet certificate, or change the app's browser origin. */
+export function prepareWalletGateway(root=ROOT,{run=spawnSync,log=console.log}={}){
+ const existing=loadWalletTls(root);if(existing)return existing;
+ const appTls=httpsTools.loadHttps(root,{});
+ if(!appTls){
+  log('[YBR] Wallet artwork is not configured. For local MetaMask images, run npm run setup:https, then npm run setup:wallet. Set its IPFS gateway to https://'+WALLET_GATEWAY_HOST+'.');
+  return null;
+ }
+ try{
+  log('[YBR] Restoring missing wallet image certificates using this checkout’s existing HTTPS CA...');
+  setupWalletGateway(root,{run,log,expectedCa:appTls.ca});
+  return loadWalletTls(root);
+ }catch(error){
+  // Optional artwork delivery must not prevent the rest of the stack starting.
+  // No unverified/HTTP wallet endpoint is substituted when restoration fails.
+  log('[YBR] Wallet artwork setup required: '+error.message);
+  log('[YBR] Run npm run setup:wallet, then npm run wallet:gateway. NFT metadata was not changed.');
+  return null;
+ }
 }
 
 /** Standard path and CID subdomain forms. No paths into private originals. */
@@ -126,14 +151,14 @@ export function probeWalletGateway(tls){
   req.on('error',e=>e.code==='ECONNREFUSED'?resolve(false):reject(e));
  });
 }
-export async function ensureWalletGateway({root=ROOT,spawnOwned,waitUntil,log=console.log}={}){
- const tls=loadWalletTls(root);if(!tls)return;
- if(!await probeWalletGateway(tls)){
+export async function ensureWalletGateway({root=ROOT,spawnOwned,waitUntil,log=console.log,run=spawnSync,probe=probeWalletGateway}={}){
+ const tls=prepareWalletGateway(root,{run,log});if(!tls)return;
+ if(!await probe(tls)){
   const child=spawnOwned('YBR wallet gateway',process.execPath,[fileURLToPath(import.meta.url)]);let error;
   child.once('error',e=>{error=e;});
   await waitUntil('YBR wallet gateway',async()=>{
    if(error||child.exitCode!==null||child.signalCode!==null)throw Object.assign(Error('Wallet gateway failed to start.'),{fatal:true});
-   return probeWalletGateway(tls);
+   return probe(tls);
   },{timeoutMs:10000});
  }
  log('[YBR] Public NFT wallet gateway: https://'+WALLET_GATEWAY_HOST+' (MetaMask Settings > Privacy > IPFS gateway).');

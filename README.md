@@ -65,9 +65,12 @@ Review and approve the public NFT thumbnail before minting to include it in the
 same transaction. Player playback permissions remain separate. Use development seeds only.
 
 For NFT artwork in a local MetaMask wallet, after [HTTPS setup](docs/LOCAL_HTTPS.md),
-run `npm run setup:wallet` once and `npm run wallet:gateway` to start immediately.
+`npm run dev` prepares missing wallet-gateway certificates with the same existing
+CA and starts the gateway, including after a clean checkout/reinstall. For an
+already running app, use `npm run setup:wallet` and `npm run wallet:gateway`.
 Set MetaMask's **Settings → Privacy → IPFS gateway** to `https://localhost:8792`,
-then **Refresh list** in NFTs. Later `npm run dev` starts the gateway automatically.
+then **Refresh list** in NFTs. Recheck this wallet setting if MetaMask itself was
+reinstalled. A chain reset also requires checking the current NFT contract and token ID.
 This wallet-wide setting serves YBR public PNG thumbnails on this computer only;
 see [wallet delivery and public-demo requirements](docs/NFT_COVERS.md#if-the-nft-has-the-right-image-uri-but-the-wallet-is-blank).
 
