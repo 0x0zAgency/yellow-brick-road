@@ -35,6 +35,7 @@ createRoot(document.getElementById('root')).render(<main style={{maxWidth:1150,m
   await page.goto((process.env.YBR_LICENSING_TEST_ORIGIN||'http://127.0.0.1:5173')+'/'+stem+'.html');await page.getByRole('button',{name:'Connect licensing wallet'}).click();await page.getByRole('button',{name:'Sign in to offer inbox'}).click();
   await page.getByRole('heading',{name:'Film publishing project'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Approve terms',exact:true}).count(),0);
+  assert.match(await page.locator('.lic-offer').innerText(),/0\.01 ETH × 10 licensed units = 0\.1 ETH prepaid/);
   await page.getByRole('button',{name:'Review & accept license'}).click();await page.getByRole('dialog',{name:'Review license payment'}).waitFor();
   assert.match(await page.getByRole('dialog').innerText(),/0\.1 ETH/);assert.match(await page.getByRole('dialog').innerText(),/Funds will remain/);assert.equal(await page.evaluate(()=>window.injected),undefined);
   await page.getByRole('button',{name:'Cancel',exact:true}).click();
