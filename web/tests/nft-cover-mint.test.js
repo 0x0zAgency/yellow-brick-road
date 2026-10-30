@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mintWithReviewedCover,reviewedMintCover} from '../src/nft-cover-mint.js';
+import {mintWithReviewedCover,reviewedMintCover,preflightMintCover} from '../src/nft-cover-mint.js';
 const bytes=new Uint8Array(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIUlEQVR4nGP8f9kpxjeSgYGBgYGBMVphNgMMMDEgARQOAMDRBDMbPbpyAAAAAElFTkSuQmCC','base64'));
 const sourceDigest='0x'+'a'.repeat(64),imageURI='ipfs://bafy'+'a'.repeat(55);
 function harness(){
@@ -17,6 +17,13 @@ test('reviewed cover is part of the same mint request, with no post-mint artwork
 });
 test('no public consent means no upload and no initial image',async()=>{
  const h=harness();h.options.nftCover.consent=false;await mintWithReviewedCover(h.options,h.dependencies);assert.deepEqual(h.calls,['mint']);assert.equal(h.options.result.nftCover,undefined);
+});
+test('an all-reference Building ignores an earlier thumbnail selection without upload or artwork validation',async()=>{
+ const h=harness();h.options.packet.bricks[0].reuse={address:'original'};h.options.nftCover.sourceDigest='previous selection';
+ await preflightMintCover(h.options);
+ h.dependencies.mint=async({initialImageURI})=>{assert.equal(initialImageURI,undefined);h.calls.push('verify references');return {reusedOnly:true};};
+ assert.equal((await mintWithReviewedCover(h.options,h.dependencies)).reusedOnly,true);
+ assert.deepEqual(h.calls,['verify references']);
 });
 test('changed source and invalid public PNG fail before every operation',async()=>{
  for(const patch of [{sourceDigest:'changed'},{bytes:new Uint8Array([1,2,3])}]){const h=harness();Object.assign(h.options.nftCover,patch);await assert.rejects(mintWithReviewedCover(h.options,h.dependencies));assert.deepEqual(h.calls,[]);}

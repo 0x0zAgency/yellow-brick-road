@@ -17,6 +17,7 @@ export function reviewedMintCover(packet, selection){
  return selection;
 }
 export async function preflightMintCover(options){
+ if(options.packet.bricks.every(b=>b.reuse))return;
  const selection=reviewedMintCover(options.packet,options.nftCover);if(!selection)return;
  const {connectChain,verifyFactory,requireBatchFactory}=await import('./chain-mint.js');
  const {client,check}=await connectChain({...options,account:options.packet.account.address});
