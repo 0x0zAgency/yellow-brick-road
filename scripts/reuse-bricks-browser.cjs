@@ -70,6 +70,7 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
    assert.equal(await page.getByLabel('Choose Audio preview',{exact:true}).count(),0);
    assert.doesNotMatch(await page.locator('.ms-panel').textContent(),/Audio Preview uses MP3/);
    await page.getByLabel('Choose '+getIpCategory(id).primary,{exact:true}).setInputFiles({name:id+'.png',mimeType:'image/png',buffer:png});
+   await page.getByText('✓ Ready',{exact:true}).waitFor();
    await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
    const protection=page.getByRole('region',{name:'Pre-mint content protection',exact:true});await protection.waitFor();
    assert.equal(await protection.getByRole('switch').isChecked(),true);assert.doesNotMatch(await page.locator('.ms-panel').textContent(),/Player/);
