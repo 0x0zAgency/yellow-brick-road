@@ -434,7 +434,13 @@ mix, then **Commit Playable Cover** to add a separate item to YBR Player.
 Mint Studio Step 3 accepts an optional public **Licensor email**. Each new Brick
 stores it in its own contract so systems can request approvals or agreements
 without decrypting the work. Set a reusable email under **Settings → Creator defaults**.
-Read or update a Brick's contact from **IP Registry** or **My Bricks → Licensor contact**.
+Read or update a Brick's contact from **IP Registry** or **My Bricks → Edit Brick → Licensor contact**.
+
+**My Bricks → Edit Brick** also provides verified private work-detail editing,
+NFT artwork, content controls, and the licensing/funds workspace. Import the
+private recovery JSON to edit descriptive metadata, review changes, and save a
+new encrypted version to the same Brick through its controller wallet. Source
+files and existing Brick references are preserved. See [Brick editor](docs/BRICK_EDITOR.md).
 The current controller can update it even while files are locked.
 [Contract interface, integration and factory compatibility](docs/BRICK_LICENSING_CONTACT.md).
 

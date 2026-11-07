@@ -22,6 +22,7 @@ on:
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/album-cover-browser.cjs'
       - 'scripts/reuse-bricks-browser.cjs'
+      - 'scripts/brick-editor-browser.cjs'
       - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
@@ -48,6 +49,7 @@ on:
       - 'scripts/upload-metadata-browser.cjs'
       - 'scripts/album-cover-browser.cjs'
       - 'scripts/reuse-bricks-browser.cjs'
+      - 'scripts/brick-editor-browser.cjs'
       - 'scripts/fixtures/**'
       - 'scripts/nft-cover-browser.cjs'
       - 'web/package.json'
@@ -122,6 +124,7 @@ jobs:
           npm install --no-audit --no-fund
           npm run compile
           node scripts/reuse-bricks-browser.cjs
+          node scripts/brick-editor-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

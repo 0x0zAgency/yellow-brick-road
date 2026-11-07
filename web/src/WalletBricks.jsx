@@ -1,6 +1,7 @@
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import WalletBrickCard from './WalletBrickCard.jsx';
+import BrickEditor from './BrickEditor.jsx';
 import {CollectionPager} from './BrickPresentation.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {BrickOwnerApprovals} from './BrickLinkApprovals.jsx';
@@ -18,6 +19,7 @@ export default function WalletBricks({wallet,onConnect}){
  const [result,setResult]=useState(null),[busy,setBusy]=useState(false),[progress,setProgress]=useState(null),[error,setError]=useState('');
  const [recoveryAddress,setRecoveryAddress]=useState(null);
  const [page,setPage]=useState(0);
+ const [editing,setEditing]=useState(null);
  const client=useMemo(()=>chainId&&window.ethereum?.request?createPublicClient({chain:networkFor(chainId),transport:ACTIVE_NETWORK?http(activeRpcUrl(),{retryCount:0,timeout:15000}):custom(window.ethereum,{retryCount:0})}):null,[chainId,wallet]);
  const requestId=useRef(0);
  const network=networkFor(chainId);
@@ -32,7 +34,7 @@ export default function WalletBricks({wallet,onConnect}){
  },[]);
  useEffect(()=>{
   requestId.current++;
-  setPage(0);setResult(null);setError('');setProgress(null);setBusy(false);setRecoveryAddress(null);
+  setPage(0);setResult(null);setError('');setProgress(null);setBusy(false);setRecoveryAddress(null);setEditing(null);
   if(!chainId){setFactory('');return;}
   let saved='';
   try{saved=localStorage.getItem(factoryStorageKey(chainId))||''}catch{}
@@ -64,9 +66,14 @@ export default function WalletBricks({wallet,onConnect}){
  };
  const {items}=useBuildingRollup({rows:result?.bricks||[],client,chainId,factoryAddress:result?.verifiedFactory});
  const pages=Math.max(1,Math.ceil(items.length/12)),currentPage=Math.min(page,pages-1);
- const renderPart=brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)}/>;
+ const renderPart=brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)} onEdit={()=>{setRecoveryAddress(null);setEditing(brick);}}/>;
+ const saved=current=>{
+  const update=row=>row.address.toLowerCase()===current.brickAddress.toLowerCase()?{...row,...current,creatorIsController:current.controller.toLowerCase()===wallet.toLowerCase()}:row;
+  setResult(old=>old?{...old,bricks:old.bricks.map(update)}:old);setEditing(old=>old?update(old):old);
+ };
+ if(editing&&result)return <BrickEditor key={wallet+':'+chainId+':'+result.verifiedFactory+':'+editing.address} brick={editing} wallet={wallet} chainId={chainId} factoryAddress={result.verifiedFactory} client={client} onSaved={saved} onClose={()=>setEditing(null)}/>;
  return <section className="wb br-collection">
-  <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Read-only discovery of Bricks minted by the connected wallet. The Road checks on-chain factory events and Brick contracts, not local demo records.</p></div>
+  <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Find your registered works and open Edit Brick to update details, artwork, contact information and permissions. Changes are saved by the current controller through their wallet.</p></div>
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
    <div className="wb-controls">
     <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><span>Network: {network?network.name+' ('+network.id+')':chainId?'Unsupported chain '+chainId:'Detecting…'}</span></div>

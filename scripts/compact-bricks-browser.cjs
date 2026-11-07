@@ -123,7 +123,8 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
     await page.locator('.wb-nft-cover > summary').first().click();
    }
    const contactSummary=page.locator('.br-grid > .br-record > details > summary').filter({hasText:/^Licensor contact$/}).first();
-   await contactSummary.click();
+   if(view==='wallet'){await page.getByRole('button',{name:'Edit Brick',exact:true}).first().click();await page.getByRole('tab',{name:'Licensor contact',exact:true}).click();}
+   else await contactSummary.click();
    const contact=page.getByRole('region',{name:'Brick licensing contact'});
    await contact.getByRole('button',{name:'Read licensing contact',exact:true}).click();
    await contact.getByRole('link',{name:'licensing+sync@example.com',exact:true}).waitFor();
@@ -137,7 +138,8 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
    await contact.getByRole('button',{name:'Read licensing contact',exact:true}).click();
    await contact.getByRole('alert').filter({hasText:'Older immutable Bricks'}).waitFor();
    assert.equal(await contact.getByRole('link').count(),0,'A failed or unsupported read does not retain a stale contact');
-   await page.evaluate(()=>{window.uiLegacyContact=false;});await contactSummary.click();
+   await page.evaluate(()=>{window.uiLegacyContact=false;});
+   if(view==='wallet')await page.getByRole('button',{name:'Back to My Bricks',exact:true}).click();else await contactSummary.click();
    await page.getByRole('button',{name:'Next page',exact:true}).click();
    await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
    await page.getByRole('button',{name:'Previous page',exact:true}).click();
