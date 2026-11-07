@@ -73,7 +73,7 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
    const result=txHash?await confirmBrickMetadataUpdate({...base,prepared:pin,transactionHash:txHash}):await updateBrickMetadata({...base,prepared:pin,onSubmitted:hash=>{if(id===generation.current){setTxHash(hash);setStatus('Transaction submitted. Waiting for confirmation…');}}});
    assertActive();
    let groupingNotice='';
-   try{refreshEditedBuilding(window.localStorage,session.review,result.current);window.dispatchEvent(new Event(BUILDING_EVENT));}catch{groupingNotice=' Local Building grouping could not be refreshed.';}
+   try{refreshEditedBuilding(window.localStorage,session.review,result.current,pin.metadata.title);window.dispatchEvent(new Event(BUILDING_EVENT));}catch{groupingNotice=' Local Building grouping could not be refreshed.';}
    setSession({kit:pin.backup,review:result.current,metadata:pin.metadata});setDraft(brickDetails(pin.metadata));setReviewing(false);setPrepared(null);setTxHash('');onLoaded(pin.metadata);
    onSaved(result.current);setStatus('Saved to this Brick as metadata version '+result.current.metadataVersion+'.'+groupingNotice);
    await remember(pin.backup,result.current,pin.metadata.title,null,id);

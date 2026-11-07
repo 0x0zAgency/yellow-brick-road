@@ -31,11 +31,12 @@ test('albums and compilations reuse Building references with order, PROV members
  assert.throws(()=>createBuilding({...album,members:[{kind:'building',ref:album.id,role:'part'}]}),/Invalid/);
  assert.throws(()=>validateBuildingGraph([album,album]),/Duplicate/);
 });
-test('real receipt association roundtrip groups live identities and survives reopening without private labels or keys',async()=>{
+test('real receipt association retains work titles locally without file names, raw metadata or keys',async()=>{
  const p=make(),mint=minted(p),record=await buildingFromPacket(p,mint),storage=memory();
- saveBuildingRecord(storage,{...record,privateKey:'secret',title:'private-title',rawPacket:p});
+ saveBuildingRecord(storage,{...record,privateKey:'secret',rawPacket:p});
  assert.deepEqual(loadBuildingIndex(storage),[record]);const saved=storage.getItem(BUILDING_STORAGE_KEY);
- for(const forbidden of ['private-title','private-','secret','A private title','recovery','plaintext'])assert.ok(!saved.includes(forbidden));
+ assert.equal(record.members.find(m=>m.part==='master').title,'A private title');
+ for(const forbidden of ['private-','secret','recovery','plaintext','Identical album tags'])assert.ok(!saved.includes(forbidden));
  const groups=rollupBuildings(rowsOf(mint),loadBuildingIndex(storage),mint);
  assert.equal(groups.length,1);assert.equal(groups[0].kind,'building');assert.equal(groups[0].parts.length,3);assert.equal(groups[0].missing,0);
  const graph=exportBuildingGraph(p,mint);assert.match(graph.id,/urn:ybr:building:/);assert.equal(graph.files.length,6);assert.equal(graph.members.length,3);assert.equal(graph.status,'context-proposal-not-deployed');

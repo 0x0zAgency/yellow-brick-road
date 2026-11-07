@@ -75,7 +75,7 @@ export async function prepareBrickMetadata({metadata,draft,review,kit,fetchImpl=
  return {metadata:edited.metadata,changes:edited.changes,uri:pinned.uri,digest,backup};
 }
 /** Only a confirmed descriptive update may advance a locally remembered Building member. */
-export function refreshEditedBuilding(storage,review,current){
+export function refreshEditedBuilding(storage,review,current,title=''){
  if(scopeKey(review)!==scopeKey(current)||!same(review.brickAddress,current.brickAddress)||!same(review.ipId,current.ipId)||!same(review.contentHash,current.contentHash))throw Error('Edited Brick identity changed.');
  let count=0;
  for(const record of loadBuildingIndex(storage)){
@@ -83,7 +83,7 @@ export function refreshEditedBuilding(storage,review,current){
   let changed=false;
   const members=record.members.map(member=>{
    if(!same(member.address,review.brickAddress)||!same(member.ipId,review.ipId)||!same(member.metadataDigest,review.metadataDigest))return member;
-   changed=true;return {...member,metadataDigest:current.metadataDigest};
+   changed=true;return {...member,metadataDigest:current.metadataDigest,title};
   });
   if(changed){saveBuildingRecord(storage,{...record,members});count++;}
  }

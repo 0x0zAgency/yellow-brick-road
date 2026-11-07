@@ -52,14 +52,15 @@ test('recovery verifies exact on-chain bytes; saves ciphertext only and exports 
  assert.deepEqual(await openBrickMetadata({review:{metadataURI:prepared.uri,metadataDigest:prepared.digest},kit,fetchImpl}),prepared.metadata,'The original recovery key remains usable');
  await assert.rejects(prepareBrickMetadata({metadata:original,draft:brickDetails(original),review,kit,fetchImpl}),/no changes/);
 });
-test('confirmed metadata updates keep shared Building references grouped and store no private work details',async()=>{
+test('confirmed metadata updates keep shared Building references grouped and refresh their local titles',async()=>{
  const packet=makeRegistrationPacket({metadata:{title:'Private title',artist:'Artist'},assets:{master:{name:'master.wav',hash:'ab'.repeat(32),size:4}},identity:{mode:'external',address:address(1)},royalties:{creatorBps:10000},training:'not-authorized',composition:false});
  const mint={simulated:false,status:'confirmed',chainId:1337,factoryAddress:address(2),genesisHash:hash(3),receipts:[{sourceId:'master',status:'verified',chainId:1337,contractAddress:address(4),id:hash(5),transactionHash:hash(6),metadataJson:JSON.stringify(packet.bricks[0].metadata),metadataDigest:sha256(toHex(JSON.stringify(packet.bricks[0].metadata)))}]};
  const memory=new Map(),storage={getItem:k=>memory.get(k)||null,setItem:(k,v)=>memory.set(k,v)},record=await buildingFromPacket(packet,mint);saveBuildingRecord(storage,record);
  const review={...mint,brickAddress:address(4),ipId:hash(5),contentHash:hash(7),metadataDigest:mint.receipts[0].metadataDigest},current={...review,metadataDigest:hash(8)};
- assert.equal(refreshEditedBuilding(storage,review,current),1);
+ assert.equal(refreshEditedBuilding(storage,review,current,'Edited work'),1);
  const row={address:address(4),ipId:hash(5),transactionHash:hash(6),metadataDigest:hash(8)};
  assert.equal(rollupBuildings([row],loadBuildingIndex(storage),mint)[0].kind,'building');
+ assert.equal(loadBuildingIndex(storage)[0].members[0].title,'Edited work');
  assert.ok(![...memory.values()].join('').includes('Private title'));
  assert.throws(()=>refreshEditedBuilding(storage,review,{...current,genesisHash:hash(9)}),/identity changed/);
 });

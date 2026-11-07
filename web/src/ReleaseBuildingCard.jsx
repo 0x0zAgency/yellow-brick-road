@@ -2,7 +2,8 @@ import {WorkspaceIcon} from './AppearanceContext.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Layers,FolderOpen} from 'lucide-react';
 import {RegistrationThumbnail,StatusPill} from './BrickPresentation.jsx';
-import {shortId} from './brick-presentation.js';
+import {applyWorkTitles,displayWorkTitle} from './work-titles.js';
+import {listRecoveryTitles,RECOVERY_VAULT_EVENT} from './recovery-vault.js';
 import {FILE_LABELS,PART_LABELS,loadBuildingIndex,rollupBuildings,saveBuildingRecord,scopeKey,buildingFromPacket} from './release-buildings.js';
 
 export const BUILDING_EVENT='ybr:release-buildings-changed';
@@ -15,17 +16,24 @@ export async function rememberMintBuilding(packet,mint){
 /** Local display associations are usable only against the current verified scan.
  * They never become proof of copyright, a license, or a deployed Building.
  */
-export function useBuildingRollup({rows,client,chainId,factoryAddress,anchor}){
+export function useBuildingRollup({rows,client,chainId,factoryAddress,anchor,wallet}){
  const [index,setIndex]=useState(()=>{try{return loadBuildingIndex(globalThis.localStorage);}catch{return [];}}),[history,setHistory]=useState(null);
  useEffect(()=>{
   const refresh=()=>{try{setIndex(loadBuildingIndex(globalThis.localStorage));}catch{setIndex([]);}};
   window.addEventListener(BUILDING_EVENT,refresh);window.addEventListener('storage',refresh);
   return()=>{window.removeEventListener(BUILDING_EVENT,refresh);window.removeEventListener('storage',refresh);};
  },[]);
- const context=JSON.stringify([chainId,factoryAddress,anchor?.hash,rows.map(r=>[r.registration?.transactionHash||r.transactionHash,r.registration?.metadataDigest||r.metadataDigest])]);
+ const [recovery,setRecovery]=useState(null);
+ useEffect(()=>{
+  let alive=true,revision=0;setRecovery(null);
+  const refresh=async()=>{const current=++revision;if(!wallet)return;try{const bindings=await listRecoveryTitles(wallet);if(alive&&current===revision)setRecovery({wallet,bindings});}catch{if(alive&&current===revision)setRecovery(null);}};
+  void refresh();window.addEventListener(RECOVERY_VAULT_EVENT,refresh);window.addEventListener('focus',refresh);
+  return()=>{alive=false;window.removeEventListener(RECOVERY_VAULT_EVENT,refresh);window.removeEventListener('focus',refresh);};
+ },[wallet]);
+ const context=JSON.stringify([wallet,chainId,factoryAddress,anchor?.hash,rows.map(r=>[r.registration?.transactionHash||r.transactionHash,r.registration?.metadataDigest||r.metadataDigest])]);
  useEffect(()=>{
   let alive=true;setHistory(null);
-  if(client&&rows.length&&index.length)void (async()=>{
+  if(client&&rows.length&&(index.length||wallet))void (async()=>{
    const [actual,genesis]=await Promise.all([client.getChainId(),client.getBlock({blockNumber:0n})]);
    if(Number(actual)!==Number(chainId))return;
    if(anchor?.hash){const block=await client.getBlock({blockNumber:BigInt(anchor.number)});if(block.hash?.toLowerCase()!==anchor.hash.toLowerCase())return;}
@@ -34,8 +42,9 @@ export function useBuildingRollup({rows,client,chainId,factoryAddress,anchor}){
   return()=>{alive=false;};
  },[client,context,index.length]);
  const scope=history?.context===context?history.scope:null;
- const items=useMemo(()=>rollupBuildings(rows,index,scope),[rows,index,scope]);
- return {items,scope,index};
+ const titledRows=useMemo(()=>applyWorkTitles(rows,index,recovery&&recovery.wallet===wallet?recovery.bindings:[],scope,wallet),[rows,index,recovery,scope,wallet]);
+ const items=useMemo(()=>rollupBuildings(titledRows,index,scope),[titledRows,index,scope]);
+ return {items,scope,index,rows:titledRows};
 }
 export function FileRoleChips({roles=[]}){
  if(!roles.length)return null;
@@ -45,8 +54,8 @@ export function ReleaseBuildingCard({group,client,chainId,factoryAddress,anchor,
  const {record,parts,missing}=group;
  const root=parts.find(p=>p.member.part==='master')||parts[0];
  const r=root.row.registration||root.row;
- const title=root.row.source!=='road-registry'&&root.row.title&&root.member.part==='master'?root.row.title:
-  (record.type==='music-release'?'Music release ':'Work bundle ')+shortId(record.root);
+ const primary=parts.find(p=>p.member.part==='master');
+ const title=primary?.row.workTitle?displayWorkTitle(primary.row):(record.type==='music-release'?'Music release':'Work bundle');
  return <article className="br-building" aria-label={title} data-building-id={record.id}>
   <div className="br-building-header"><RegistrationThumbnail client={client} anchor={anchor} title={title}
    identity={{chainId,factoryAddress,brickAddress:r.brickAddress||r.address,ipId:r.ipId,originator:r.originator,collection:r.nftContractAddress,tokenId:r.tokenId}}/>
@@ -62,7 +71,7 @@ export function ReleaseBuildingCard({group,client,chainId,factoryAddress,anchor,
  </article>;
 }
 /** The selected JSON is parsed locally; only minimal association identifiers are
- * retained. It is not sent to the Player, IPFS, an identity service or a wallet.
+ * retained with work titles for display. It is not sent to the Player, IPFS, an identity service or a wallet.
  */
 export function ImportBuildingPacket({rows,client,chainId,factoryAddress}){
  const input=useRef(null),[status,setStatus]=useState(''),[busy,setBusy]=useState(false),revision=useRef(0);

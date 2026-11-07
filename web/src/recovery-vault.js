@@ -63,6 +63,10 @@ async function transaction(wallet,mode,operation,indexedDB){
 export async function listRecoveryFiles(wallet,options={}){
  return transaction(wallet,'readonly',(_,rows)=>rows.map(row=>({...row,...makeRecoveryRecord(row)})).sort((a,b)=>b.updatedAt-a.updatedAt),options.indexedDB);
 }
+// Card labels do not need recovery keys or file entries outside the vault.
+export async function listRecoveryTitles(wallet,options={}){
+ return transaction(wallet,'readonly',(_,rows)=>rows.flatMap(row=>row.bindings.map(binding=>({...recoveryBinding(binding),wallet:row.wallet,updatedAt:row.updatedAt}))),options.indexedDB);
+}
 export async function saveRecoveryRecords(wallet,records,options={}){
  wallet=recoveryWallet(wallet);
  if(!Array.isArray(records)||records.length>MAX_VAULT_FILES)throw Error('Too many recovery files.');

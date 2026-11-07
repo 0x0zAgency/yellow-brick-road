@@ -15,6 +15,12 @@ Changing wallets/networks starts fresh discovery with that scope’s defaults. L
 
 Discovery sends no account keys, private files, encrypted media, local drafts, metadata JSON or source content to the Road. RPC queries go to the blockchain node configured in your wallet; that provider can observe the queried wallet and contract addresses, so this is **read-only**, but not a zero-network-traffic privacy mode.
 
+## Work titles
+
+Brick headings use the work title; grouped Buildings use their primary work’s title. Titles are retained locally from confirmed mint packets and existing wallet recovery associations, matched to the exact chain history, factory, Brick, IP identity and current metadata digest. Editor saves refresh the title. Addresses remain available in expanded details.
+
+The registry can show these local titles to the connected creator/controller and search them alongside public labels. This does not publish private metadata. If an older mint has no saved title, open Edit Brick with its recovery file or restore its complete JSON mint packet. Until a title is available, cards show “Registered work,” “Music release,” or “Work bundle.”
+
 ## Optional private IPFS recovery
 
 For an `ipfs://` metadata reference, choose **Recover encrypted files** and import the private recovery JSON exported by Mint Studio. The import is local. **Retrieve & verify registered metadata** then fetches pinned ciphertext from the local YBR bridge and decrypts it in the browser. Its exact plaintext hash must match the metadata digest read from the selected contract before source-file references appear.

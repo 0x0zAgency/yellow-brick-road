@@ -1,4 +1,5 @@
-/** Search public registry fields only. Private metadata and playback terms are not sale listings. */
+/** Search public fields and already-known local display titles; never fetch private metadata. */
+import {displayWorkTitle} from './work-titles.js';
 export const SEARCH_DEFAULTS={query:'',category:'all',preview:'all',wallet:'',walletRole:'either',fromBlock:'',toBlock:'',sort:'newest',shortlisted:false,mine:false};
 export const WORK_TYPES=[['all','All work types'],['music','Music & audio'],['visual','Images & graphics'],['writing','Writing'],['video','Film & video'],['software','Software'],['data','Data & research'],['other','Other'],['undisclosed','Type not disclosed']];
 export const SEARCH_PURPOSES=[['explore','Explore IP'],['publishing','License for publishing'],['ingestion','License for ingestion'],['purchase','Discuss a purchase']];
@@ -26,7 +27,7 @@ export function matchesRegistrySearch(brick,filters,{wallet,shortlist=[],network
  if(filters.preview==='available'&&!brick.streamAllowed||filters.preview==='unavailable'&&brick.streamAllowed)return false;
  if(address){const fields=filters.walletRole==='originator'?[r.originator]:filters.walletRole==='controller'?[r.controller]:[r.originator,r.controller];if(!fields.some(value=>lower(value)===address))return false;}
  if(filters.fromBlock&&BigInt(r.blockNumber)<BigInt(filters.fromBlock)||filters.toBlock&&BigInt(r.blockNumber)>BigInt(filters.toBlock))return false;
- const fields=[brick.title,brick.id,r.brickAddress,r.originator,r.controller,r.transactionHash,r.contentHash,r.metadataDigest];
+ const fields=[displayWorkTitle(brick),brick.title,brick.id,r.brickAddress,r.originator,r.controller,r.transactionHash,r.contentHash,r.metadataDigest];
  if(brick.source==='road')fields.push(brick.creator,brick.description);
  return !q||fields.some(value=>lower(value).includes(q));
 }
@@ -39,7 +40,7 @@ export function searchRegistryItems(items,filters,context={}){
  })[0];
  return selected.sort((a,b)=>{
   const aa=representative(a),bb=representative(b);
-  if(filters.sort==='title')return aa.title.localeCompare(bb.title)||aa.id.localeCompare(bb.id);
+  if(filters.sort==='title')return displayWorkTitle(aa).localeCompare(displayWorkTitle(bb))||aa.id.localeCompare(bb.id);
   const left=BigInt(aa.registration.blockNumber),right=BigInt(bb.registration.blockNumber);
   return left===right?0:filters.sort==='oldest'?(left<right?-1:1):(left>right?-1:1);
  });
