@@ -15,7 +15,8 @@ async function main(){
   const {mintOnChain,localConfig}=await load('chain-mint.js'),{makeRegistrationPacket}=await load('mint-model.js'),{pinEncryptedBrickMetadata}=await load('ipfs-upload.js');
   const [account,other]=await server.provider.request({method:'eth_accounts'}),chain=localConfig(rpcUrl,1337),client=createPublicClient({chain,transport:http(rpcUrl)}),wallet=createWalletClient({account,chain,transport:http(rpcUrl)});
   const artifact=JSON.parse(fs.readFileSync(path.join(root,'artifacts/contracts/YellowBrickFactory.sol/YellowBrickFactory.json')));
-  const factoryAddress=(await client.waitForTransactionReceipt({hash:await wallet.deployContract({abi:artifact.abi,bytecode:artifact.bytecode})})).contractAddress;
+  const gas=await client.estimateGas({account,data:artifact.bytecode});
+  const factoryAddress=(await client.waitForTransactionReceipt({hash:await wallet.deployContract({abi:artifact.abi,bytecode:artifact.bytecode,gas:gas+gas/5n})})).contractAddress;
   const secret='disposable-brick-editor-test-key',pin=bytes=>{const sha256=digest(bytes),cid='bafy'+sha256;store.set(cid,Buffer.from(bytes));return {cid,sha256,size:bytes.length,pinned:true,verified:true};};
   let packet=makeRegistrationPacket({metadata:{title:'Original artwork title',artist:'Artist',ipCategory:'illustration'},assets:{master:{name:'art.png',type:'image/png',hash:'ab'.repeat(32),size:4}},identity:{mode:'external',address:account,connected:true},royalties:{creatorBps:10000},training:'not-authorized',composition:false,contentPolicy:{locked:true,preview:false,artwork:false,lyrics:false}});
   packet=await pinEncryptedBrickMetadata({packet,secret,fetchImpl:async(url,options)=>Response.json(pin(options.body))});
@@ -55,7 +56,7 @@ createRoot(document.getElementById('root')).render(<main style={{maxWidth:1100,m
   await page.evaluate(()=>window.testWalletChange());await editor.getByRole('alert').filter({hasText:'wallet or network changed'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.walletWrites),2,'One rejection and one metadata transaction; no mint or extra signing');assert.deepEqual(errors,[]);
   console.log('BRICK EDITOR PASS: My Bricks entry, live commitment + private recovery verification, locked visual-work edits, no Player controls, review, rejected-wallet retry, exact chain save, recovery export, reopen, account invalidation and mobile layout.');
- }catch(error){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'brick-editor-failure.png'),fullPage:true}).catch(()=>{});}throw Error(error.shortMessage||error.message);}
+ }catch(error){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'brick-editor-failure.png'),fullPage:true}).catch(()=>{});}throw Error([error.shortMessage||error.message,error.details].filter(Boolean).join('\n'));}
  finally{await browser?.close();await vite?.close();await server.close();for(const file of [html,jsx])fs.rmSync(file,{force:true});}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

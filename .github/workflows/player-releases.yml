@@ -119,7 +119,7 @@ jobs:
           node scripts/active-network-browser.cjs
           node scripts/settings-browser.cjs
           node scripts/tools-browser.cjs
-      - name: Exercise duplicate Brick reuse and songwriter splits on an isolated chain
+      - name: Exercise Brick reuse, songwriter splits and the editor on isolated chains
         run: |
           npm install --no-audit --no-fund
           npm run compile
