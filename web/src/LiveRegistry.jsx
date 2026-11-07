@@ -9,7 +9,7 @@ import {useEffect,useMemo,useRef,useState} from 'react';
 import CopyField from './CopyField.jsx';
 import LicensingContactEditor from './LicensingContactEditor.jsx';
 import {fetchRegistry} from './registry-client.js';
-import {Bookmark} from 'lucide-react';
+import {Bookmark,CheckCircle2,AlertCircle} from 'lucide-react';
 import {RegistrySearch,RegistryWorkDetails} from './RegistrySearch.jsx';
 import {SEARCH_DEFAULTS,readShortlist,toggleShortlist,registrationKey,searchRegistryItems,matchesRegistrySearch,publicWorkTypeLabel,validateSearch,SHORTLIST_KEY} from './registry-search.js';
 import './live-registry.css';
@@ -54,6 +54,8 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
  const selectedBrick=titledRows.find(brick=>registrationKey(brick,data.network)===selected);
  useEffect(()=>{if(data&&selected&&!selectedBrick)setSelected('');},[data,selected,selectedBrick]);
  const pages=Math.max(1,Math.ceil(shown.length/12)),currentPage=Math.min(page,pages-1);
+ const waiting=busy||(!data&&!error);
+ const statusLabel=waiting?(data?'Updating registry…':'Loading registry…'):error?'Registry unavailable':'Registry up to date';
  const renderPart=brick=>{const r=brick.registration,title=displayWorkTitle(brick);return <article className="br-record" key={r.chainId+':'+r.factoryAddress+':'+r.brickAddress}>
      <div className="br-record-header"><RegistrationThumbnail client={client} anchor={data.head} title={title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/>
       <div className="br-record-copy"><span className="br-kicker">ON-CHAIN BRICK · BLOCK {r.blockNumber}</span><h3>{title}</h3><StatusPill tone={brick.streamAllowed?'success':'neutral'}>{brick.streamAllowed?'Public playback available':'Registered · private media'}</StatusPill>
@@ -72,15 +74,19 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
   <div className="registry-bar"><div className="tabs">
    <button type="button" className={!examples?'active':''} onClick={()=>setExamples(false)}>On-chain registrations</button>
    <button type="button" className={examples?'active':''} onClick={()=>setExamples(true)}>Local drafts &amp; examples</button>
-  </div>{!examples&&<button type="button" className="quiet" disabled={busy} onClick={()=>void refresh.current()}>{busy?'Reading chain…':'Refresh registry'}</button>}</div>
+  </div>{!examples&&<button type="button" className="quiet" disabled={busy} onClick={()=>void refresh.current()}>Refresh registry</button>}</div>
   {examples?children:<>
    <p className="lr-boundary">Discover registered works, review their public information and start a conversation with the licensor.</p>
    <details className="lr-network br-surface"><summary><span>{data?.network?.label||ACTIVE_NETWORK?.label||'Selected network'} · chain {data?.network?.chainId||ACTIVE_NETWORK?.chainId||'connecting'}</span><StatusPill tone={data?'success':'warning'}>{data?data.bricks.length+' registrations':'Connecting'}</StatusPill></summary><div className="br-surface-body">
     {data&&<><CopyField label="Registry factory" value={data.network.factoryAddress}/><small>RPC: {data.network.rpcUrl||'Active network through the local read-only proxy'}</small><small>Blocks {data.fromBlock}–{data.head.number} · checked {checked} · refreshes every 5 seconds</small></>}
     <p>Use Dev Control to change the active blockchain. <button type="button" className="text-action" onClick={onWallet}>Open My Bricks for the connected creator</button>.</p>
    </div></details>
-   {error&&<p className="wb-error" role="alert">{error} The registry is unavailable, not empty.</p>}
-   {!error&&(busy||!data)&&<RoadProgress size={data?'compact':'normal'} label={data?'Refreshing IP Registry…':'Reading confirmed factory events and Brick contracts…'}/>}
+   <div className="lr-status" role="group" data-state={waiting?(data?'refreshing':'loading'):error?'error':'ready'} aria-label="Registry status">
+    <span className="lr-status-indicator">{waiting?<RoadProgress size="tiny" hideLabel label={statusLabel}/>:error?<AlertCircle size={20} aria-hidden="true"/>:<CheckCircle2 size={20} aria-hidden="true"/>}</span>
+    <div className="lr-status-copy" role={error&&!waiting?'alert':undefined} tabIndex={error&&!waiting?0:undefined}>
+     <strong>{statusLabel}</strong><span>{error&&!waiting?<>{error} The registry is unavailable, not empty.</>:checked?'Last updated '+checked+' · Refreshes automatically': 'Reading registered works…'}</span>
+    </div>
+   </div>
    {data&&<>
     {(data.limited||data.limitReached)&&<p className="wb-warning">Partial scan: {data.matchingEvents} matching events in the scanned range; up to 200 newest registrations are shown. This is not a complete historical index.</p>}
     <RegistrySearch filters={filters} onChange={changeFilters} purpose={purpose} onPurpose={setPurpose} rows={data.bricks} shortlistCount={savedCount} wallet={wallet} view={view} onView={setView}/>

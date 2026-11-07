@@ -35,3 +35,7 @@ Use existing provenance standards when enriching public records: retain PROV-O r
 ## Verification
 
 Model tests cover combined filters, undisclosed fields, exact wallet roles, large block numbers, Building grouping, sorting and identity-scoped local storage. Existing Chromium regressions cover real React search controls, no-match/error states, shortlist persistence, list/grid views, purchase email, scope handoff, keyboard focus, desktop/mobile bounds and the absence of signing/private-content requests. The licensing regression verifies that the selected publishing scope reaches the actual offer form.
+
+## Refresh status
+
+The registry polls every five seconds. Loading, refreshing, last-updated and failure messages share a reserved status row above search; its height and the Refresh registry button label stay stable. Background refreshes keep the current results visible until the response is validated. Failed or invalid reads still hide the results and report that the registry is unavailable, not empty. Long error messages scroll inside the status row and remain keyboard-accessible.

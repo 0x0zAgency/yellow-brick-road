@@ -1,1 +1,8 @@
 .lr-network{padding:16px 0;display:grid;gap:8px}.lr-network p,.lr-boundary{color:var(--muted,#9e9eaa);font-size:.9rem;line-height:1.6}.lr-network .copy-field{max-width:100%}.lr-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,360px),1fr));gap:20px}.lr-card{min-width:0;padding:22px}.lr-card h3{margin:12px 0;overflow-wrap:anywhere}.lr-card p{color:var(--muted,#9e9eaa);line-height:1.6}.lr-card dl{margin-top:18px}.lr-card dt{font-size:.8rem;color:var(--muted,#9e9eaa);margin-top:12px}.lr-card dd{margin:6px 0;overflow-wrap:anywhere;font-family:monospace;font-size:.82rem}.lr-card summary{cursor:pointer;padding:12px 0}.lr-card .text-action{display:inline-flex;margin-top:14px}.lr-boundary{margin-top:24px}.lr .registry-bar{gap:14px;flex-wrap:wrap}.lr .tabs{flex-wrap:wrap}.lr .searchbox{max-width:100%;min-width:240px}.lr-network small{overflow-wrap:anywhere}
+
+/* Polling status owns a permanent slot, so updates cannot push the search or cards. */
+.lr-status{display:flex;align-items:center;gap:14px;block-size:88px;margin:16px 0;padding:12px 16px;border:1px solid #30363e;border-radius:10px;background:#171d25;min-width:0}
+.lr-status-indicator{display:flex;align-items:center;justify-content:center;flex:0 0 56px;color:#edc575}.lr-status .road-progress{margin:0}
+.lr-status-copy{display:flex;flex-direction:column;gap:4px;min-width:0;max-block-size:100%;overflow:auto;overflow-wrap:anywhere;line-height:1.5}.lr-status-copy strong{font-size:12px;color:#e5e8e5}.lr-status-copy>span{font-size:11px;color:#9ba6b0}
+.lr-status[data-state=error]{border-color:#766748}.lr-status-copy:focus-visible{outline:2px solid #edc575;outline-offset:2px}
+@media(max-width:430px){.lr-status{padding:10px 12px;gap:10px}}

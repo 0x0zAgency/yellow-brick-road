@@ -73,7 +73,7 @@ function App(){const [view,setView]=useState('mint'),[partial,setPartial]=useSta
 }
 createRoot(document.getElementById('compact-root')).render(<App/>);
 `,{flag:'wx'});
- const browser=await chromium.launch({headless:true});let page;let offline=false;
+ const browser=await chromium.launch({headless:true});let page;let offline=false,registryGate=null;
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1050}});page=await context.newPage();const errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
@@ -84,7 +84,7 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
    const result=Array.isArray(payload)?await Promise.all(payload.map(one)):await one(payload);
    await route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(result)});
   });
-  await page.route('**/road/api/registry',async route=>route.fulfill({status:offline?503:200,contentType:'application/json',body:JSON.stringify(offline?{error:'Fixture node offline'}:await page.evaluate(()=>window.uiRegistry))}));
+  await page.route('**/road/api/registry',async route=>{const gate=registryGate;registryGate=null;if(gate)await gate();await route.fulfill({status:offline?503:200,contentType:'application/json',body:JSON.stringify(offline?{error:'Fixture node offline. '+('Check the node connection. '.repeat(20))}:await page.evaluate(()=>window.uiRegistry))});});
   await page.goto('http://127.0.0.1:5173/'+stem+'.html');
   await page.getByRole('button',{name:'Customize NFT appearance',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.br-hero img')?.naturalWidth>0);
@@ -152,11 +152,34 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
    assert.equal(await page.locator('.br-record .road-copy-value').first().isVisible(),true);
    await page.getByText(detail,{exact:true}).first().click();
    if(view==='registry'){
+    // Hold actual polling responses: the status slot, button, search and cards must not move.
+    const geometry=()=>page.evaluate(()=>Object.fromEntries(['.lr-status','.lr .registry-bar>button','.rs-search','.lr .br-grid'].map(selector=>{const r=document.querySelector(selector).getBoundingClientRect();return [selector,{x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:selector==='.lr .br-grid'?0:r.height}];})));
+    const sameLayout=(before,after,phase)=>{for(const selector of Object.keys(before))for(const key of Object.keys(before[selector]))assert.ok(Math.abs(before[selector][key]-after[selector][key])<1,phase+' shifted '+selector+' '+key);};
+    for(const width of [1440,390]){
+     await page.setViewportSize({width,height:1050});await page.locator('.lr-status[data-state="ready"]').waitFor();
+     const before=await geometry();let release,started;
+     const reached=new Promise(resolve=>{started=resolve;});registryGate=()=>new Promise(resolve=>{release=resolve;started();});
+     // Desktop checks the button; mobile waits for the real five-second auto-refresh.
+     if(width===1440)await page.evaluate(()=>document.querySelector('.lr .registry-bar>button').click());
+     let timeout;try{await Promise.race([reached,new Promise((_,reject)=>{timeout=setTimeout(()=>reject(Error('Registry did not refresh within 12 seconds.')),12000);})]);}finally{clearTimeout(timeout);registryGate=null;}
+     try{
+      await page.locator('.lr-status[data-state="refreshing"]').waitFor();
+      await page.getByRole('progressbar',{name:'Updating registry…',exact:true}).waitFor();
+      assert.equal(await page.getByRole('button',{name:'Refresh registry',exact:true}).isDisabled(),true);
+      sameLayout(before,await geometry(),width+' pending');
+      await page.screenshot({path:path.join(out,'registry-refresh-'+(width===1440?'desktop':'mobile')+'.png'),fullPage:true});
+     }finally{release();}
+     await page.locator('.lr-status[data-state="ready"]').waitFor();sameLayout(before,await geometry(),width+' completed');
+     assert.equal(await page.locator('.lr-status .road-progress').count(),0,'Idle status is still, with no looping loader');
+    }
+    await page.setViewportSize({width:1440,height:1050});
     await page.getByLabel('Search on-chain registrations').fill('Registered Brick 13');
     await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
     await page.getByLabel('Search on-chain registrations').fill('');
     offline=true;await page.getByRole('button',{name:'Refresh registry',exact:true}).click();
     await page.getByRole('alert').filter({hasText:'unavailable, not empty'}).waitFor();assert.equal(await page.locator('.br-grid > .br-record').count(),0);
+    assert.equal(await page.locator('.lr-status').evaluate(el=>el.getBoundingClientRect().height),88,'Error status uses the same reserved space');
+    assert.equal(await page.locator('.lr-status-copy').getAttribute('tabindex'),'0','Long errors remain keyboard-scrollable');
     offline=false;await page.getByRole('button',{name:'Refresh registry',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===12);
    }
