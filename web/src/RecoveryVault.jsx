@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {RECOVERY_VAULT_EVENT,MAX_COLLECTION_BYTES,MAX_VAULT_FILES,listRecoveryFiles,parseRecoveryImport,saveRecoveryRecords,removeRecoveryFile,exportRecoveryCollection,downloadRecoveryJson,recoveryWallet} from './recovery-vault.js';
 import './recovery-vault.css';
@@ -31,6 +32,6 @@ export default function RecoveryVault({wallet,onConnect}){
    <div className="rv-list">{visible.map(row=><article key={row.id} className="rv-file"><div><h3>{row.title||row.name}</h3><p>{row.name}</p><small>{row.kit.metadata.length} metadata references · {row.kit.assets.length} file references</small>{row.bindings.length>0?<details><summary>{row.bindings.length} linked Brick{row.bindings.length===1?'':'s'}</summary>{row.bindings.map(b=><p key={[b.chainId,b.genesisHash,b.factoryAddress,b.brickAddress].join(':')}>{b.title||'Registered Brick'}<br/><code>{b.brickAddress}</code> · Network {b.chainId}</p>)}</details>:<small>Matched and linked when you open a Brick for editing.</small>}</div><div className="rv-actions"><button type="button" className="outline-btn" disabled={busy} onClick={()=>downloadRecoveryJson(JSON.stringify(row.kit,null,2),row.name)}>Download file</button><button type="button" className="quiet" disabled={busy} onClick={()=>{if(window.confirm('Remove this recovery file from this browser? Downloaded copies and the Brick are unchanged.'))void run(async()=>{await removeRecoveryFile(valid,row.id);return 'Recovery file removed from this browser.';});}}>Remove</button></div></article>)}</div>
   </>}
   <p className="rv-note">Stored only in this browser profile at this site address. Clearing site data removes these copies. Downloads contain private recovery keys; no recovery files are backed up to YBR, IPFS, or a server.</p>
-  {status&&<p role="status" className="rv-notice">{status}</p>}{error&&<p role="alert" className="wb-error">{error}</p>}
+  {busy?<RoadProgress label="Working with local recovery files…"/>:status&&<p role="status" className="rv-notice">{status}</p>}{error&&<p role="alert" className="wb-error">{error}</p>}
  </section>;
 }

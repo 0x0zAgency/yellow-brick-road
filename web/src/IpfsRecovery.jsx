@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {parseRecoveryFile,recoverIpfsEntry,assetsFromRecoveredMetadata,MAX_RECOVERY_FILE_BYTES} from './ipfs-recovery.js';
 import {validCid} from './ipfs-upload.js';
@@ -111,7 +112,7 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
    </>}
   </>}
   {busy&&busy!=='import'&&<button type="button" className="quiet ir-cancel" onClick={()=>{cancelWork();setBusy('');setStatus('Recovery canceled.');}}>Cancel retrieval</button>}
-  {status&&<p className="ir-status" role="status">{status}</p>}{error&&<p className="ir-error" role="alert">{error}</p>}
+  {busy?<RoadProgress label={status||'Reading recovery file…'}/>:status&&<p className="ir-status" role="status">{status}</p>}{error&&<p className="ir-error" role="alert">{error}</p>}
   <p className="ir-note">Your local IPFS node and YBR bridge must be running with the original pins available. Clearing this session releases the imported key and pending downloads. File recovery does not grant a license or transfer rights.</p>
  </section>;
 }

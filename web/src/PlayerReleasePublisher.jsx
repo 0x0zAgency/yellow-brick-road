@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import NftCoverPublisher from './NftCoverPublisher.jsx';
 import './player-release.css';
 
@@ -7,6 +8,7 @@ export default function PlayerReleasePublisher({delivery={status:'not-requested'
  return <>{includeCover&&<NftCoverPublisher {...props}/>}<section className="pr-publish" aria-label="YBR Player delivery status">
   <span className="eyebrow">YBR PLAYER / DELIVERY STATUS</span>
   <h3>{ready?'Ready in YBR Player':failed?(props.mint?.simulated?'Simulation complete. Player delivery needs attention.':'Mint confirmed. Player delivery needs attention.'):delivery.status==='sending'?'Delivering approved Player copies…':'Player delivery was not requested'}</h3>
+  {delivery.status==='sending'&&<RoadProgress size="compact" label="Delivering approved Player copies…" hideLabel/>}
   {ready?<div className="pr-success" role="status"><p>The copies approved in Step 3 were delivered automatically. The Player continues to check the Brick’s live permissions for real mints.</p>
    {delivery.simulated&&<p>Simulation preview only. No on-chain permission was created.</p>}
    <a className="ms-primary" href={'//127.0.0.1:4173/#release='+delivery.brick.id} target="_blank" rel="noreferrer">Open release in Player ↗</a></div>:

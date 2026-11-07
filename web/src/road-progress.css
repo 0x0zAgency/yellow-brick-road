@@ -1,0 +1,18 @@
+/* Two staggered courses, built left to right. Only transform and opacity animate. */
+.road-progress{display:inline-flex;flex-direction:column;gap:11px;width:100%;max-width:420px;margin:16px 0;vertical-align:middle;min-width:0}
+.road-progress-bed{display:block;position:relative;width:100%;height:39px;overflow:hidden;isolation:isolate;border-radius:7px;background:#101c26;border:1px solid #514839;box-shadow:inset 0 2px 7px #0006,0 1px 0 #ffffff09}
+.road-progress-slot{position:absolute;left:calc(var(--road-column)*12.5% + 2px);top:calc(var(--road-row)*50% + 2px);width:calc(12.5% - 3px);height:calc(50% - 3px);border-radius:3px;background:#e2b84e12}
+.road-progress-brick{position:absolute;inset:0;display:block;border-radius:inherit;background:linear-gradient(155deg,#f6d27a 0%,#edc575 42%,#b58134 100%);border-top:1px solid #fff0ca;border-bottom:2px solid #796642;box-shadow:inset 0 1px 0 #ffffff12,0 2px 3px #0006;transform-origin:50% 90%;opacity:0}
+.road-progress--waiting .road-progress-brick{animation:road-build 3.2s cubic-bezier(.2,.75,.25,1) infinite both;animation-delay:calc(var(--road-order)*.075s)}
+@keyframes road-build{0%,4%{opacity:0;transform:translate3d(-9px,-22px,0) rotate(-10deg) scale(.86)}17%{opacity:1;transform:translate3d(0,1px,0) rotate(0) scale(1)}23%,76%{opacity:1;transform:translate3d(0,0,0)}94%,100%{opacity:0;transform:translate3d(8px,0,0)}}
+.road-progress--measured .is-built .road-progress-brick{opacity:1;animation:road-place .38s cubic-bezier(.2,.75,.25,1) both}
+@keyframes road-place{from{opacity:0;transform:translate3d(-4px,-18px,0) rotate(-7deg)}to{opacity:1;transform:translate3d(0,0,0) rotate(0)}}
+.road-progress-caption{display:flex;justify-content:space-between;align-items:baseline;gap:16px;font:500 12px/1.6 system-ui,sans-serif;color:inherit;overflow-wrap:anywhere;text-align:left}.road-progress-value{font-variant-numeric:tabular-nums;color:#edcb80;flex:none}
+.road-progress--compact{max-width:270px;gap:8px;margin:10px 0}.road-progress--compact .road-progress-bed{height:25px;border-radius:5px}.road-progress--compact .road-progress-brick{border-bottom-width:1px}.road-progress--tiny{width:56px;max-width:100%;margin:0;gap:0}.road-progress--tiny .road-progress-bed{height:18px;border:0;border-radius:3px}.road-progress--tiny .road-progress-slot{border-radius:1px}.road-progress--tiny .road-progress-brick{border-width:0 0 1px}.road-progress--tiny .road-progress-caption{font-size:10px}
+.ms-demo-dialog .road-progress{margin:8px 0 24px;max-width:none}.ms-demo-dialog .road-progress-bed{height:46px}.br-artwork-fallback>.road-progress{margin:0 8px;max-width:calc(100% - 16px)}
+[hidden] .road-progress-brick{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.road-progress .road-progress-brick{animation:none!important;transform:none!important}.road-progress--waiting .road-progress-slot:nth-child(-n+9) .road-progress-brick{opacity:.8}.road-progress--measured .is-built .road-progress-brick{opacity:1}}
+html[data-road-motion=reduced] .road-progress .road-progress-brick{animation:none!important;transform:none!important}
+html[data-road-motion=reduced] .road-progress--waiting .road-progress-slot:nth-child(-n+9) .road-progress-brick{opacity:.8}
+html[data-road-motion=reduced] .road-progress--measured .is-built .road-progress-brick{opacity:1}
+@media(forced-colors:active){.road-progress-bed{border:1px solid CanvasText}.road-progress-brick{background:Highlight;border-color:Highlight;forced-color-adjust:none}}

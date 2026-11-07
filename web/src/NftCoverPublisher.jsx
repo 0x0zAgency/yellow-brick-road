@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import PublicNftCoverCheck from './PublicNftCoverCheck.jsx';
 import {readPublicNftCover,decodePublicCover} from './nft-cover-read.js';
 import {useEffect,useRef,useState} from 'react';
@@ -93,7 +94,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
   </>}
   <p className="nft-cover-note">Only a resized PNG display copy is published. Original source files, metadata and recovery keys stay private. Original signatures are not represented as signatures of this derived thumbnail. A local IPFS pin does not guarantee worldwide availability.</p>
   <p className="nft-cover-note">Publishing a thumbnail does not grant permission to distribute or license the original work.</p>
-  {status&&<p role="status">{status}</p>}
+  {busy?<RoadProgress label={status||'Working on NFT artwork…'}/>:status&&<p role="status">{status}</p>}
   {pinned&&<p>Public image: <code>{pinned.imageURI}</code>{!saved?' · May already be public even if the wallet transaction is canceled.':''}</p>}
   {txHash&&<p>Artwork transaction: <code>{txHash}</code>{pendingTransaction?' · Review this transaction in your wallet before attempting another update.':''}</p>}
   {saved&&<div className="nft-cover-success"><strong>Cover URI verified on the actual NFTs.</strong><p>Wallets may cache metadata. Refresh the NFT’s metadata where supported. Its collection address and token ID have not changed.</p></div>}

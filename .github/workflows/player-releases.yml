@@ -14,6 +14,7 @@ on:
       - 'scripts/playable-cover-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/road-progress-browser.cjs'
       - 'scripts/settings-browser.cjs'
       - 'scripts/tools-browser.cjs'
       - 'web/appearance-css.js'
@@ -41,6 +42,7 @@ on:
       - 'scripts/playable-cover-browser.cjs'
       - 'scripts/ingest-player-interactions.cjs'
       - 'scripts/compact-bricks-browser.cjs'
+      - 'scripts/road-progress-browser.cjs'
       - 'scripts/settings-browser.cjs'
       - 'scripts/tools-browser.cjs'
       - 'web/appearance-css.js'
@@ -114,6 +116,7 @@ jobs:
           node scripts/album-cover-browser.cjs
           node scripts/nft-cover-browser.cjs
           node scripts/player-library-browser.cjs
+          node scripts/road-progress-browser.cjs
           node scripts/compact-bricks-browser.cjs
           node scripts/licensing-browser.cjs
           node scripts/active-network-browser.cjs

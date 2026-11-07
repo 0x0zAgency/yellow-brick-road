@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {useState} from 'react';
 import {createPublicClient,createWalletClient,custom,http,defineChain,isAddress} from 'viem';
@@ -64,7 +65,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   </article>)}
   <button type="button" className="ms-outline" onClick={add}>+ Add existing Brick reference</button>
   <p className="ms-link-note">For a Safe or other contract wallet controller, obtain an ERC-1271-compatible signature externally and paste its signed response. EIP-712 verifies a narrowly scoped approval, not all collaborators' rights; enforcement and licensing remain separate.</p>
-  {error&&<p className="ms-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+  {busy!==null&&<RoadProgress size="compact" label="Checking Brick approval…"/>}{error&&<p className="ms-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
  </details>;
 }
 export function BrickOwnerApprovals({wallet,onConnect}){

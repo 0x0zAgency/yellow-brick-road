@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {parseRecoveryFile,MAX_RECOVERY_FILE_BYTES} from './ipfs-recovery.js';
 import {DETAIL_FIELDS,MUSIC_FIELDS,IDENTIFIER_FIELDS,brickDetails,applyBrickDetails,openBrickMetadata,prepareBrickMetadata,refreshEditedBuilding} from './brick-editor.js';
@@ -103,6 +104,6 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
   {(session||backup||txHash)&&<button type="button" className="quiet" disabled={busy} onClick={clear}>Clear private session</button>}
   {!session&&<button type="button" className="quiet" disabled={busy} onClick={()=>void loadLocal()}>Load saved recovery file</button>}
   {localNotice&&<p className="be-note">{localNotice}</p>}
-  {status&&<p role="status" className="be-notice">{status}</p>}{error&&<p role="alert" className="wb-error">{error}</p>}
+  {busy?<RoadProgress label={status||'Working on this Brick…'}/>:status&&<p role="status" className="be-notice">{status}</p>}{error&&<p role="alert" className="wb-error">{error}</p>}
  </section>;
 }
