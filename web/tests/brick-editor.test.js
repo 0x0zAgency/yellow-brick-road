@@ -45,7 +45,8 @@ test('recovery verifies exact on-chain bytes; saves ciphertext only and exports 
  const draft=brickDetails(original);draft.title='Corrected title';
  const prepared=await prepareBrickMetadata({metadata:original,draft,review,kit,fetchImpl,now:'2026-11-07T00:00:00Z'});
  assert.equal(uploads.length,1);assert.equal(prepared.metadata.provenance.recordedAt,original.provenance.recordedAt);
- assert.equal(prepared.metadata.provenance.revisions[0]['prov:wasRevisionOf'],review.metadataURI);
+ assert.deepEqual(prepared.metadata.provenance.revisions[0]['prov:wasRevisionOf'],{'@id':review.metadataURI});
+ assert.deepEqual(prepared.metadata.provenance.revisions[0]['prov:generatedAtTime'],{'@value':'2026-11-07T00:00:00Z','@type':'http://www.w3.org/2001/XMLSchema#dateTime'});
  const newKit=parseRecoveryFile(JSON.stringify(prepared.backup));
  assert.deepEqual(await openBrickMetadata({review:{metadataURI:prepared.uri,metadataDigest:prepared.digest},kit:newKit,fetchImpl}),prepared.metadata);
  assert.deepEqual(await openBrickMetadata({review:{metadataURI:prepared.uri,metadataDigest:prepared.digest},kit,fetchImpl}),prepared.metadata,'The original recovery key remains usable');

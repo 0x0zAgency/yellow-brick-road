@@ -63,7 +63,7 @@ export async function prepareBrickMetadata({metadata,draft,review,kit,fetchImpl=
  const prior=edited.metadata.provenance.revisions||[];
  if(!Array.isArray(prior)||prior.length>=1000)throw Error('This Brick has an unsupported revision history.');
  edited.metadata.provenance.revisions=[...prior,{'@context':{prov:'http://www.w3.org/ns/prov#'},'@type':'prov:Entity',
-  'prov:wasRevisionOf':review.metadataURI,'prov:generatedAtTime':now,previousDigest:review.metadataDigest,previousVersion:review.metadataVersion,changedFields:edited.changes.map(c=>c.label)}];
+  'prov:wasRevisionOf':{'@id':review.metadataURI},'prov:generatedAtTime':{'@value':now,'@type':'http://www.w3.org/2001/XMLSchema#dateTime'},previousDigest:review.metadataDigest,previousVersion:review.metadataVersion,changedFields:edited.changes.map(c=>c.label)}];
  const bytes=new TextEncoder().encode(JSON.stringify(edited.metadata));
  if(bytes.byteLength>1024*1024)throw Error('Edited metadata exceeds the 1 MiB editor limit.');
  const digest=sha256(toHex(bytes)),encrypted=await encryptAsset(bytes,kit.key,{name:'brick-metadata',mime:'application/octet-stream'});
