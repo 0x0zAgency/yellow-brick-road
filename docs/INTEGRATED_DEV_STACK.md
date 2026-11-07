@@ -16,6 +16,19 @@ npm run setup:dev
 
 Or, for an existing clone, update to the newest `main`, then run `npm run setup:dev`.
 
+On ordinary startup, the launcher checks the required dependencies in the root,
+web and Player installations. If a pull introduced a missing package (for example,
+`mp3tag.js`), it runs `npm install` for that project, applies the existing script
+approval policy and rebuilds before starting services. Complete installations are
+not reinstalled. Optional packages are not required. This check detects missing
+packages; use `npm run setup:dev` to refresh changed dependency versions too.
+
+If Vite is already showing `Failed to resolve import "mp3tag.js"`, stop the running
+dev command, run `npm run setup:dev` from the repository root, then `npm run dev`.
+The dependency repair does not reset Ganache, wallets or IPFS data. Standalone
+`npm --prefix web run dev:web` bypasses the integrated startup check, so run setup
+first after updating that installation.
+
 ## Start everything
 
 From **repository root**:

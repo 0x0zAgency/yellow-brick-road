@@ -24,6 +24,12 @@ Start **Docker with Compose** first, or run **IPFS Desktop** with its local Kubo
 Kubo through Docker. Ganache, the factory, Explorer, IPFS bridge and Player are
 prepared automatically.
 
+After pulling updates, restart with `npm run dev`. The launcher installs missing
+declared dependencies before starting services. To refresh all dependencies
+manually, stop the dev command and run `npm run setup:dev`, then `npm run dev`.
+This also fixes Vite errors such as `Failed to resolve import "mp3tag.js"` after
+updating an older installation. Dependency setup preserves local chain and IPFS data.
+
 Open [Road Explorer / Mint Studio](http://127.0.0.1:5173) or
 [YBR Player](http://127.0.0.1:4173). Press **s** in the startup dashboard to reveal
 the development wallet and Player login details.
@@ -407,7 +413,7 @@ they do not spend funds on public Sepolia.
 For local testing, the main web app now launches the **standalone YBR Player**, Ganache (or reuses your existing chain 1337), the verified YellowBrickFactory, and one opt-in synthetic audio Brick together:
 
 ```sh
-npm run setup:dev  # first time only
+npm run setup:dev  # first install, or manually refresh dependencies after a pull
 npm run dev
 ```
 

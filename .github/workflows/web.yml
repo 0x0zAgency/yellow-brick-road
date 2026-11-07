@@ -54,6 +54,18 @@ jobs:
           npm --prefix web run dev -- --check-node
       - name: Pull Kubo image before timing stack readiness
         run: docker compose -f infra/ipfs/compose.yaml pull kubo
+      - name: Repair a missing web dependency after a pull
+        run: |
+          node <<'NODE'
+          const fs=require('node:fs'),path=require('node:path');
+          const root=process.cwd(),web=path.join(root,'web');
+          const {prepareInstallScripts}=require('./scripts/dev-install-scripts.cjs');
+          const {runChild,runtimeEnv}=require('./scripts/dev.cjs');
+          fs.rmSync(path.join(web,'node_modules','mp3tag.js'),{recursive:true,force:true});
+          prepareInstallScripts({root,run:runChild,env:runtimeEnv()}).then(()=>{
+            console.log('Repaired MP3 tag editor dependency:',require.resolve('mp3tag.js',{paths:[web]}));
+          }).catch(error=>{console.error(error);process.exitCode=1;});
+          NODE
       - name: Test cleanup against a disposable offline Kubo repository
         shell: bash
         run: |
