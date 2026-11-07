@@ -94,7 +94,7 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
  return <section className="ir" aria-label={brick?'Recover registered Brick files':'Recover IPFS files'}>
   <div className="ir-heading"><div><span className="eyebrow">PRIVATE FILE RECOVERY</span><h2>{brick?'Recover this Brick’s files':'Recover your files from IPFS'}</h2></div>{onClose&&<button type="button" className="quiet" onClick={onClose}>Close recovery</button>}</div>
   <p>Choose the private recovery JSON saved in Mint Studio. Encrypted files are retrieved from your local YBR IPFS node and decrypted here. {wallet?'The recovery file is also saved locally for this wallet.':'Your recovery key stays in this browser session.'}</p>
-  
+
   {brick&&<p className="ir-context">Selected Brick: <code>{brick.address}</code><br/>Recovered metadata must match this registration’s on-chain commitment before its file references are used.</p>}
   <div className="ir-import"><label htmlFor={brick?'brick-recovery-file':'ipfs-recovery-file'}>Private recovery file</label>
    <input ref={fileInput} id={brick?'brick-recovery-file':'ipfs-recovery-file'} type="file" accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];if(file)void importBackup(file);}}/>

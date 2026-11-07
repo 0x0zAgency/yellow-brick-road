@@ -37,6 +37,6 @@ export default function AlbumCoverSuggestion({album,previewDigest,wallet,chainId
   </div>)}
   {value?.kind==='album'&&<><p role="status">Selected: the existing public image URI will be used at mint.</p><button type="button" className="ms-outline" onClick={()=>onChange(null)}>Clear album artwork selection</button></>}
   {(state.error||state.playerUnavailable)&&<><p className="nft-cover-note">The Player’s saved uploads are unavailable; local receipt matches are still checked.</p><button type="button" className="ms-outline" onClick={()=>setRetry(n=>n+1)}>Retry album lookup</button></>}
-  
+
  </section>;
 }

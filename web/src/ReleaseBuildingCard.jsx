@@ -1,3 +1,4 @@
+import StatusArea from './StatusArea.jsx';
 import {WorkspaceIcon} from './AppearanceContext.jsx';
 import {useEffect,useMemo,useRef,useState} from 'react';
 import {Layers,FolderOpen} from 'lucide-react';
@@ -93,9 +94,9 @@ export function ImportBuildingPacket({rows,client,chainId,factoryAddress}){
   }catch(error){if(id===revision.current)setStatus(error instanceof SyntaxError?'That file is not a valid JSON mint packet.':error.message);}
   finally{if(id===revision.current)setBusy(false);}
  };
- return <div className="br-building-import"><button type="button" className="text-action" disabled={busy||!client||!rows.length} onClick={()=>input.current?.click()}>{busy?'Checking packet…':'Restore grouping from JSON packet'}</button>
+ return <div className="br-building-import"><button type="button" className="text-action" disabled={busy||!client||!rows.length} onClick={()=>input.current?.click()}>Restore grouping from JSON packet</button>
   <input ref={input} type="file" accept="application/json,.json" aria-label="Import release grouping packet" hidden onChange={event=>void read(event)}/>
   <small>Earlier mints stay separate until their explicit packet association is available. No title or cover matching.</small>
-  {status&&<p role="status">{status}</p>}
+  <StatusArea size="inline" busy={busy} label="Checking the local packet…" message={status} name="Building packet status"/>
  </div>;
 }

@@ -103,7 +103,7 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
   {backup&&<button type="button" className="outline-btn" onClick={download}>Download updated recovery file</button>}
   {(session||backup||txHash)&&<button type="button" className="quiet" disabled={busy} onClick={clear}>Clear private session</button>}
   {!session&&<button type="button" className="quiet" disabled={busy} onClick={()=>void loadLocal()}>Load saved recovery file</button>}
-  
+
   <StatusArea size="normal" busy={busy} label={status||'Working on this Brick…'} message={status} error={error} detail={localNotice} name="Brick editing status"/>
  </section>;
 }

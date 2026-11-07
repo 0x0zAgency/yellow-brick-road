@@ -1,5 +1,5 @@
 /* Explicit border-box sizing also works in tools rendered without Bootstrap. */
-.status-area{box-sizing:border-box;display:flex;align-items:center;gap:14px;block-size:88px;min-width:0;margin:16px 0;padding:12px 16px;border:1px solid #30363e;border-radius:10px;background:#171d25;color:#e5e8e5}
+.status-area{box-sizing:border-box;width:100%;display:flex;align-items:center;gap:14px;block-size:88px;min-width:0;margin:16px 0;padding:12px 16px;border:1px solid #30363e;border-radius:10px;background:#171d25;color:#e5e8e5}
 .status-area--compact{block-size:72px;margin:12px 0;padding:10px 12px;gap:10px}
 .status-area--inline{block-size:48px;margin:4px 0;padding:4px 0;gap:8px;border:0;background:transparent}
 .status-area[data-state=idle]{border-color:transparent;background:transparent}

@@ -98,6 +98,6 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
   {pinned&&<p>Public image: <code>{pinned.imageURI}</code>{!saved?' · May already be public even if the wallet transaction is canceled.':''}</p>}
   {txHash&&<p>Artwork transaction: <code>{txHash}</code>{pendingTransaction?' · Review this transaction in your wallet before attempting another update.':''}</p>}
   {saved&&<div className="nft-cover-success"><strong>Cover URI verified on the actual NFTs.</strong><p>Wallets may cache metadata. Refresh the NFT’s metadata where supported. Its collection address and token ID have not changed.</p></div>}
-  
+
  </section>;
 }

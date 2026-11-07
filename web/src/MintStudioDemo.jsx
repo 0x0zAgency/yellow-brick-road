@@ -316,7 +316,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
   <StatusArea message={ipfsHealth} name="IPFS connection status"/>
  </>}
  <p>Without IPFS, uploads remain simulated. Encryption keys stay in browser memory and are not uploaded.</p>
- 
+
  </section>
  </>}
  {step===2&&<><h2>03. IP and licensing.</h2>{ipfsEnabled&&<div className="ms-ipfs-confirm"><strong>Files encrypted locally, pending creator approval</strong>

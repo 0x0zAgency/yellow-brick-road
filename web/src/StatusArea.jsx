@@ -11,7 +11,7 @@ export default function StatusArea({busy=false,label='Working…',message='',err
   <span className="status-area-indicator" aria-hidden={pending?undefined:true}>
    {pending?<RoadProgress size="tiny" hideLabel label={label} value={value} max={max}/>:text?(failed?<AlertCircle size={20}/>:<CheckCircle2 size={20}/>):null}
   </span>
-  <div className="status-area-copy" role={failed?'alert':'status'} aria-atomic="true" tabIndex={text||children?0:undefined}>
+  <div className="status-area-copy" role={failed?'alert':'status'} aria-atomic="true" tabIndex={text||detail||children?0:undefined}>
    {text&&<span>{text}{measured&&<span className="status-area-percent"> · {Math.floor(Math.max(0,Math.min(100,value/(max??100)*100)))}%</span>}</span>}
    {detail&&<small>{detail}</small>}{children}
   </div>
