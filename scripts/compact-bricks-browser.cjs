@@ -30,14 +30,14 @@ const cid='bafy'+'a'.repeat(55),image='ipfs://'+cid;
 const records=Array.from({length:13},(_,i)=>({address:address(100+i),originator:owner,controller:owner,ipId:hash(1000+i),contentHash:hash(2000+i),metadataDigest:hash(3000+i),metadataVersion:'1',metadataURI:'ipfs://bafy'+'b'.repeat(55),nftContractAddress:collection,tokenId:String(1000+i),transactionHash:hash(4000+i),blockNumber:'9',creatorIsController:true}));
 const abi=[...presentationAbi,...factoryAbi,...BRICK_READ_ABI,...licensingContactAbi];
 const block={number:'0x9',hash:headHash,parentHash:hash(499),nonce:'0x0000000000000000',sha3Uncles:hash(0),logsBloom:'0x'+'00'.repeat(256),transactionsRoot:hash(1),stateRoot:hash(2),receiptsRoot:hash(3),miner:owner,difficulty:'0x0',totalDifficulty:'0x0',extraData:'0x',size:'0x1',gasLimit:'0x1c9c380',gasUsed:'0x0',timestamp:'0x1',transactions:[],uncles:[]};
-window.uiWalletWrites=0;
+window.uiWalletWrites=0;window.uiDiscoveryCalls=0;window.uiAccount=owner;window.uiChainId='0x539';const listeners={};
 window.uiRpc=async({method,params=[]})=>{
- if(method==='eth_chainId')return '0x539';
- if(method==='eth_accounts')return [owner];
+ if(method==='eth_chainId')return window.uiChainId;
+ if(method==='eth_accounts')return [window.uiAccount];
  if(method==='eth_blockNumber')return '0x9';
  if(method==='eth_getCode')return '0x6000';
  if(method==='eth_getBlockByNumber')return block;
- if(method==='eth_getLogs')return records.map((r,i)=>({address:factory,blockNumber:'0x9',blockHash:headHash,transactionHash:r.transactionHash,transactionIndex:'0x0',logIndex:'0x'+i.toString(16),removed:false,topics:encodeEventTopics({abi:factoryAbi,eventName:'BrickDeployed',args:{ipId:r.ipId,brick:r.address,originator:owner}}),data:encodeAbiParameters([{type:'bytes32'}],[r.contentHash])}));
+ if(method==='eth_getLogs'){window.uiDiscoveryCalls++;if(window.uiHoldDiscovery){window.uiHoldDiscovery=false;await new Promise(resolve=>{window.uiReleaseDiscovery=resolve;});}return records.map((r,i)=>({address:factory,blockNumber:'0x9',blockHash:headHash,transactionHash:r.transactionHash,transactionIndex:'0x0',logIndex:'0x'+i.toString(16),removed:false,topics:encodeEventTopics({abi:factoryAbi,eventName:'BrickDeployed',args:{ipId:r.ipId,brick:r.address,originator:owner}}),data:encodeAbiParameters([{type:'bytes32'}],[r.contentHash])}));}
  if(method==='eth_call'){
   const {functionName,args=[]}=decodeFunctionData({abi,data:params[0].data});
   const r=records.find(r=>r.address.toLowerCase()===params[0].to.toLowerCase())||records.find(r=>BigInt(r.tokenId)===args[0])||records[0];
@@ -49,7 +49,7 @@ window.uiRpc=async({method,params=[]})=>{
  }
  window.uiWalletWrites++;throw Error('Unexpected or non-read-only wallet method: '+method);
 };
-window.ethereum={request:window.uiRpc,on:()=>{},removeListener:()=>{}};
+window.ethereum={request:window.uiRpc,on:(key,fn)=>{(listeners[key]||=new Set()).add(fn);},removeListener:(key,fn)=>listeners[key]?.delete(fn)};window.uiSwitchNetwork=id=>{window.uiChainId=id;for(const fn of listeners.chainChanged||[])fn(id);};
 localStorage.setItem('road:factory:1337',factory);
 const registry={format:'ybr-chain-registry/1',network:{ready:true,chainId:1337,factoryAddress:factory,rpcUrl:'http://127.0.0.1:8545'},head:{number:'9',hash:headHash},fromBlock:'0',matchingEvents:13,limited:false,limitReached:false,bricks:records.map((r,i)=>({id:r.ipId,type:'RegisteredBrick',source:'road-registry',title:'Registered Brick '+String(i+1).padStart(2,'0'),creator:owner,description:'Private registered work.',streamAllowed:false,registration:{...r,chainId:1337,factoryAddress:factory,brickAddress:r.address}}))};
 window.uiRegistry=registry;
@@ -63,10 +63,10 @@ const mint={genesisHash:headHash,simulated:false,status:'confirmed',network:'Gan
 window.uiBuildingPacket={...packet,onChainMint:mint};
 window.uiRememberBuilding=async()=>{saveBuildingRecord(localStorage,await buildingFromPacket(packet,mint));window.dispatchEvent(new Event(BUILDING_EVENT));};
 const bytes=Uint8Array.from(atob('${png.toString('base64')}'),c=>c.charCodeAt(0));
-function App(){const [view,setView]=useState('mint'),[partial,setPartial]=useState(false);window.uiShow=setView;window.uiPartial=setPartial;
+function App(){const [view,setView]=useState('mint'),[partial,setPartial]=useState(false),[connectedWallet,setConnectedWallet]=useState(owner);window.uiShow=setView;window.uiPartial=setPartial;window.uiSetWallet=value=>{window.uiAccount=value;setConnectedWallet(value);};
  return <main style={{maxWidth:1120,margin:'0 auto',padding:'24px',minHeight:'100vh'}}>
   <div className="br-kicker" style={{marginBottom:16}}>YELLOW BRICK ROAD / CREATOR WORKSPACE</div>
-  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={owner} onConnect={()=>{}}/>:<LiveRegistry wallet={owner} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
+  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={connectedWallet} onConnect={()=>{}}/>:<LiveRegistry wallet={owner} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
  </main>;
 }
 createRoot(document.getElementById('compact-root')).render(<App/>);
@@ -113,11 +113,11 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.evaluate(()=>{localStorage.removeItem('road:release-buildings:v1');window.dispatchEvent(new Event('ybr:release-buildings-changed'));});
   for(const view of ['wallet','registry']){
    await page.evaluate(view=>window.uiShow(view),view);
-   if(view==='wallet')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
    await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===12);
    await page.waitForFunction(()=>document.querySelector('.br-record img')?.naturalWidth>0);
    assert.equal(await page.locator('.br-grid > .br-record details[open]').count(),0);
    if(view==='wallet'){
+    assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);assert.equal(await page.getByLabel('YellowBrickFactory address',{exact:true}).isVisible(),false);
     await page.getByRole('button',{name:'Customize NFT',exact:false}).first().click();
     assert.equal(await page.getByRole('region',{name:'NFT cover artwork'}).first().isVisible(),true);
     await page.locator('.wb-nft-cover > summary').first().click();
@@ -174,7 +174,6 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.getByText('Explore release parts',{exact:true}).click();
   await page.screenshot({path:path.join(out,'registry-buildings.png'),fullPage:true});
   await page.evaluate(()=>window.uiShow('wallet'));
-  await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
   await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-building').length===1);
   assert.equal(await page.locator('.br-grid > .br-record').count(),10);
   await page.getByText('Explore release parts',{exact:true}).click();
@@ -183,16 +182,29 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.setViewportSize({width:390,height:844});
   for(const view of ['mint','wallet','registry']){
    await page.evaluate(view=>window.uiShow(view),view);
-   if(view==='wallet')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
    await (view==='mint'?page.locator('.br-release-rollup'):page.locator('.br-building')).first().waitFor();
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),true,view+' mobile should not overflow horizontally');
    await page.screenshot({path:path.join(out,view+'-compact-mobile.png'),fullPage:true});
   }
+  // Visit, refresh and advanced search are read-only. Stale requests never restore old cards.
+  await page.evaluate(()=>{window.uiShow('wallet');});await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
+  const scans=()=>page.evaluate(()=>window.uiDiscoveryCalls),initialScans=await scans();
+  await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();assert.equal(await scans(),initialScans+1);
+  await page.getByText('Advanced search',{exact:true}).click();await page.getByLabel('Start block',{exact:true}).fill('2');await page.waitForTimeout(100);assert.equal(await scans(),initialScans+1,'Typing advanced settings does not scan');
+  await page.getByRole('button',{name:'Search Bricks',exact:true}).click();await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();assert.equal(await scans(),initialScans+2);await page.getByText('Advanced search',{exact:true}).click();
+  await page.evaluate(()=>{window.uiHoldDiscovery=true;});await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.waitForFunction(()=>typeof window.uiReleaseDiscovery==='function');
+  await page.evaluate(()=>window.uiSetWallet('0x0000000000000000000000000000000000000099'));await page.getByRole('heading',{name:'No registrations in this range',exact:true}).waitFor();
+  await page.evaluate(()=>{window.uiReleaseDiscovery();delete window.uiReleaseDiscovery;});await page.waitForTimeout(100);assert.equal(await page.locator('.br-grid .br-record').count(),0,'Late scan from previous wallet is ignored');
+  await page.evaluate(()=>window.uiSetWallet('0x0000000000000000000000000000000000000001'));await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
+  await page.evaluate(()=>{window.uiHoldDiscovery=true;});await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.waitForFunction(()=>typeof window.uiReleaseDiscovery==='function');
+  await page.evaluate(()=>window.uiSwitchNetwork('0x53a'));await page.getByRole('alert').filter({hasText:'Choose a factory address in Advanced search'}).waitFor();assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);
+  await page.evaluate(()=>{window.uiReleaseDiscovery();delete window.uiReleaseDiscovery;});await page.waitForTimeout(100);assert.equal(await page.locator('.br-grid .br-record').count(),0,'Late scan from previous network is ignored');
+  await page.evaluate(()=>window.uiSwitchNetwork('0x539'));await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>window.uiWalletWrites),0,'Rendering and expanding never requests signing');
   assert.ok(!requests.some(r=>r.url.includes('/api/road-ipfs/content/')),'No encrypted originals or metadata are fetched for thumbnails');
   assert.ok(!requests.some(r=>r.url.includes('/api/road-ipfs/nft-cover')&&r.method==='POST'),'Rendering never publishes artwork');
   assert.deepEqual(errors,[]);
-  console.log('BUILDING ROLLUPS / COMPACT VIEWS PASS: real React views, NFT controls before receipts, collapsed details with complete copy values, lazy thumbnail identity reads, 12-card pagination, search/offline behavior, mobile bounds and no signing or private fetches. RPC and image responses are explicit fixtures.');
+  console.log('BUILDING ROLLUPS / COMPACT VIEWS PASS: real React views, NFT controls before receipts, collapsed details with complete copy values, lazy thumbnail identity reads, 12-card pagination, search/offline behavior, mobile bounds, automatic discovery on visits/wallet/network changes, explicit advanced search, cancellation of late scans and no signing or private fetches. RPC and image responses are explicit fixtures.');
  }catch(error){
   if(page){const out=path.join(ROOT,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'compact-views-failure.png'),fullPage:true}).catch(()=>{});}
   throw error;

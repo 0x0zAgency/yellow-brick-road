@@ -16,54 +16,63 @@ const envFactory=id=>id===1337?import.meta.env.VITE_ROAD_GANACHE_FACTORY||'':id=
 
 export default function WalletBricks({wallet,onConnect}){
  const [chainId,setChainId]=useState(ACTIVE_NETWORK?.chainId||null),[factory,setFactory]=useState(ACTIVE_NETWORK?.factoryAddress||''),[startBlock,setStartBlock]=useState('');
+ const [networkReady,setNetworkReady]=useState(false),[networkRevision,setNetworkRevision]=useState(0);
  const [result,setResult]=useState(null),[busy,setBusy]=useState(false),[progress,setProgress]=useState(null),[error,setError]=useState('');
  const [recoveryAddress,setRecoveryAddress]=useState(null);
  const [page,setPage]=useState(0);
  const [editing,setEditing]=useState(null);
  const client=useMemo(()=>chainId&&window.ethereum?.request?createPublicClient({chain:networkFor(chainId),transport:ACTIVE_NETWORK?http(activeRpcUrl(),{retryCount:0,timeout:15000}):custom(window.ethereum,{retryCount:0})}):null,[chainId,wallet]);
- const requestId=useRef(0);
+ const requestId=useRef(0),scanController=useRef(null);
  const network=networkFor(chainId);
  useEffect(()=>{
   const provider=window.ethereum;
-  if(!provider?.request){setChainId(null);return;}
-  let alive=true;
-  const update=id=>{if(alive){try{setChainId(ACTIVE_NETWORK?.chainId||Number(BigInt(id)))}catch{setChainId(null)}}};
-  provider.request({method:'eth_chainId'}).then(update).catch(()=>{if(alive)setChainId(null)});
-  provider.on?.('chainChanged',update);
-  return()=>{alive=false;provider.removeListener?.('chainChanged',update)};
+  if(!provider?.request){setChainId(null);setNetworkReady(true);return;}
+  let alive=true,changedSinceRead=false;
+  const update=id=>{if(alive){try{setChainId(ACTIVE_NETWORK?.chainId||Number(BigInt(id)))}catch{setChainId(null)}setNetworkReady(true);}};
+  const changed=id=>{if(alive){changedSinceRead=true;update(id);setNetworkRevision(value=>value+1);}};
+  provider.request({method:'eth_chainId'}).then(id=>{if(!changedSinceRead)update(id);}).catch(()=>{if(alive&&!changedSinceRead){setChainId(null);setNetworkReady(true);}});
+  provider.on?.('chainChanged',changed);
+  return()=>{alive=false;provider.removeListener?.('chainChanged',changed)};
  },[]);
- useEffect(()=>{
-  requestId.current++;
-  setPage(0);setResult(null);setError('');setProgress(null);setBusy(false);setRecoveryAddress(null);setEditing(null);
-  if(!chainId){setFactory('');return;}
-  let saved='';
-  try{saved=localStorage.getItem(factoryStorageKey(chainId))||''}catch{}
-  setFactory(ACTIVE_NETWORK?.factoryAddress||saved||envFactory(chainId));
-  if(ACTIVE_NETWORK)setStartBlock(String(ACTIVE_NETWORK.deploymentBlock));
- },[wallet,chainId]);
- const reset=()=>{requestId.current++;setResult(null);setProgress(null);setError('');setBusy(false);setRecoveryAddress(null)};
- const run=async()=>{
+ const reset=()=>{requestId.current++;scanController.current?.abort();setPage(0);setResult(null);setProgress(null);setError('');setBusy(false);setRecoveryAddress(null);setEditing(null);};
+ const run=async({factoryAddress=factory,fromBlock=startBlock}={})=>{
   if(!wallet||!network){setError('Connect your wallet and select the chain where your factory was deployed.');return;}
-  if(!isAddress(factory)){setError('Enter a valid deployed YellowBrickFactory contract address.');return;}
+  if(!isAddress(factoryAddress)){setError('Enter a valid deployed YellowBrickFactory contract address in Advanced search.');return;}
   const provider=window.ethereum;
   if(!provider?.request){setError('An EIP-1193 browser wallet is required.');return;}
   const id=++requestId.current;
-  setBusy(true);setPage(0);setResult(null);setError('');setProgress(null);setRecoveryAddress(null);
+  scanController.current?.abort();const controller=new AbortController();scanController.current=controller;
+  setBusy(true);setPage(0);setResult(null);setError('');setProgress(null);setRecoveryAddress(null);setEditing(null);
   try{
    const actual=Number(BigInt(await provider.request({method:'eth_chainId'})));
+   controller.signal.throwIfAborted();
    if(actual!==chainId)throw Error('Switch the browser wallet to the active Dev Control network, then retry.');
    const accounts=await provider.request({method:'eth_accounts'});
+   controller.signal.throwIfAborted();
    if(!Array.isArray(accounts)||!accounts.some(a=>a.toLowerCase()===wallet.toLowerCase()))throw Error('Connected wallet account changed. Reconnect to refresh.');
-   const client=createPublicClient({chain:network,transport:ACTIVE_NETWORK?http(activeRpcUrl(),{retryCount:0,timeout:15000}):custom(provider)});
+   const client=createPublicClient({chain:network,transport:ACTIVE_NETWORK?http(activeRpcUrl(),{retryCount:0,timeout:15000}):custom(provider,{retryCount:0})});
    if(ACTIVE_NETWORK&&(await client.getBlock({blockNumber:0n})).hash.toLowerCase()!==ACTIVE_NETWORK.genesisHash.toLowerCase())throw Error('The active RPC history changed. Restart Dev Control before scanning.');
-   const data=await discoverWalletBricks({client,factoryAddress:factory,wallet,startBlock,
+   const data=await discoverWalletBricks({client,factoryAddress,wallet,startBlock:fromBlock,signal:controller.signal,
     onProgress:p=>{if(id===requestId.current)setProgress({from:p.from.toString(),to:p.to.toString(),found:p.found})}});
    if(id!==requestId.current)return;
    setResult(data);
-   try{localStorage.setItem(factoryStorageKey(chainId),factory)}catch{}
+   try{localStorage.setItem(factoryStorageKey(chainId),factoryAddress)}catch{}
   }catch(e){if(id===requestId.current)setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.');}
   finally{if(id===requestId.current)setBusy(false)}
  };
+ // A visit or wallet/network change uses current defaults once. Editing advanced
+ // fields stays explicit so typing a factory address does not start RPC scans.
+ useEffect(()=>{
+  reset();setStartBlock('');
+  let saved='';try{if(chainId)saved=localStorage.getItem(factoryStorageKey(chainId))||'';}catch{}
+  const nextFactory=chainId?(ACTIVE_NETWORK?.factoryAddress||saved||envFactory(chainId)):'';
+  setFactory(nextFactory);
+  if(wallet&&networkReady&&chainId){
+   if(isAddress(nextFactory))void run({factoryAddress:nextFactory,fromBlock:''});
+   else setError('Choose a factory address in Advanced search to load your Bricks.');
+  }
+  return()=>{requestId.current++;scanController.current?.abort();};
+ },[wallet,chainId,networkReady,networkRevision]);
  const {items}=useBuildingRollup({rows:result?.bricks||[],client,chainId,factoryAddress:result?.verifiedFactory});
  const pages=Math.max(1,Math.ceil(items.length/12)),currentPage=Math.min(page,pages-1);
  const renderPart=brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)} onEdit={()=>{setRecoveryAddress(null);setEditing(brick);}}/>;
@@ -73,16 +82,14 @@ export default function WalletBricks({wallet,onConnect}){
  };
  if(editing&&result)return <BrickEditor key={wallet+':'+chainId+':'+result.verifiedFactory+':'+editing.address} brick={editing} wallet={wallet} chainId={chainId} factoryAddress={result.verifiedFactory} client={client} onSaved={saved} onClose={()=>setEditing(null)}/>;
  return <section className="wb br-collection">
-  <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Find your registered works and open Edit Brick to update details, artwork, contact information and permissions. Changes are saved by the current controller through their wallet.</p></div>
+  <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Your registered works load automatically. Open Edit Brick to update a work.</p></div>
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
    <div className="wb-controls">
-    <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><span>Network: {network?network.name+' ('+network.id+')':chainId?'Unsupported chain '+chainId:'Detecting…'}</span></div>
-    {!network?<p role="alert" className="wb-error">Select the network where the factory was deployed in your browser wallet to view registrations.</p>:<>
-     <details className="br-surface" open={!isAddress(factory)}><summary><span>Network &amp; discovery settings</span></summary><div className="br-surface-body"><label>YellowBrickFactory address<input aria-label="YellowBrickFactory address" readOnly={!!ACTIVE_NETWORK} spellCheck="false" placeholder="0x..." value={factory} onChange={e=>{reset();setFactory(e.target.value.trim())}}/></label>
+    <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><button type="button" className="outline-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>{busy?'Loading…':'Refresh Bricks'}</button></div>
+    {!networkReady?<p role="status" className="wb-note">Detecting wallet network…</p>:!network&&<p role="alert" className="wb-error">Select the network where the factory was deployed in your browser wallet to view registrations.</p>}
+     <details className="br-surface wb-advanced"><summary><span>Advanced search</span></summary><div className="br-surface-body"><p className="wb-note">Network: {network?network.name+' ('+network.id+')':'Unavailable'}</p><label>YellowBrickFactory address<input aria-label="YellowBrickFactory address" readOnly={!!ACTIVE_NETWORK} spellCheck="false" placeholder="0x..." value={factory} onChange={e=>{reset();setFactory(e.target.value.trim())}}/></label>
      <label>Scan from block (optional)<input aria-label="Start block" inputMode="numeric" placeholder={chainId===1337?'0 (Ganache genesis)':'Recent 100,000 blocks'} value={startBlock} onChange={e=>{reset();setStartBlock(e.target.value.trim())}}/></label>
-     <p className="wb-note">The factory address identifies which registrations to search. On larger chains, an empty start block scans only the latest 100,000 blocks. Enter its deployment block for older mints (up to 100,000 blocks per scan). No wallet approval is requested.</p></div></details>
-     <button className="gold-btn" disabled={busy||!isAddress(factory)} onClick={()=>void run()}>{busy?'Scanning…':'Find my on-chain Bricks'}</button>
-    </>}
+     <p className="wb-note">The factory address identifies which registrations to search. On larger chains, an empty start block scans only the latest 100,000 blocks. Enter its deployment block for older mints (up to 100,000 blocks per scan). No wallet approval is requested.</p><button type="button" className="gold-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>Search Bricks</button></div></details>
    </div>
    {busy&&<div role="status" className="wb-message">Reading factory events{progress?' · blocks '+progress.from+'–'+progress.to+' · '+progress.found+' match(es) found':' and checking the deployed contract…'}</div>}
    {error&&<p role="alert" className="wb-error">{error}</p>}

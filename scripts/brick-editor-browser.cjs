@@ -40,7 +40,7 @@ const root=createRoot(document.getElementById('root'));window.showRecovery=walle
   await page.route('**/api/road-ipfs/health',route=>route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,peerId:'test-node'})}));
   await page.addInitScript(({rpcUrl,factoryAddress})=>localStorage.setItem('road:mint:network:v1',JSON.stringify({version:1,data:{network:'ganache',rpcUrl,ganacheChainId:'1337',useStartupFactory:false,factories:{['ganache:1337:'+rpcUrl]:factoryAddress}}})),{rpcUrl,factoryAddress});
   await page.goto('http://127.0.0.1:'+vite.httpServer.address().port+'/'+stem+'.html');
-  await page.getByRole('button',{name:'Find my on-chain Bricks',exact:true}).click();await page.getByRole('button',{name:'Edit Brick',exact:true}).click();
+  await page.getByRole('button',{name:'Edit Brick',exact:true}).click();
   const editor=page.getByRole('region',{name:'Brick editor',exact:true});await editor.waitFor();await page.waitForFunction(()=>document.querySelector('[aria-label="Edit work details"]')?.getAttribute('aria-busy')==='false');assert.equal(await page.evaluate(()=>window.walletWrites),0);
   await editor.getByLabel('Private recovery file',{exact:true}).setInputFiles({name:'wrong.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({...backup,key:'wrong-test-recovery-secret'}))});await editor.getByRole('alert').filter({hasText:'key is incorrect'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).count(),0);
   await editor.getByLabel('Private recovery file',{exact:true}).setInputFiles(recoveryFile);await editor.getByLabel('Title',{exact:true}).waitFor();
@@ -55,7 +55,7 @@ const root=createRoot(document.getElementById('root'));window.showRecovery=walle
   const downloadEvent=page.waitForEvent('download');await editor.getByRole('button',{name:'Download updated recovery file',exact:true}).click();const download=await downloadEvent;const downloaded=JSON.parse(fs.readFileSync(await download.path()));assert.equal(downloaded.key,secret);assert.equal(downloaded.metadata.length,1);
   const stored=await page.evaluate(()=>JSON.stringify({...localStorage}));assert.ok(!stored.includes(secret));assert.ok(!stored.includes('Edited artwork title'));
   await editor.getByRole('button',{name:'Back to My Bricks',exact:true}).click();await page.getByRole('button',{name:'Edit Brick',exact:true}).click();await editor.getByRole('status').filter({hasText:'Loaded saved recovery file · verified metadata version 2'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).inputValue(),'Edited artwork title');
-  await page.reload();await page.getByRole('button',{name:'Find my on-chain Bricks',exact:true}).click();await page.getByRole('button',{name:'Edit Brick',exact:true}).click();await editor.getByRole('status').filter({hasText:'Loaded saved recovery file · verified metadata version 2'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).inputValue(),'Edited artwork title');
+  await page.reload();await page.getByRole('button',{name:'Edit Brick',exact:true}).click();await editor.getByRole('status').filter({hasText:'Loaded saved recovery file · verified metadata version 2'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).inputValue(),'Edited artwork title');
   await page.evaluate(()=>window.testWalletChange());await editor.getByRole('alert').filter({hasText:'wallet or network changed'}).waitFor();assert.equal(await editor.getByLabel('Title',{exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.walletWrites),0,'Reload and automatic recovery require no wallet write');assert.deepEqual(errors,[]);
   // Local collection: atomic imports, durable IndexedDB, wallet isolation and downloads.
@@ -89,7 +89,8 @@ const root=createRoot(document.getElementById('root'));window.showRecovery=walle
   assert.equal(await page.evaluate(()=>window.mintRecoveryBeforeWrite),true);
   const minted=await page.evaluate(async wallet=>{const {listRecoveryFiles}=await import('/src/recovery-vault.js');return (await listRecoveryFiles(wallet)).filter(r=>r.title==='Auto saved mint');},account);
   assert.equal(minted.length,1,'Binding enrichment must not duplicate the saved file');assert.equal(minted[0].bindings.length,1);assert.equal(minted[0].kit.assets.length,1);assert.equal(minted[0].kit.metadata.length,1);
-  assert.equal(minted[0].bindings[0].factoryAddress,factoryAddress.toLowerCase());assert.deepEqual(errors,[]);
+  assert.equal(minted[0].bindings[0].factoryAddress,factoryAddress.toLowerCase());
+  await page.reload();await page.getByRole('heading',{name:'2 verified Bricks created',exact:true}).waitFor();assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);assert.deepEqual(errors,[]);
   console.log('BRICK EDITOR PASS: My Bricks entry, live commitment + private recovery verification, locked visual-work edits, no Player controls, review, rejected-wallet retry, exact chain save, recovery export, automatic reopen/reload, account invalidation, wallet-scoped bulk collection, atomic import, concurrent storage, downloads/removal, IPFS mint auto-save and mobile layouts.');
  }catch(error){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'brick-editor-failure.png'),fullPage:true}).catch(()=>{});}throw Error([error.shortMessage||error.message,error.details].filter(Boolean).join('\n'));}
  finally{await browser?.close();await vite?.close();await server.close();for(const file of [html,jsx])fs.rmSync(file,{force:true});}

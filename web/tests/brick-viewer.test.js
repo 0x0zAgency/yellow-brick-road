@@ -72,3 +72,14 @@ test('rejects invalid factories and inconsistency between event and contract',as
  await assert.rejects(discoverWalletBricks({client:mockClient({wrongOriginator:true}),factoryAddress:factory,wallet:creator}),/do not match/);
  await assert.rejects(discoverWalletBricks({client:mockClient(),factoryAddress:'not-an-address',wallet:creator}),/valid wallet/);
 });
+
+test('leaving a wallet scan stops queued RPC reads and discards late results',async()=>{
+ const canceled=new AbortController();canceled.abort();let reads=0;
+ await assert.rejects(discoverWalletBricks({client:{getBytecode:()=>{reads++;}},factoryAddress:factory,wallet:creator,signal:canceled.signal}),{name:'AbortError'});
+ assert.equal(reads,0);
+ const controller=new AbortController(),client=mockClient({latest:10001n});
+ await assert.rejects(discoverWalletBricks({client,factoryAddress:factory,wallet:creator,signal:controller.signal,onProgress:()=>controller.abort()}),{name:'AbortError'});
+ assert.equal(client.calls.length,1,'Do not request the next event page after cancellation');
+ const late=new AbortController();
+ await assert.rejects(discoverWalletBricks({client:{getBytecode:async()=>{late.abort();return '0x6000';}},factoryAddress:factory,wallet:creator,signal:late.signal}),{name:'AbortError'});
+});

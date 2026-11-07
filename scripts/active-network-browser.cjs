@@ -32,7 +32,7 @@ createRoot(document.getElementById('root')).render(<Test/>);
   assert.equal(await network.inputValue(),'sepolia');assert.equal(await network.isDisabled(),true);assert.equal(await address.inputValue(),factory);assert.equal(await address.evaluate(el=>el.readOnly),true);
   await page.evaluate(()=>window.walletChainChanged('0x539'));assert.equal(await network.inputValue(),'sepolia','Wallet events must not silently change application networks');assert.equal(await page.getByLabel('Local RPC URL',{exact:true}).count(),0);
   await page.getByRole('button',{name:'Fixture Wallet'}).click();const walletFactory=page.getByLabel('YellowBrickFactory address',{exact:true});assert.equal(await walletFactory.inputValue(),factory);assert.equal(await walletFactory.evaluate(el=>el.readOnly),true);
-  await page.getByRole('button',{name:'Find my on-chain Bricks',exact:true}).click();await page.getByRole('alert').filter({hasText:'Switch the browser wallet to the active Dev Control network'}).waitFor();
+  assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);await page.getByRole('alert').filter({hasText:'Switch the browser wallet to the active Dev Control network'}).waitFor();
   await page.getByRole('button',{name:'Fixture Registry'}).click();await page.getByText(/Sepolia.*11155111/).first().waitFor();assert.equal(await page.getByText(/Ganache · chain 1337/).count(),0);
   assert.equal(await page.evaluate(()=>window.walletWrites),0);assert.deepEqual(errors,[]);
   const out=path.join(ROOT,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'active-sepolia-registry.png'),fullPage:true});

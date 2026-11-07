@@ -5,9 +5,13 @@ Open **My Bricks** in the Road sidebar and connect your EIP-1193 browser wallet.
 ## How it works
 
 1. The client reads the connected wallet address and current EVM chain ID without requesting a signature.
-2. Supply the **YellowBrickFactory** address deployed on that network. If you successfully minted through Mint Studio using this browser, its factory address is saved *locally* under `road:factory:<chainId>` so the viewer can prefill it. Public `VITE_ROAD_GANACHE_FACTORY` and `VITE_ROAD_SEPOLIA_FACTORY` settings also prefill the field.
-3. Click **Find my on-chain Bricks**. The client verifies the factory and implementation bytecode, searches its `BrickDeployed` events filtered by the connected wallet's `originator` address, then checks individual Brick contracts.
+2. Each visit automatically loads registrations using the active Dev Control factory, or the factory saved locally by Mint Studio under `road:factory:<chainId>`. Public `VITE_ROAD_GANACHE_FACTORY` and `VITE_ROAD_SEPOLIA_FACTORY` settings are fallbacks. Returning after a mint runs a fresh search, without a discovery button or wallet approval.
+3. The client verifies the factory and implementation bytecode, searches its `BrickDeployed` events filtered by the connected wallet's `originator` address, then checks individual Brick contracts.
 4. It displays on-chain contract address, IP identity, content and metadata commitments, metadata version/reference, current controller, block and transaction link (for Sepolia).
+
+**Refresh Bricks** repeats discovery while you stay on the page. **Advanced search** is collapsed by default and contains the network, factory address and optional start block. Editing these fields cancels the current search but does not issue a new query until **Search Bricks** is selected. If no factory is configured, the page explains how to set one here. The active Dev Control factory remains read-only.
+
+Changing wallets/networks starts fresh discovery with that scope’s defaults. Leaving the page or changing the search cancels queued reads and discards late results. Automatic searches use the normal bounded recent-block range; older registrations can be requested through Advanced search.
 
 Discovery sends no account keys, private files, encrypted media, local drafts, metadata JSON or source content to the Road. RPC queries go to the blockchain node configured in your wallet; that provider can observe the queried wallet and contract addresses, so this is **read-only**, but not a zero-network-traffic privacy mode.
 
@@ -15,7 +19,7 @@ Discovery sends no account keys, private files, encrypted media, local drafts, m
 
 For an `ipfs://` metadata reference, choose **Recover encrypted files** and import the private recovery JSON exported by Mint Studio. The import is local. **Retrieve & verify registered metadata** then fetches pinned ciphertext from the local YBR bridge and decrypts it in the browser. Its exact plaintext hash must match the metadata digest read from the selected contract before source-file references appear.
 
-The source download checks both ciphertext and original hashes from that verified metadata. An early key-only backup works when the selected registration supplies the metadata CID. Version-one backups remain supported. No wallet signature, license grant, or key upload occurs. Keys remain in browser memory; changing accounts/networks, rerunning discovery, or closing the recovery panel clears that session.
+The source download checks both ciphertext and original hashes from that verified metadata. An early key-only backup works when the selected registration supplies the metadata CID. Version-one backups remain supported. No wallet signature, license grant, or key upload occurs. Imported recovery files are retained in browser-local IndexedDB under **Tools → Recovery files**. Changing accounts/networks, rerunning discovery, or closing the recovery panel clears the in-memory session; saved local recovery files remain available.
 
 This requires the local Kubo node and bridge with the original pins available. See [IPFS recovery setup and limits](IPFS_YBR_STORAGE_PILOT.md#recover-files-after-reopening-the-app).
 

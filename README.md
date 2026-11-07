@@ -439,6 +439,8 @@ stores it in its own contract so systems can request approvals or agreements
 without decrypting the work. Set a reusable email under **Settings → Creator defaults**.
 Read or update a Brick's contact from **IP Registry** or **My Bricks → Edit Brick → Licensor contact**.
 
+**My Bricks** loads current registrations automatically on each visit. Network and discovery controls live under the collapsed **Advanced search**; **Refresh Bricks** reloads the current view.
+
 **My Bricks → Edit Brick** also provides verified private work-detail editing,
 NFT artwork, content controls, and the licensing/funds workspace. It loads a
 matching private recovery file from this browser automatically; import one if
