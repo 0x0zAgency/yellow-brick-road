@@ -182,7 +182,7 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.getByText('Explore release parts',{exact:true}).click();
   assert.equal(await page.locator('.br-building-children .br-record').count(),3);
   await page.locator('.br-building-header').getByRole('heading',{name:'Midnight Transit',exact:true}).waitFor();
-  assert.deepEqual(await page.locator('.br-building-children h3').allTextContents(),['Midnight Transit','Midnight Transit / composition','Midnight Transit / cover']);
+  assert.deepEqual(await page.locator('.br-building-children .br-record-header h3').allTextContents(),['Midnight Transit','Midnight Transit / composition','Midnight Transit / cover']);
   const labels=await page.evaluate(()=>window.uiRememberRecovery());assert.ok(!JSON.stringify(labels).includes('synthetic-title-fixture-key'),'Display queries never return recovery keys');
   await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor();
   await page.evaluate(()=>window.uiShow('registry'));await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor();
