@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {parseRecoveryFile,recoverIpfsEntry,assetsFromRecoveredMetadata,MAX_RECOVERY_FILE_BYTES} from './ipfs-recovery.js';
 import {validCid} from './ipfs-upload.js';
@@ -89,12 +89,12 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
  const rows=(entries,label)=>entries.length>0&&<section className="ir-section"><h3>{label}</h3><div className="ir-files">{entries.map(entry=><article className="ir-file" key={entryId(entry)}>
   <div><strong>{entry.name}</strong><span>{entry.role}</span><code title={entry.cid}>{short(entry.cid)}</code>
    {completed[entryId(entry)]&&<small className="ir-verified">{completed[entryId(entry)]}</small>}</div>
-  <button type="button" className="outline-btn" disabled={!!busy} onClick={()=>void recover(entry)}>{busy===entryId(entry)?'Recovering…':'Recover & download'}</button>
+  <button type="button" className="outline-btn" disabled={!!busy} onClick={()=>void recover(entry)}>Recover &amp; download</button>
  </article>)}</div></section>;
  return <section className="ir" aria-label={brick?'Recover registered Brick files':'Recover IPFS files'}>
   <div className="ir-heading"><div><span className="eyebrow">PRIVATE FILE RECOVERY</span><h2>{brick?'Recover this Brick’s files':'Recover your files from IPFS'}</h2></div>{onClose&&<button type="button" className="quiet" onClick={onClose}>Close recovery</button>}</div>
   <p>Choose the private recovery JSON saved in Mint Studio. Encrypted files are retrieved from your local YBR IPFS node and decrypted here. {wallet?'The recovery file is also saved locally for this wallet.':'Your recovery key stays in this browser session.'}</p>
-  {localNotice&&<p className="ir-note">{localNotice}</p>}
+  
   {brick&&<p className="ir-context">Selected Brick: <code>{brick.address}</code><br/>Recovered metadata must match this registration’s on-chain commitment before its file references are used.</p>}
   <div className="ir-import"><label htmlFor={brick?'brick-recovery-file':'ipfs-recovery-file'}>Private recovery file</label>
    <input ref={fileInput} id={brick?'brick-recovery-file':'ipfs-recovery-file'} type="file" accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];if(file)void importBackup(file);}}/>
@@ -103,7 +103,7 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
   {kit&&<>
    <div className="ir-session"><div><strong>{backupName}</strong><span>{kit.assets.length} file reference{kit.assets.length===1?'':'s'} · {kit.metadata.length} metadata reference{kit.metadata.length===1?'':'s'}</span></div><button type="button" className="quiet" onClick={clear}>Clear recovery session</button></div>
    {brick?<>
-    {!cid?<p className="ir-warning">This registration has no supported encrypted IPFS metadata reference.</p>:<button type="button" className="gold-btn" disabled={!!busy} onClick={()=>void openRegisteredMetadata()}>{busy==='registered-metadata'?'Checking registered metadata…':'Retrieve & verify registered metadata'}</button>}
+    {!cid?<p className="ir-warning">This registration has no supported encrypted IPFS metadata reference.</p>:<button type="button" className="gold-btn" disabled={!!busy} onClick={()=>void openRegisteredMetadata()}>Retrieve &amp; verify registered metadata</button>}
     {chainAssets!==null&&<><div className="ir-confirmed"><strong>{workTitle||'Registered metadata recovered'}</strong><span>Matches the on-chain metadata commitment. File checksums below come from that verified metadata.</span></div>{rows(chainAssets,'Files referenced by this Brick')}{!chainAssets.length&&<p>No pinned source files are referenced by this metadata.</p>}</>}
    </>:<>
     {!kit.assets.length&&!kit.metadata.length&&<p className="ir-warning">This is an early key backup with no file addresses. Use it from an IPFS registration in My Bricks, or import the recovery file downloaded after upload.</p>}
@@ -111,8 +111,7 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
     {(kit.assets.length>0||kit.metadata.length>0)&&<p className="ir-note">Checks here compare files with this backup. To compare metadata with a blockchain registration, open recovery from that Brick in My Bricks.</p>}
    </>}
   </>}
-  {busy&&busy!=='import'&&<button type="button" className="quiet ir-cancel" onClick={()=>{cancelWork();setBusy('');setStatus('Recovery canceled.');}}>Cancel retrieval</button>}
-  {busy?<RoadProgress label={status||'Reading recovery file…'}/>:status&&<p className="ir-status" role="status">{status}</p>}{error&&<p className="ir-error" role="alert">{error}</p>}
+  <StatusArea size="normal" busy={!!busy} label={status||'Reading recovery file…'} message={status} error={error} detail={localNotice} name="File recovery status">{busy&&busy!=='import'&&<button type="button" className="quiet ir-cancel" onClick={()=>{cancelWork();setBusy('');setStatus('Recovery canceled.');}}>Cancel retrieval</button>}</StatusArea>
   <p className="ir-note">Your local IPFS node and YBR bridge must be running with the original pins available. Clearing this session releases the imported key and pending downloads. File recovery does not grant a license or transfer rights.</p>
  </section>;
 }

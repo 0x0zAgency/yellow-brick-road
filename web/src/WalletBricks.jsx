@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import WalletBrickCard from './WalletBrickCard.jsx';
@@ -43,7 +43,7 @@ export default function WalletBricks({wallet,onConnect}){
   if(!provider?.request){setError('An EIP-1193 browser wallet is required.');return;}
   const id=++requestId.current;
   scanController.current?.abort();const controller=new AbortController();scanController.current=controller;
-  setBusy(true);setPage(0);setResult(null);setError('');setProgress(null);setRecoveryAddress(null);setEditing(null);
+  setBusy(true);setError('');setProgress(null);setRecoveryAddress(null);setEditing(null);
   try{
    const actual=Number(BigInt(await provider.request({method:'eth_chainId'})));
    controller.signal.throwIfAborted();
@@ -58,7 +58,7 @@ export default function WalletBricks({wallet,onConnect}){
    if(id!==requestId.current)return;
    setResult(data);
    try{localStorage.setItem(factoryStorageKey(chainId),factoryAddress)}catch{}
-  }catch(e){if(id===requestId.current)setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.');}
+  }catch(e){if(id===requestId.current){setResult(null);setError(e.shortMessage||e.message||'Unable to scan wallet Bricks.');}}
   finally{if(id===requestId.current)setBusy(false)}
  };
  // A visit or wallet/network change uses current defaults once. Editing advanced
@@ -86,14 +86,13 @@ export default function WalletBricks({wallet,onConnect}){
   <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Your registered works load automatically. Open Edit Brick to update a work.</p></div>
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
    <div className="wb-controls">
-    <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><button type="button" className="outline-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>{busy?'Loading…':'Refresh Bricks'}</button></div>
-    {!networkReady?<RoadProgress size="compact" label="Detecting wallet network…"/>:!network&&<p role="alert" className="wb-error">Select the network where the factory was deployed in your browser wallet to view registrations.</p>}
+    <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><button type="button" className="outline-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>Refresh Bricks</button></div>
+    
      <details className="br-surface wb-advanced"><summary><span>Advanced search</span></summary><div className="br-surface-body"><p className="wb-note">Network: {network?network.name+' ('+network.id+')':'Unavailable'}</p><label>YellowBrickFactory address<input aria-label="YellowBrickFactory address" readOnly={!!ACTIVE_NETWORK} spellCheck="false" placeholder="0x..." value={factory} onChange={e=>{reset();setFactory(e.target.value.trim())}}/></label>
      <label>Scan from block (optional)<input aria-label="Start block" inputMode="numeric" placeholder={chainId===1337?'0 (Ganache genesis)':'Recent 100,000 blocks'} value={startBlock} onChange={e=>{reset();setStartBlock(e.target.value.trim())}}/></label>
      <p className="wb-note">The factory address identifies which registrations to search. On larger chains, an empty start block scans only the latest 100,000 blocks. Enter its deployment block for older mints (up to 100,000 blocks per scan). No wallet approval is requested.</p><button type="button" className="gold-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>Search Bricks</button></div></details>
    </div>
-   {busy&&<RoadProgress label={'Reading factory events'+(progress?' · blocks '+progress.from+'–'+progress.to+' · '+progress.found+' match(es) found':' and checking the deployed contract…')}/>}
-   {error&&<p role="alert" className="wb-error">{error}</p>}
+   <StatusArea size="normal" busy={!networkReady||busy} label={!networkReady?'Detecting wallet network…':'Reading factory events'+(progress?' · blocks '+progress.from+'–'+progress.to+' · '+progress.found+' match(es) found':' and checking the deployed contract…')} error={error||(!network&&networkReady?'Select the network where the factory was deployed in your browser wallet to view registrations.':'')} message={result?'Bricks up to date':''} name="My Bricks status"/>
    {result&&<div className="wb-results">
     <div className="wb-results-header"><h3>{result.bricks.length} verified Brick{result.bricks.length===1?'':'s'} created</h3><span>Scanned blocks {result.fromBlock}–{result.toBlock}</span></div>
     {result.limited&&<p className="wb-warning">This scan covers only recent blocks, not the complete chain history. Enter a deployment/start block to search historical registrations, or use an indexer for full history.</p>}

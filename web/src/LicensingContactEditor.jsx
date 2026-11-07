@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {readBrickLicensingContact,updateBrickLicensingContact} from './licensing-contact-chain.js';
 import {licensingMailto} from './licensing-contact.js';
@@ -29,6 +29,6 @@ export default function LicensingContactEditor({wallet,chainId,factoryAddress,br
     <button type="submit" className="gold-btn" disabled={busy||email===contact.email}>Save licensor contact on chain</button>
    </form>}
   </>}
-  {busy?<RoadProgress size="compact" label="Checking the Brick’s licensing contact…"/>:status&&<p role="status">{status}</p>}{error&&<p role="alert" className="cp-warning">{error}</p>}
+  <StatusArea busy={busy} label="Checking the Brick’s licensing contact…" message={status} error={error} name="Licensor contact status"/>
  </section>;
 }

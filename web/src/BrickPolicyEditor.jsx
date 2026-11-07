@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {readBrickPolicy,updateBrickPolicy} from './content-policy-chain.js';
 import './content-policy.css';
@@ -33,6 +33,6 @@ export default function BrickPolicyEditor({wallet,chainId,factoryAddress,brickAd
     <button type="button" className="outline-btn" disabled={busy||!owner||!seal} onClick={()=>void perform('lock')}>Permanently lock files</button></>}
    <p className="cp-note">The original registration hash never changes. File replacements use an explicit revision with new checksums and revoke existing Player approval. A locked file set needs a new linked Brick. The upload-revision editor is not yet exposed in this screen.</p>
   </>}
-  {busy?<RoadProgress size="compact" label="Checking the Brick’s content policy…"/>:status&&<p role="status">{status}</p>}{error&&<p className="cp-warning" role="alert">{error}</p>}
+  <StatusArea busy={busy} label="Checking the Brick’s content policy…" message={status} error={error} name="Content policy status"/>
  </section>;
 }

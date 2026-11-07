@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import './nft-image-delivery.css';
 import {useEffect,useState} from 'react';
 import {readPublicNftCover,publicCoverPath} from './nft-cover-read.js';
@@ -7,27 +7,26 @@ import CopyField from './CopyField.jsx';
 export default function PublicNftCoverCheck({imageURI}){
  const [retry,setRetry]=useState(0),[state,setState]=useState(null);
  useEffect(()=>{
-  const controller=new AbortController();setState(null);
+  const controller=new AbortController();
   if(publicCoverPath(imageURI))void readPublicNftCover(imageURI,{signal:controller.signal})
-   .then(info=>{if(!controller.signal.aborted)setState({info});})
-   .catch(error=>{if(!controller.signal.aborted)setState({error:error.message});});
+   .then(info=>{if(!controller.signal.aborted)setState({info,imageURI,retry});})
+   .catch(error=>{if(!controller.signal.aborted)setState({error:error.message,imageURI,retry});});
   return()=>controller.abort();
  },[imageURI,retry]);
- const path=publicCoverPath(imageURI);
+ const path=publicCoverPath(imageURI),current=state?.imageURI===imageURI?state:null;
+ const checking=!!path&&(!current||current.retry!==retry);
  return <section className="nft-public-check" aria-label="Public NFT thumbnail check">
   <h4>Public NFT thumbnail</h4>
   <p>This checks the NFT metadata’s <code>image</code>, not the Brick’s encrypted metadata or original file.</p>
   {!path?<p role="status">No supported public image URI is available from this NFT read. Retry the NFT lookup first.</p>:<>
    <p>On-chain image: <code>{imageURI}</code></p>
-   {!state&&<RoadProgress size="compact" label="Checking public PNG bytes and image decoding…"/>}
-   {state?.error&&<p role="alert">{state.error}</p>}
-   {state?.info&&<>
-    <strong role="status">Verified public PNG through this YBR node · {state.info.width} × {state.info.height} · {state.info.size.toLocaleString()} bytes</strong>
-    <img src={path} width={state.info.width} height={state.info.height} alt="Verified public NFT thumbnail" className="nft-cover-preview" referrerPolicy="no-referrer"/>
-    <p>Thumbnail SHA-256: <code>{state.info.sha256}</code></p>
+   <StatusArea busy={checking} label="Checking public PNG bytes and image decoding…" error={current?.error} message={current?.info?'Verified public PNG through this YBR node · '+current.info.width+' × '+current.info.height+' · '+current.info.size.toLocaleString()+' bytes':''} name="Public thumbnail status"/>
+   <button type="button" className="ms-outline" disabled={checking} onClick={()=>setRetry(n=>n+1)}>Check image again</button>
+   {current?.info&&<>
+    <img src={path} width={current.info.width} height={current.info.height} alt="Verified public NFT thumbnail" className="nft-cover-preview" referrerPolicy="no-referrer"/>
+    <p>Thumbnail SHA-256: <code>{current.info.sha256}</code></p>
     <a href={path} target="_blank" rel="noreferrer">Open public thumbnail ↗</a>
    </>}
-   <button type="button" className="ms-outline" onClick={()=>setRetry(n=>n+1)}>Check image again</button>
   </>}
   {path&&<details><summary>Artwork works here but is blank in MetaMask?</summary>
    <p>Wallets use their own IPFS gateway. A successful image check here does not test that gateway. A gateway returning an error or an HTML page cannot display your NFT.</p>

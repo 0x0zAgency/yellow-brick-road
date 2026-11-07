@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import PublicNftCoverCheck from './PublicNftCoverCheck.jsx';
 import {readPublicNftCover,decodePublicCover} from './nft-cover-read.js';
 import {useEffect,useRef,useState} from 'react';
@@ -66,7 +66,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
  };
  const inspect=async()=>{
   if(lock.current)return;lock.current=true;setBusy(true);setError('');
-  const id=++revision.current;setInspection(null);
+  const id=++revision.current;setStatus('Reading actual NFT metadata…');
   try{
    const session=await nftCoverSession({mint,provider:window.ethereum,expectedAccount:wallet||packet?.account?.address});
    const data=await session.inspect();
@@ -75,7 +75,7 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
    if(pinned&&data.every(item=>item.image===pinned.imageURI)){
     setSaved({imageURI:pinned.imageURI});notify({imageURI:pinned.imageURI});setStatus('Verified: every selected NFT currently points to this public cover.');
    }else {setSaved(null);setStatus(data.every(item=>item.hasCover)?'Public image URI is set on-chain. The separate thumbnail check below verifies whether the image actually loads.':'The actual NFT metadata still contains fallback artwork. Publish a cover below; do not remint.');}
-  }catch(e){if(id===revision.current){setError(e.shortMessage||e.message);setStatus('');}}
+  }catch(e){if(id===revision.current){setInspection(null);setError(e.shortMessage||e.message);setStatus('');}}
   finally{if(id===revision.current){lock.current=false;setBusy(false);}}
  };
  return <section className="nft-cover" aria-label="NFT cover artwork">
@@ -86,18 +86,18 @@ function CoverEditor({packet,mint,vault,wallet,preparedCover,onCoverVerified=()=
   <p>This updates the actual NFT <code>tokenURI</code>. The same cover can be applied to this batch’s {mint.receipts?.length||0} registration receipt(s), without minting new Bricks.</p>
   <p>{file?'Selected: '+file.name:canUseAttached?'Attached cover: '+existing.name:'Choose a cover image to prepare a public display copy.'}</p>
   <label>Use another cover (PNG, JPEG or WebP; up to 8 MiB)<input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy||pendingTransaction} onChange={e=>{if(!e.target.files?.[0])return;setFile(e.target.files[0]);setTxHash('');setPendingTransaction(false);setInspection(null);setStatus('');setPrepared(null);setConsent(false);setPinned(null);setSaved(null);setError('');}}/></label>
-  {!prepared&&<button type="button" className="ms-outline" disabled={busy||(!file&&!canUseAttached)||pendingTransaction} onClick={()=>void prepare()}>{busy?'Preparing…':'Prepare NFT cover'}</button>}
+  {!prepared&&<button type="button" className="ms-outline" disabled={busy||(!file&&!canUseAttached)||pendingTransaction} onClick={()=>void prepare()}>Prepare NFT cover</button>}
   {preview&&<img src={preview} className="nft-cover-preview" alt="Public NFT display copy to publish"/>}
   {prepared&&!saved&&<>
    <label className="nft-cover-consent"><input type="checkbox" checked={consent} disabled={busy||pendingTransaction} onChange={e=>setConsent(e.target.checked)}/> I have permission to publish this display copy as public NFT artwork. Anyone may retrieve or retain it from IPFS.</label>
-   <button type="button" className="ms-primary" disabled={!consent||busy||pendingTransaction} onClick={()=>void publish()}>{busy?'Applying cover…':'Publish cover to NFTs'}</button>
+   <button type="button" className="ms-primary" disabled={!consent||busy||pendingTransaction} onClick={()=>void publish()}>Publish cover to NFTs</button>
   </>}
   <p className="nft-cover-note">Only a resized PNG display copy is published. Original source files, metadata and recovery keys stay private. Original signatures are not represented as signatures of this derived thumbnail. A local IPFS pin does not guarantee worldwide availability.</p>
   <p className="nft-cover-note">Publishing a thumbnail does not grant permission to distribute or license the original work.</p>
-  {busy?<RoadProgress label={status||'Working on NFT artwork…'}/>:status&&<p role="status">{status}</p>}
+  <StatusArea size="normal" busy={busy} label={status||'Working on NFT artwork…'} message={status} error={error} name="NFT artwork status"/>
   {pinned&&<p>Public image: <code>{pinned.imageURI}</code>{!saved?' · May already be public even if the wallet transaction is canceled.':''}</p>}
   {txHash&&<p>Artwork transaction: <code>{txHash}</code>{pendingTransaction?' · Review this transaction in your wallet before attempting another update.':''}</p>}
   {saved&&<div className="nft-cover-success"><strong>Cover URI verified on the actual NFTs.</strong><p>Wallets may cache metadata. Refresh the NFT’s metadata where supported. Its collection address and token ID have not changed.</p></div>}
-  {error&&<p className="ms-error" role="alert">{error}</p>}
+  
  </section>;
 }
