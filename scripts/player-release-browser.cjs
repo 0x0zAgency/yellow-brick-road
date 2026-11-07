@@ -65,7 +65,7 @@ async function main(){
   assert.equal(await summary.locator('input').count(),0,'Final review summarizes Step 3; it does not create another policy editor');
   assert.equal(await summary.getByText('Allowed',{exact:true}).count(),3);
   await studio.getByRole('button',{name:'Simulate mint →',exact:true}).click();
-  await studio.getByRole('button',{name:'Confirm simulation',exact:true}).click();
+  await studio.getByRole('button',{name:'Run simulation',exact:true}).click();
   await studio.getByRole('button',{name:'View receipts →',exact:true}).click({timeout:30000});
   await studio.waitForFunction(()=>document.querySelector('.br-result .br-hero img')?.naturalWidth>0);
   assert.equal(await studio.locator('.br-grid--receipts details[open]').count(),0);

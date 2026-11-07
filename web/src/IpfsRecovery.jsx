@@ -1,6 +1,7 @@
 import {useEffect,useRef,useState} from 'react';
 import {parseRecoveryFile,recoverIpfsEntry,assetsFromRecoveredMetadata,MAX_RECOVERY_FILE_BYTES} from './ipfs-recovery.js';
 import {validCid} from './ipfs-upload.js';
+import {saveRecoveryFile} from './recovery-vault.js';
 import './ipfs-recovery.css';
 
 const entryId=entry=>entry.kind+':'+entry.cid;
@@ -18,16 +19,18 @@ function verificationMessage(verification){
  return 'Decryption authenticated. This older backup has no separately saved checksum.';
 }
 
-/** Private creator recovery. No key or decrypted content leaves this component. */
-export default function IpfsRecovery({brick=null,onClose}){
+/** Private creator recovery. Keys and decrypted content stay on this device. */
+export default function IpfsRecovery({brick=null,onClose,wallet}){
  const [kit,setKit]=useState(null),[backupName,setBackupName]=useState('');
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[status,setStatus]=useState('');
+ const [localNotice,setLocalNotice]=useState('');
  const [completed,setCompleted]=useState({}),[chainAssets,setChainAssets]=useState(null),[workTitle,setWorkTitle]=useState('');
  const operation=useRef(0),controller=useRef(null),downloads=useRef(new Set()),fileInput=useRef(null);
  const cid=metadataCid(brick);
  const cancelWork=()=>{operation.current++;controller.current?.abort();controller.current=null;};
  const releaseDownloads=()=>{for(const url of downloads.current)URL.revokeObjectURL(url);downloads.current.clear();};
  useEffect(()=>()=>{cancelWork();releaseDownloads();},[]);
+ useEffect(()=>{clear();setLocalNotice('');},[wallet]);
  const clear=()=>{
   cancelWork();releaseDownloads();setKit(null);setBackupName('');setBusy('');setError('');setStatus('');
   setCompleted({});setChainAssets(null);setWorkTitle('');if(fileInput.current)fileInput.current.value='';
@@ -40,6 +43,7 @@ export default function IpfsRecovery({brick=null,onClose}){
    const parsed=parseRecoveryFile(await file.text());
    if(id!==operation.current)return;
    setKit(parsed);setBackupName(file.name);setStatus('Recovery key loaded in this browser session.');
+   if(wallet){try{await saveRecoveryFile({wallet,kit:parsed,name:file.name});if(id===operation.current)setLocalNotice('Saved in Tools → Recovery files on this browser.');}catch{if(id===operation.current)setLocalNotice('Local recovery storage is unavailable or full. Keep your downloaded recovery JSON.');}}
   }catch(e){if(id===operation.current)setError(e.message||'Unable to read the recovery file.');}
   finally{if(id===operation.current)setBusy('');}
  };
@@ -88,7 +92,8 @@ export default function IpfsRecovery({brick=null,onClose}){
  </article>)}</div></section>;
  return <section className="ir" aria-label={brick?'Recover registered Brick files':'Recover IPFS files'}>
   <div className="ir-heading"><div><span className="eyebrow">PRIVATE FILE RECOVERY</span><h2>{brick?'Recover this Brick’s files':'Recover your files from IPFS'}</h2></div>{onClose&&<button type="button" className="quiet" onClick={onClose}>Close recovery</button>}</div>
-  <p>Choose the private recovery JSON saved in Mint Studio. Encrypted files are retrieved from your local YBR IPFS node and decrypted here. Your recovery key stays in this browser session.</p>
+  <p>Choose the private recovery JSON saved in Mint Studio. Encrypted files are retrieved from your local YBR IPFS node and decrypted here. {wallet?'The recovery file is also saved locally for this wallet.':'Your recovery key stays in this browser session.'}</p>
+  {localNotice&&<p className="ir-note">{localNotice}</p>}
   {brick&&<p className="ir-context">Selected Brick: <code>{brick.address}</code><br/>Recovered metadata must match this registration’s on-chain commitment before its file references are used.</p>}
   <div className="ir-import"><label htmlFor={brick?'brick-recovery-file':'ipfs-recovery-file'}>Private recovery file</label>
    <input ref={fileInput} id={brick?'brick-recovery-file':'ipfs-recovery-file'} type="file" accept="application/json,.json" onChange={e=>{const file=e.target.files?.[0];if(file)void importBackup(file);}}/>
