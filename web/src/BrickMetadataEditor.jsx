@@ -3,18 +3,41 @@ import {parseRecoveryFile,MAX_RECOVERY_FILE_BYTES} from './ipfs-recovery.js';
 import {DETAIL_FIELDS,MUSIC_FIELDS,IDENTIFIER_FIELDS,brickDetails,applyBrickDetails,openBrickMetadata,prepareBrickMetadata,refreshEditedBuilding} from './brick-editor.js';
 import {readBrickForEditing,assertBrickEditReview,updateBrickMetadata,confirmBrickMetadataUpdate} from './brick-editor-chain.js';
 import {BUILDING_EVENT} from './ReleaseBuildingCard.jsx';
+import {listRecoveryFiles,saveRecoveryFile} from './recovery-vault.js';
+import {findLocalBrickRecovery} from './local-brick-recovery.js';
 
 export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick,client,onSaved,onLoaded,onStateChange}){
  const [session,setSession]=useState(null),[draft,setDraft]=useState(null),[reviewing,setReviewing]=useState(false),[prepared,setPrepared]=useState(null),[txHash,setTxHash]=useState('');
  const [busy,setBusy]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState(''),[backup,setBackup]=useState(null);
+ const [localNotice,setLocalNotice]=useState('');
  const generation=useRef(0),mutex=useRef(false),abort=useRef(null),input=useRef(null);
  const dirty=!!session&&JSON.stringify(draft)!==JSON.stringify(brickDetails(session.metadata));
  useEffect(()=>{onStateChange({dirty,busy,pending:!!txHash});},[dirty,busy,txHash,onStateChange]);
  useEffect(()=>{const warn=e=>{if(dirty||txHash||busy){e.preventDefault();e.returnValue='';}};window.addEventListener('beforeunload',warn);return()=>window.removeEventListener('beforeunload',warn);},[dirty,txHash,busy]);
- useEffect(()=>()=>{generation.current++;abort.current?.abort();},[]);
+ useEffect(()=>{void loadLocal();return()=>{generation.current++;abort.current?.abort();mutex.current=false;};},[wallet,chainId,factoryAddress,brick.address]);
  const options=()=>({provider:window.ethereum,walletAddress:wallet,chainId:Number(chainId),factoryAddress,brickAddress:brick.address});
  const begin=()=>{mutex.current=true;setBusy(true);setError('');const id=++generation.current;return {id,assertActive:()=>{if(id!==generation.current)throw Error('Editor session changed. Reopen the Brick.');}};};
- const finish=id=>{mutex.current=false;if(id===generation.current)setBusy(false);};
+ const finish=id=>{if(id===generation.current){mutex.current=false;setBusy(false);}};
+ const remember=async(kit,review,title,name,id)=>{
+  try{await saveRecoveryFile({wallet,kit,title,name:name||'brick-'+brick.address.slice(2,10)+'-recovery.json',bindings:[{...review,title}]});if(id===generation.current)setLocalNotice('Recovery file saved in this browser. Manage copies in Tools → Recovery files.');}
+  catch{if(id===generation.current)setLocalNotice('Local recovery storage is unavailable or full. Download your recovery file to keep a copy.');}
+ };
+ async function loadLocal(){
+  if(mutex.current)return;
+  const {id,assertActive}=begin();abort.current=new AbortController();setStatus('Looking for a saved recovery file…');
+  try{
+   const records=await listRecoveryFiles(wallet);assertActive();
+   if(!records.length){setStatus('No saved recovery file yet. Import it below to open this Brick.');return;}
+   const review=await readBrickForEditing({...options(),client});assertActive();
+   if(review.controller.toLowerCase()!==wallet?.toLowerCase())throw Error('Only the current Brick controller can edit its work details.');
+   const match=await findLocalBrickRecovery({wallet,review,records,signal:abort.current.signal});assertActive();
+   if(!match){setStatus('No saved recovery file matches this Brick. Import its recovery JSON below.');return;}
+   setSession({kit:match.record.kit,review,metadata:match.metadata});setDraft(brickDetails(match.metadata));onLoaded(match.metadata);
+   setStatus('Loaded saved recovery file · verified metadata version '+review.metadataVersion+'.');
+   await remember(match.record.kit,review,match.metadata.title,match.record.name,id);
+  }catch(e){if(id===generation.current){setStatus('');setLocalNotice(e.shortMessage||e.message);}}
+  finally{finish(id);}
+ }
  const load=async file=>{
   if(!file||mutex.current)return;
   const {id,assertActive}=begin();setSession(null);setDraft(null);setPrepared(null);setTxHash('');setBackup(null);setReviewing(false);onLoaded(null);setStatus('Reading the Brick and verifying its encrypted metadata…');
@@ -26,6 +49,7 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
    const metadata=await openBrickMetadata({review,kit,signal:abort.current.signal});assertActive();
    setSession({kit,review,metadata});setDraft(brickDetails(metadata));onLoaded(metadata);
    setStatus('Work details verified against metadata version '+review.metadataVersion+'.');
+   await remember(kit,review,metadata.title,file.name,id);
   }catch(e){if(id===generation.current){setStatus('');setError(e.shortMessage||e.message);}}
   finally{finish(id);if(input.current)input.current.value='';}
  };
@@ -41,14 +65,17 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
     await assertBrickEditReview(base);assertActive();
     setStatus('Encrypting and pinning the updated work details…');
     pin=pin||await prepareBrickMetadata({metadata:session.metadata,draft,review:session.review,kit:session.kit});assertActive();
-    setPrepared(pin);setBackup(pin.backup);setStatus('Confirm the metadata update in your wallet.');
+    setPrepared(pin);setBackup(pin.backup);
+    await remember(pin.backup,session.review,pin.metadata.title,null,id);assertActive();
+    setStatus('Confirm the metadata update in your wallet.');
    }else setStatus('Checking the submitted transaction…');
    const result=txHash?await confirmBrickMetadataUpdate({...base,prepared:pin,transactionHash:txHash}):await updateBrickMetadata({...base,prepared:pin,onSubmitted:hash=>{if(id===generation.current){setTxHash(hash);setStatus('Transaction submitted. Waiting for confirmation…');}}});
    assertActive();
    let groupingNotice='';
    try{refreshEditedBuilding(window.localStorage,session.review,result.current);window.dispatchEvent(new Event(BUILDING_EVENT));}catch{groupingNotice=' Local Building grouping could not be refreshed.';}
    setSession({kit:pin.backup,review:result.current,metadata:pin.metadata});setDraft(brickDetails(pin.metadata));setReviewing(false);setPrepared(null);setTxHash('');onLoaded(pin.metadata);
-   onSaved(result.current);setStatus('Saved to this Brick as metadata version '+result.current.metadataVersion+'.'+groupingNotice+' Download the updated private recovery file.');
+   onSaved(result.current);setStatus('Saved to this Brick as metadata version '+result.current.metadataVersion+'.'+groupingNotice);
+   await remember(pin.backup,result.current,pin.metadata.title,null,id);
   }catch(e){if(id===generation.current){setStatus('');setError(e.shortMessage||e.message);}}
   finally{finish(id);}
  };
@@ -56,8 +83,8 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
  const clear=()=>{if(busy)return;if((dirty||txHash)&&!window.confirm(txHash?'A transaction has already been submitted. Keep your recovery backup and check the Brick before retrying. Clear this session?':'Discard unsaved work details?'))return;generation.current++;abort.current?.abort();setSession(null);setDraft(null);setPrepared(null);setTxHash('');setBackup(null);setReviewing(false);setError('');setStatus('Private editing session cleared.');onLoaded(null);};
  let changes=[];try{if(session&&draft)changes=applyBrickDetails(session.metadata,draft).changes;}catch{/* Validation is shown when Review is selected. */}
  return <section aria-label="Edit work details" className="be-details" aria-busy={busy}>
-  <h3>Work details</h3><p>Open the private recovery JSON saved when you uploaded this work. Details are decrypted here and checked against the Brick before editing.</p>
-  <label className="be-import">Private recovery file<input ref={input} type="file" accept="application/json,.json" disabled={busy||!!txHash||dirty} onChange={e=>void load(e.target.files?.[0])}/></label>
+  <h3>Work details</h3><p>A matching recovery file loads automatically from this browser. Work details are decrypted locally and verified against this Brick.</p>
+  <details open={!session}><summary>{session?'Use another recovery file':'Import a recovery file'}</summary><label className="be-import">Private recovery file<input ref={input} type="file" accept="application/json,.json" disabled={busy||!!txHash||dirty} onChange={e=>void load(e.target.files?.[0])}/></label></details>
   {session&&<><div className="be-status"><span>Verified version {session.review.metadataVersion}</span><span>{session.metadata.categoryLabel||session.metadata.objectType}</span><span>{dirty?'Unsaved changes':'Up to date'}</span></div>
    <fieldset disabled={busy||!!txHash}><legend className="visually-hidden">Descriptive metadata</legend><div className="be-fields">
     {DETAIL_FIELDS.map(([key,label,max])=><label key={key} className={key==='description'?'be-wide':''}>{label}{key==='description'?<textarea rows={4} maxLength={max} value={draft[key]} onChange={e=>edit({[key]:e.target.value})}/>:<input maxLength={max} value={draft[key]} onChange={e=>edit({[key]:e.target.value})}/>}</label>)}
@@ -74,6 +101,8 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
   {txHash&&<div className="be-review"><p>Submitted transaction: <code>{txHash}</code></p><button type="button" className="outline-btn" disabled={busy} onClick={()=>void save()}>Check confirmation</button></div>}
   {backup&&<button type="button" className="outline-btn" onClick={download}>Download updated recovery file</button>}
   {(session||backup||txHash)&&<button type="button" className="quiet" disabled={busy} onClick={clear}>Clear private session</button>}
+  {!session&&<button type="button" className="quiet" disabled={busy} onClick={()=>void loadLocal()}>Load saved recovery file</button>}
+  {localNotice&&<p className="be-note">{localNotice}</p>}
   {status&&<p role="status" className="be-notice">{status}</p>}{error&&<p role="alert" className="wb-error">{error}</p>}
  </section>;
 }

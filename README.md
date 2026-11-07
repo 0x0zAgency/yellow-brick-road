@@ -66,7 +66,7 @@ permissions, select **Local Ganache**, and approve the registration transactions
 The dashboard shows the active factory address if needed. Without a wallet,
 Mint Studio runs a simulation.
 
-For stored uploads, enable encrypted IPFS storage and download the recovery backup.
+For stored uploads, enable encrypted IPFS storage. Recovery files are saved locally for the connected wallet; download a separate copy from Tools → Recovery files.
 Review and approve the public NFT thumbnail before minting to include it in the
 same transaction. Player playback permissions remain separate. Use development seeds only.
 
@@ -367,7 +367,10 @@ Mint Studio can optionally pin browser-encrypted originals and metadata to a
 local Kubo node. The **Recover files** screen imports a private recovery backup,
 retrieves pinned ciphertext, and verifies/decrypts it in the browser. **My Bricks**
 can additionally compare recovered metadata with the digest read from the selected
-contract. See the [encrypted IPFS pilot and recovery guide](docs/IPFS_YBR_STORAGE_PILOT.md).
+contract. **Tools → Recovery files** keeps a wallet-scoped collection in this browser
+(IndexedDB), with bulk import, individual/all downloads and local removal. Minting
+and editing retain recovery files here automatically. There is no server backup;
+clearing site data removes these copies. See the [encrypted IPFS pilot and recovery guide](docs/IPFS_YBR_STORAGE_PILOT.md).
 Without the opt-in IPFS path, uploads remain simulated. Remote delivery entitlements
 and license-based decryption are not implemented. `road-local://sha256/…` is a local
 metadata commitment, not a remotely retrievable storage URI. A composition
@@ -437,8 +440,9 @@ without decrypting the work. Set a reusable email under **Settings → Creator d
 Read or update a Brick's contact from **IP Registry** or **My Bricks → Edit Brick → Licensor contact**.
 
 **My Bricks → Edit Brick** also provides verified private work-detail editing,
-NFT artwork, content controls, and the licensing/funds workspace. Import the
-private recovery JSON to edit descriptive metadata, review changes, and save a
+NFT artwork, content controls, and the licensing/funds workspace. It loads a
+matching private recovery file from this browser automatically; import one if
+missing. Edit descriptive metadata, review changes, and save a
 new encrypted version to the same Brick through its controller wallet. Source
 files and existing Brick references are preserved. See [Brick editor](docs/BRICK_EDITOR.md).
 The current controller can update it even while files are locked.

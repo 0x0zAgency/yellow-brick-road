@@ -91,7 +91,7 @@ createRoot(document.getElementById('scroll-root')).render(<StrictMode>
    await page.getByRole('button',{name:'Cancel',exact:true}).click();
    assert.equal(await count(),beforeDialog,'Cancel preserves the current review position');
    await page.getByRole('button',{name:'Simulate mint →',exact:true}).click();
-   await page.getByRole('button',{name:'Confirm simulation',exact:true}).click();
+   await page.getByRole('button',{name:'Run simulation',exact:true}).click();
    await page.getByRole('button',{name:'View receipts →',exact:true}).waitFor({timeout:30000});
    assert.equal(await count(),beforeDialog,'Results must not scroll or focus behind the completion dialog');
    assert.equal(await page.locator('.ms-panel h2').first().evaluate(node=>node===document.activeElement),false);

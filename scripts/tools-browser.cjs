@@ -17,6 +17,7 @@ async function main(){
   assert.equal(await tools.getAttribute('aria-expanded'),'false');assert.equal(await nav.getByRole('button',{name:'Settings',exact:true}).count(),0);
   await tools.click();assert.equal(await tools.getAttribute('aria-expanded'),'true');
   assert.ok(await page.evaluate(()=>{const nav=document.querySelector('.sidebar nav'),player=nav.nextElementSibling;return nav.getBoundingClientRect().bottom<=player.getBoundingClientRect().top+1;}),'Expanded Tools must not overlap the Player shortcut');await nav.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('region',{name:'Workspace settings'}).waitFor();
+  await nav.getByRole('button',{name:'Recovery files',exact:true}).click();await page.getByRole('region',{name:'Local recovery files'}).waitFor();await page.getByText('Connect the wallet whose recovery files you want to collect.',{exact:true}).waitFor();
   await nav.getByRole('button',{name:'Recover files',exact:true}).click();await page.getByRole('heading',{name:'Recover your originals.',exact:true}).waitFor();
   await nav.getByRole('button',{name:'MP3 Tags',exact:true}).click();await page.getByRole('region',{name:'MP3 tag reader and updater'}).waitFor();
   await page.getByLabel('MP3 file',{exact:true}).setInputFiles({name:'synthetic-tags.mp3',mimeType:'audio/mpeg',buffer:fixture()});

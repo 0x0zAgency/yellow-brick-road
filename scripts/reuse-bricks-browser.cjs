@@ -57,7 +57,7 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
   await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'songwriter-splits-mobile.png'),fullPage:true});assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Dialog has no horizontal overflow');
   await dialog.getByRole('button',{name:'Save songwriter splits',exact:true}).click();await dialog.waitFor({state:'hidden'});
   await page.getByRole('button',{name:'Continue →',exact:true}).click();await page.getByRole('heading',{name:'04. Review mint.',exact:true}).waitFor();
-  await page.getByRole('button',{name:'Review wallet mint →',exact:true}).click();const confirmation=page.getByRole('dialog');await confirmation.waitFor();assert.match(await confirmation.textContent(),/Mint 2 new Bricks and reuse 1 existing Bricks/);await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();
+  await page.getByRole('button',{name:'Review wallet mint →',exact:true}).click();const confirmation=page.getByRole('dialog');await confirmation.waitFor();assert.match(await confirmation.textContent(),/2 new · 1 reused/);assert.equal(await confirmation.locator('details').evaluate(el=>el.open),false);assert.doesNotMatch(await confirmation.innerText(),/Factory|Public licensor email/);await page.screenshot({path:path.join(out,'mint-confirm-mobile.png'),fullPage:true});await page.setViewportSize({width:1280,height:1000});await page.screenshot({path:path.join(out,'mint-confirm-desktop.png'),fullPage:true});await confirmation.getByText('Details',{exact:true}).click();assert.match(await confirmation.innerText(),/Factory/);await confirmation.getByText('Details',{exact:true}).click();await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'← Back',exact:true}).click();await page.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Writer A, Writer C');await page.getByRole('button',{name:'Continue →',exact:true}).click();await dialog.waitFor();assert.equal(await dialog.getByLabel('Writer C share (%)',{exact:true}).count(),1);await dialog.getByRole('button',{name:'Cancel',exact:true}).click();
   await page.getByRole('button',{name:'← Back',exact:true}).click();await page.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles({name:'different.png',mimeType:'image/png',buffer:Buffer.concat([png,Buffer.from('different')])});await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));assert.equal(await page.getByRole('button',{name:'Previous Brick selected',exact:true}).count(),0);
   assert.equal(await page.evaluate(()=>window.walletWrites),0);assert.deepEqual(uploads,[]);assert.deepEqual(errors,[]);
@@ -84,10 +84,10 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
     await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'graphic-mint-mobile.png'),fullPage:true});
    }
    await page.getByRole('button',{name:'Review wallet mint →',exact:true}).click();await confirmation.waitFor();
-   assert.doesNotMatch(await confirmation.textContent(),/Player/);assert.match(await confirmation.textContent(),/Mint 1 new Bricks and reuse 0 existing Bricks/);
+   assert.doesNotMatch(await confirmation.textContent(),/Player/);assert.match(await confirmation.textContent(),/1 new/);
    if(id!=='illustration'){await confirmation.getByRole('button',{name:'Cancel',exact:true}).click();continue;}
    await page.evaluate(()=>{window.allowTestMint=true;});
-   await confirmation.getByRole('button',{name:'Request mint transaction',exact:true}).click();
+   await confirmation.getByRole('button',{name:'Mint Bricks',exact:true}).click();
    await confirmation.getByRole('heading',{name:'Registration complete',exact:true}).waitFor();assert.doesNotMatch(await confirmation.textContent(),/Player/);
    await confirmation.getByRole('button',{name:'View receipts →',exact:true}).click();
   }
@@ -106,8 +106,8 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
   assert.equal(await page.getByRole('region',{name:'Pre-mint content protection',exact:true}).count(),0);
   await page.getByRole('button',{name:'Continue →',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Preview cover for NFTs',exact:true}).count(),0);
   await page.getByRole('button',{name:'Review wallet mint →',exact:true}).click();await confirmation.waitFor();
-  assert.match(await confirmation.textContent(),/Mint 0 new Bricks and reuse 1 existing Bricks/);
-  await confirmation.getByRole('button',{name:'Confirm Brick reuse',exact:true}).click();await confirmation.getByRole('heading',{name:'Building references ready',exact:true}).waitFor();
+  assert.match(await confirmation.textContent(),/0 new · 1 reused/);
+  await confirmation.getByRole('button',{name:'Confirm reuse',exact:true}).click();await confirmation.getByRole('heading',{name:'Building references ready',exact:true}).waitFor();
   await confirmation.getByRole('button',{name:'View receipts →',exact:true}).click();
   assert.match(await results.textContent(),/0 new Brick receipts · 1 existing references/);assert.equal(await page.getByRole('button',{name:'Customize NFT appearance',exact:true}).count(),0);
   const reusedPacket=await readPacket(),reusedReceipt=reusedPacket.onChainMint.receipts[0];
