@@ -1,4 +1,4 @@
-import RoadProgress from './RoadProgress.jsx';
+import StatusArea from './StatusArea.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {useState} from 'react';
 import {createPublicClient,createWalletClient,custom,http,defineChain,isAddress} from 'viem';
@@ -65,7 +65,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   </article>)}
   <button type="button" className="ms-outline" onClick={add}>+ Add existing Brick reference</button>
   <p className="ms-link-note">For a Safe or other contract wallet controller, obtain an ERC-1271-compatible signature externally and paste its signed response. EIP-712 verifies a narrowly scoped approval, not all collaborators' rights; enforcement and licensing remain separate.</p>
-  {busy!==null&&<RoadProgress size="compact" label="Checking Brick approval…"/>}{error&&<p className="ms-error" role="alert">{error}</p>}{notice&&<p role="status">{notice}</p>}
+  <StatusArea busy={busy!==null} label="Checking Brick approval…" error={error} message={notice} name="Reference request status"/>
  </details>;
 }
 export function BrickOwnerApprovals({wallet,onConnect}){
@@ -105,9 +105,9 @@ export function BrickOwnerApprovals({wallet,onConnect}){
    <label><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/> I approve this exact relationship and scope as controller of the referenced Brick.</label>
   </div>}
   {wallet?<p>Signing wallet: {wallet}</p>:<button className="ms-outline" type="button" onClick={onConnect}>Connect owner wallet</button>}
-  <button type="button" className="ms-outline" disabled={!preview||!ack||working||!wallet} onClick={()=>void approve()}>{working?'Checking…':'Validate controller and sign approval'}</button>
+  <button type="button" className="ms-outline" disabled={!preview||!ack||working||!wallet} onClick={()=>void approve()}>Validate controller and sign approval</button>
   {result&&<div className="ms-link-json"><strong>Signed response · send this back to requester</strong><textarea rows={7} readOnly value={result}/><button onClick={()=>void navigator.clipboard.writeText(result)} type="button">Copy signed response</button></div>}
-  {error&&<p role="alert" className="ms-error">{error}</p>}
+  <StatusArea busy={working} label="Checking controller and requesting approval…" error={error} name="Reference approval status"/>
   <p className="ms-link-note">Signatures are not uploaded or stored by the Road. The requester must receive this response and revalidate it before minting. For smart-contract multisigs, use a compatible ERC-1271 signing workflow.</p>
  </section>;
 }

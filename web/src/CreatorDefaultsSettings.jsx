@@ -1,3 +1,4 @@
+import StatusArea from './StatusArea.jsx';
 import {useState} from 'react';
 import {loadCreatorDefaults,saveCreatorDefaults,defaultCreatorDefaults} from './creator-defaults.js';
 import {trainingModes} from './mint-model.js';
@@ -29,7 +30,6 @@ export default function CreatorDefaultsSettings(){
    <p>These are proposed licensing terms. The mint review still requires confirmation.</p>
   </fieldset>
   <div className="settings-buttons"><button type="submit" className="settings-primary">Save creator defaults</button><button type="button" onClick={()=>{setValue(saved);setError('');setMessage('Unsaved creator changes discarded.');}}>Discard creator changes</button><button type="button" onClick={()=>{setValue(defaultCreatorDefaults());setError('');setMessage('Defaults reset in this form. Save to apply.');}}>Reset creator defaults</button></div>
-  {JSON.stringify(value)!==JSON.stringify(saved)&&<small>Unsaved creator defaults</small>}
-  {error&&<p role="alert" className="settings-error">{error}</p>}{message&&<p role="status" className="settings-message">{message}</p>}
+  <StatusArea message={message} error={error} detail={JSON.stringify(value)!==JSON.stringify(saved)?'Unsaved creator defaults':''} name="Creator settings status"/>
  </form>;
 }

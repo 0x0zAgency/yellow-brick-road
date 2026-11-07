@@ -15,7 +15,7 @@ import {createRoot} from 'react-dom/client';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './styles.css';import './mint-studio.css';import './mint-demo.css';
 import MintResults from './MintResults.jsx';
-import WalletBricks from './WalletBricks.jsx';
+import WalletBricks from './WalletBricks.jsx';import CoverArtStudio from './CoverArtStudio.jsx';
 import LiveRegistry from './LiveRegistry.jsx';
 import {presentationAbi} from './brick-presentation.js';
 import {factoryAbi} from './chain-mint.js';
@@ -68,12 +68,12 @@ const bytes=Uint8Array.from(atob('${png.toString('base64')}'),c=>c.charCodeAt(0)
 function App(){const [view,setView]=useState('mint'),[partial,setPartial]=useState(false),[connectedWallet,setConnectedWallet]=useState(owner);window.uiShow=setView;window.uiPartial=setPartial;window.uiSetWallet=value=>{window.uiAccount=value;setConnectedWallet(value);};
  return <main style={{maxWidth:1120,margin:'0 auto',padding:'24px',minHeight:'100vh'}}>
   <div className="br-kicker" style={{marginBottom:16}}>YELLOW BRICK ROAD / CREATOR WORKSPACE</div>
-  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={connectedWallet} onConnect={()=>{}}/>:<LiveRegistry wallet={connectedWallet} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
+  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={connectedWallet} onConnect={()=>{}}/>:view==='buildings'?<CoverArtStudio view="buildings"/>:<LiveRegistry wallet={connectedWallet} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
  </main>;
 }
 createRoot(document.getElementById('compact-root')).render(<App/>);
 `,{flag:'wx'});
- const browser=await chromium.launch({headless:true});let page;let offline=false,registryGate=null;
+ const browser=await chromium.launch({headless:true});let page;let offline=false,registryGate=null,studioGate=null;
  try{
   const context=await browser.newContext({viewport:{width:1440,height:1050}});page=await context.newPage();const errors=[],requests=[];
   page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push({url:r.url(),method:r.method()}));
@@ -85,6 +85,8 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
    await route.fulfill({contentType:'application/json',headers:{'Access-Control-Allow-Origin':'*'},body:JSON.stringify(result)});
   });
   await page.route('**/road/api/registry',async route=>{const gate=registryGate;registryGate=null;if(gate)await gate();await route.fulfill({status:offline?503:200,contentType:'application/json',body:JSON.stringify(offline?{error:'Fixture node offline. '+('Check the node connection. '.repeat(20))}:await page.evaluate(()=>window.uiRegistry))});});
+  await page.route('**/api/player-publish/config',route=>route.fulfill({json:{token:'fixture-only'}}));
+  await page.route('**/api/player-publish/cover-studio',async route=>{const gate=studioGate;studioGate=null;if(gate)await gate();await route.fulfill({json:{uploads:[{id:'fixture-preview',title:'Midnight Transit',creator:'Fixture creator'}],buildings:[{id:'fixture-building',title:'Midnight Transit',releaseType:'Single',source:'creator',members:['fixture-preview']}],covers:[]}});});
   await page.goto('http://127.0.0.1:5173/'+stem+'.html');
   await page.getByRole('button',{name:'Customize NFT appearance',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('.br-hero img')?.naturalWidth>0);
@@ -113,12 +115,41 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   // Clear only the disposable fixture index before standalone pagination tests.
   await page.waitForTimeout(100);
   await page.evaluate(()=>{localStorage.removeItem('road:release-buildings:v1');window.dispatchEvent(new Event('ybr:release-buildings-changed'));});
+  // Refreshing Buildings preserves the catalog while the next response is pending.
+  await page.evaluate(()=>window.uiShow('buildings'));
+  await page.locator('.cas-building').first().waitFor();
+  for(const width of [1440,390]){
+   await page.setViewportSize({width,height:1050});
+   const geometry=()=>page.evaluate(()=>['.cas-heading','[aria-label="Buildings status"]','.cas-created','.cas-upload-buildings'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width,height:r.height};}));
+   const before=await geometry();let release;const pending=new Promise(resolve=>{release=resolve;});studioGate=()=>pending;
+   await page.getByRole('button',{name:'Refresh uploads',exact:true}).click();
+   try{await page.locator('[aria-label="Buildings status"][data-state=busy]').waitFor();const during=await geometry();before.forEach((r,i)=>Object.keys(r).forEach(k=>assert.ok(Math.abs(r[k]-during[i][k])<1,'Buildings refresh shifted '+i+' '+k)));await page.screenshot({path:path.join(out,'buildings-refresh-'+width+'.png')});}
+   finally{release();}
+   await page.locator('[aria-label="Buildings status"]:not([data-state=busy])').waitFor();const after=await geometry();before.forEach((r,i)=>Object.keys(r).forEach(k=>assert.ok(Math.abs(r[k]-after[i][k])<1,'Buildings completion shifted '+i+' '+k)));
+  }
+  await page.setViewportSize({width:1440,height:1050});
   for(const view of ['wallet','registry']){
    await page.evaluate(view=>window.uiShow(view),view);
    await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===12);
    await page.waitForFunction(()=>document.querySelector('.br-record img')?.naturalWidth>0);
    assert.equal(await page.locator('.br-grid > .br-record details[open]').count(),0);
    if(view==='wallet'){
+    // A same-scope discovery refresh must keep the existing cards and action positions.
+    const geometry=()=>page.evaluate(()=>['.wb-controls','[aria-label="My Bricks status"]','.wb-results','.wb .br-grid'].map(s=>{const r=document.querySelector(s).getBoundingClientRect();return {x:r.x+scrollX,y:r.y+scrollY,width:r.width};}));
+    for(const width of [1440,390]){
+     await page.setViewportSize({width,height:1050});const before=await geometry();
+     await page.evaluate(()=>{window.uiHoldDiscovery=true;document.querySelector('.wb-identity button').click();});
+     try{
+      await page.waitForFunction(()=>!!window.uiReleaseDiscovery);await page.locator('[aria-label="My Bricks status"][data-state=busy]').waitFor();
+      assert.equal(await page.locator('.wb .br-grid > .br-record').count(),12,'Previous results remain mounted during same-scope refresh');
+      assert.equal(await page.getByRole('button',{name:'Refresh Bricks',exact:true}).isDisabled(),true);
+      const pending=await geometry();before.forEach((r,i)=>Object.keys(r).forEach(k=>assert.ok(Math.abs(r[k]-pending[i][k])<1,'My Bricks pending shifted '+i+' '+k)));
+      await page.screenshot({path:path.join(out,'wallet-refresh-'+width+'.png')});
+     }finally{await page.evaluate(()=>{window.uiReleaseDiscovery?.();window.uiReleaseDiscovery=null;});}
+     await page.locator('[aria-label="My Bricks status"][data-state=ready]').waitFor();
+     const after=await geometry();before.forEach((r,i)=>Object.keys(r).forEach(k=>assert.ok(Math.abs(r[k]-after[i][k])<1,'My Bricks completion shifted '+i+' '+k)));
+    }
+    await page.setViewportSize({width:1440,height:1050});
     assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);assert.equal(await page.getByLabel('YellowBrickFactory address',{exact:true}).isVisible(),false);
     await page.getByRole('button',{name:'Customize NFT',exact:false}).first().click();
     assert.equal(await page.getByRole('region',{name:'NFT cover artwork'}).first().isVisible(),true);
@@ -225,7 +256,7 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   // Visit, refresh and advanced search are read-only. Stale requests never restore old cards.
   await page.evaluate(()=>{window.uiShow('wallet');});await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
   const scans=()=>page.evaluate(()=>window.uiDiscoveryCalls),initialScans=await scans();
-  await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();assert.equal(await scans(),initialScans+1);
+  await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.locator('[aria-label="My Bricks status"][data-state=ready]').waitFor();await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();assert.equal(await scans(),initialScans+1);
   await page.getByText('Advanced search',{exact:true}).click();await page.getByLabel('Start block',{exact:true}).fill('2');await page.waitForTimeout(100);assert.equal(await scans(),initialScans+1,'Typing advanced settings does not scan');
   await page.getByRole('button',{name:'Search Bricks',exact:true}).click();await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();assert.equal(await scans(),initialScans+2);await page.getByText('Advanced search',{exact:true}).click();
   await page.evaluate(()=>{window.uiHoldDiscovery=true;});await page.getByRole('button',{name:'Refresh Bricks',exact:true}).click();await page.waitForFunction(()=>typeof window.uiReleaseDiscovery==='function');
