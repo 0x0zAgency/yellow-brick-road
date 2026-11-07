@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useState} from 'react';
 import {findReusableBricks,matchesReusableFiles,reuseMedia} from './reuse-bricks.js';
 const labels={master:'recording / primary work',artwork:'cover artwork',composition:'songwriting evidence'};
@@ -17,7 +18,7 @@ export default function ExistingFileBricks({assets,composition,wallet,chainId,fa
  const matches=['master','artwork',...(composition?['composition']:[])].map(part=>({part,rows:candidates.filter(c=>matchesReusableFiles(c,part,reuseMedia(assets,part,{composition})))})).filter(group=>group.rows.length||value[group.part]);
  return <section className="ms-link-panel" aria-label="Matching uploaded files">
   <h3>Reuse a previous Brick</h3>
-  {state.loading?<p role="status">Checking this wallet’s previous Bricks…</p>:matches.length?matches.map(({part,rows})=><div className="ms-reuse-match" key={part}>
+  {state.loading?<RoadProgress size="compact" label="Checking this wallet’s previous Bricks…"/>:matches.length?matches.map(({part,rows})=><div className="ms-reuse-match" key={part}>
    <strong>Exact file match · {labels[part]}</strong>
    <p>Reuse the previous Brick in this Building to skip another IPFS upload and NFT mint for these files. Its existing credits, permissions and payouts stay in place.</p>
    {rows.map(candidate=><div key={candidate.address}><code>{candidate.address}</code><button type="button" className="ms-outline" disabled={value[part]?.address===candidate.address} onClick={()=>onChange({...value,[part]:candidate})}>{value[part]?.address===candidate.address?'Previous Brick selected':'Use previous '+labels[part]+' Brick'}</button></div>)}

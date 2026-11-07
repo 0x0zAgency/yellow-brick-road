@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {Download,FileAudio,Music2,RefreshCw,ShieldCheck,Upload,X} from 'lucide-react';
 import {MAX_MP3_BYTES,TAG_FIELDS,updatedFilename,validateChanges} from './mp3-tag-editor.js';
@@ -53,7 +54,7 @@ export default function Mp3TagEditor(){
   <div className="mp3-intro"><div><span className="settings-eyebrow">TOOLS / MP3 TAGS</span><h2>The details travel with the music.</h2><p>Read the tags. Fix the credits. Download a verified copy—without uploading your audio or changing a Brick.</p></div><FileAudio size={46} aria-hidden="true"/></div>
   <div className="mp3-local"><ShieldCheck size={17} aria-hidden="true"/><span>Browser-local · MP3 only · up to 128 MiB · original file untouched</span></div>
   <div className="mp3-picker"><label className="mp3-file"><Upload size={17} aria-hidden="true"/>{file?'Choose another MP3':'Choose an MP3'}<input ref={input} type="file" accept=".mp3,audio/mpeg" aria-label="MP3 file" onChange={e=>{const f=e.target.files?.[0];e.target.value='';void choose(f);}}/></label>{file&&<><span className="mp3-filename">{file.name}<small>{prettySize(file.size)}{read?' · '+read.tagVersion:''}</small></span><button type="button" className="quiet" onClick={close}><X size={15}/>Clear file</button></>}</div>
-  {busy&&<p role="status" className="mp3-notice">{busy} <button type="button" onClick={()=>{task.current?.cancel();coverJob.current?.abort();generation.current++;setBusy('');}}>Cancel</button></p>}
+  {busy&&<div className="mp3-notice"><RoadProgress size="compact" label={busy}/> <button type="button" onClick={()=>{task.current?.cancel();coverJob.current?.abort();generation.current++;setBusy('');}}>Cancel</button></div>}
   {error&&<p role="alert" className="mp3-error">{error}</p>}
   {!file&&!busy&&<div className="mp3-empty"><Music2 size={38} aria-hidden="true"/><h3>Check an album before you mint.</h3><p>Inspect album, songwriter, composer, lyricist, artwork and other embedded tags. Files and tag values are kept in memory, not saved to browser storage.</p></div>}
   {read&&<><div className="mp3-summary"><span>{read.format.codec}</span><span>{read.format.sampleRate?.toLocaleString()} Hz</span><span>{read.format.channels} channel(s)</span><span>{read.frames.length} ID3v2 frame types</span></div>

@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import './nft-image-delivery.css';
 import {useEffect,useState} from 'react';
 import {readPublicNftCover,publicCoverPath} from './nft-cover-read.js';
@@ -18,7 +19,7 @@ export default function PublicNftCoverCheck({imageURI}){
   <p>This checks the NFT metadata’s <code>image</code>, not the Brick’s encrypted metadata or original file.</p>
   {!path?<p role="status">No supported public image URI is available from this NFT read. Retry the NFT lookup first.</p>:<>
    <p>On-chain image: <code>{imageURI}</code></p>
-   {!state&&<p role="status">Checking public PNG bytes and image decoding…</p>}
+   {!state&&<RoadProgress size="compact" label="Checking public PNG bytes and image decoding…"/>}
    {state?.error&&<p role="alert">{state.error}</p>}
    {state?.info&&<>
     <strong role="status">Verified public PNG through this YBR node · {state.info.width} × {state.info.height} · {state.info.size.toLocaleString()} bytes</strong>

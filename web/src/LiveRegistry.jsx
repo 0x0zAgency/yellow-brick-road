@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import {createPublicClient,http} from 'viem';
@@ -78,7 +79,7 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
     <p>Use Dev Control to change the active blockchain. <button type="button" className="text-action" onClick={onWallet}>Open My Bricks for the connected creator</button>.</p>
    </div></details>
    {error&&<p className="wb-error" role="alert">{error} The registry is unavailable, not empty.</p>}
-   {!data&&!error&&<p role="status">Reading confirmed factory events and Brick contracts…</p>}
+   {!error&&(busy||!data)&&<RoadProgress size={data?'compact':'normal'} label={data?'Refreshing IP Registry…':'Reading confirmed factory events and Brick contracts…'}/>}
    {data&&<>
     {(data.limited||data.limitReached)&&<p className="wb-warning">Partial scan: {data.matchingEvents} matching events in the scanned range; up to 200 newest registrations are shown. This is not a complete historical index.</p>}
     <RegistrySearch filters={filters} onChange={changeFilters} purpose={purpose} onPurpose={setPurpose} rows={data.bricks} shortlistCount={savedCount} wallet={wallet} view={view} onView={setView}/>

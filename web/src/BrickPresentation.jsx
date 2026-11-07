@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import PublicNftCoverCheck from './PublicNftCoverCheck.jsx';
 import {WorkspaceIcon,WorkspaceGraphic} from './AppearanceContext.jsx';
 import {useEffect,useRef,useState} from 'react';
@@ -19,7 +20,7 @@ export function ArtworkTile({imageURI,localUrl,title='Registered work',caption,s
  const label=status==='loading'?'Reading NFT cover…':status==='error'?(ready?'Last verified cover':'NFT read unavailable'):ready?(caption||'NFT cover'):available?'Loading thumbnail…':src?'Cover unavailable':'No public cover';
  return <figure className="br-artwork" title={label}>
   {available&&<img key={loadKey} src={src} alt={title+' cover'} width="512" height="512" loading="eager" decoding="async" referrerPolicy="no-referrer" onLoad={event=>{if(event.currentTarget.naturalWidth)setLoaded(loadKey);else setFailed(loadKey);}} onError={()=>setFailed(loadKey)}/>}
-  {!ready&&<div className="br-artwork-fallback" aria-label={available?'Loading public thumbnail':'Cover unavailable'}><WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/></div>}
+  {!ready&&<div className="br-artwork-fallback" aria-label={available?'Loading public thumbnail':'Cover unavailable'}><>{status==='loading'||available?<RoadProgress size="tiny" label={label} hideLabel/>:<WorkspaceGraphic slot="placeholder" alt="App placeholder, not NFT artwork" fallback={<WorkspaceIcon slot="placeholder" size={28}/>}/>}</></div>}
   <figcaption>{label}</figcaption>
   {onRetry&&(status==='error'||failed===loadKey)&&<button type="button" className="text-action br-cover-retry" onClick={onRetry} aria-label={'Retry cover for '+title}>Retry cover</button>}
  </figure>;

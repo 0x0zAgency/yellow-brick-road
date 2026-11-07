@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {decodePublicCover} from './nft-cover-read.js';
 import {useEffect,useRef,useState} from 'react';
 import {readAttachedCover,prepareNftCover} from './nft-cover-source.js';
@@ -30,7 +31,7 @@ export default function NftCoverReview({getPacket,vault,sourceDigest,value,onCha
   <p>Your uploaded cover or photo can be the NFT image from its first mint. Review and approve the public display copy below. It is included in the same transaction as the Bricks, with no separate initial artwork transaction.</p>
   {!sourceDigest?<p>No supported cover or photo attached. The NFT will use the yellow-square fallback. Add an image in Files to change it.</p>:<>
    {!value?.bytes&&<button type="button" className="ms-outline" disabled={busy} onClick={()=>void prepare()}>{busy?'Preparing NFT preview…':'Preview cover for NFTs'}</button>}
-   {preview&&<img src={preview} className="nft-cover-preview" alt="NFT image included at mint"/>}
+   {busy&&<RoadProgress size="compact" label="Preparing NFT preview…"/>}{preview&&<img src={preview} className="nft-cover-preview" alt="NFT image included at mint"/>}
    {value?.bytes&&<label className="nft-cover-consent"><input type="checkbox" checked={value.consent===true} onChange={e=>onChange({...value,consent:e.target.checked})}/> Publish this reviewed thumbnail publicly on IPFS and include it in my registration NFTs at mint.</label>}
    <p role="status">{value?.consent?'NFT cover selected. It will be included in the single mint transaction.':'NFT artwork is NOT selected. Minting now will leave the yellow-square fallback.'}</p>
   </>}

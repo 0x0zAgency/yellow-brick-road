@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
 import WalletBrickCard from './WalletBrickCard.jsx';
@@ -86,12 +87,12 @@ export default function WalletBricks({wallet,onConnect}){
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
    <div className="wb-controls">
     <div className="wb-identity"><span>Connected creator</span><strong title={wallet}>{short(wallet)}</strong><button type="button" className="outline-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>{busy?'Loading…':'Refresh Bricks'}</button></div>
-    {!networkReady?<p role="status" className="wb-note">Detecting wallet network…</p>:!network&&<p role="alert" className="wb-error">Select the network where the factory was deployed in your browser wallet to view registrations.</p>}
+    {!networkReady?<RoadProgress size="compact" label="Detecting wallet network…"/>:!network&&<p role="alert" className="wb-error">Select the network where the factory was deployed in your browser wallet to view registrations.</p>}
      <details className="br-surface wb-advanced"><summary><span>Advanced search</span></summary><div className="br-surface-body"><p className="wb-note">Network: {network?network.name+' ('+network.id+')':'Unavailable'}</p><label>YellowBrickFactory address<input aria-label="YellowBrickFactory address" readOnly={!!ACTIVE_NETWORK} spellCheck="false" placeholder="0x..." value={factory} onChange={e=>{reset();setFactory(e.target.value.trim())}}/></label>
      <label>Scan from block (optional)<input aria-label="Start block" inputMode="numeric" placeholder={chainId===1337?'0 (Ganache genesis)':'Recent 100,000 blocks'} value={startBlock} onChange={e=>{reset();setStartBlock(e.target.value.trim())}}/></label>
      <p className="wb-note">The factory address identifies which registrations to search. On larger chains, an empty start block scans only the latest 100,000 blocks. Enter its deployment block for older mints (up to 100,000 blocks per scan). No wallet approval is requested.</p><button type="button" className="gold-btn" disabled={busy||!networkReady||!network||!isAddress(factory)} onClick={()=>void run()}>Search Bricks</button></div></details>
    </div>
-   {busy&&<div role="status" className="wb-message">Reading factory events{progress?' · blocks '+progress.from+'–'+progress.to+' · '+progress.found+' match(es) found':' and checking the deployed contract…'}</div>}
+   {busy&&<RoadProgress label={'Reading factory events'+(progress?' · blocks '+progress.from+'–'+progress.to+' · '+progress.found+' match(es) found':' and checking the deployed contract…')}/>}
    {error&&<p role="alert" className="wb-error">{error}</p>}
    {result&&<div className="wb-results">
     <div className="wb-results-header"><h3>{result.bricks.length} verified Brick{result.bricks.length===1?'':'s'} created</h3><span>Scanned blocks {result.fromBlock}–{result.toBlock}</span></div>

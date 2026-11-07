@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {findAlbumCovers} from './album-covers.js';
 import {publicCoverPath,readPublicNftCover} from './nft-cover-read.js';
@@ -29,7 +30,7 @@ export default function AlbumCoverSuggestion({album,previewDigest,wallet,chainId
  return <section className="nft-cover" aria-label="Previous album artwork">
   <span className="eyebrow">RELATED UPLOAD / TOKENURI IMAGE</span><h3>Album detected: {album}</h3>
   <p>Use artwork from an earlier upload in this album. Each new track keeps its own metadata and NFT identity.</p>
-  {state.loading?<p role="status">Checking your previous album uploads…</p>:state.error?<p role="status">{state.error}</p>:covers.length===0?<p>No earlier NFT artwork found for this album on the selected wallet and network.</p>:covers.map(candidate=><div className="album-cover-option" key={candidate.brickAddress}>
+  {busy&&<RoadProgress size="compact" label="Checking selected artwork…"/>}{state.loading?<RoadProgress size="compact" label="Checking your previous album uploads…"/>:state.error?<p role="status">{state.error}</p>:covers.length===0?<p>No earlier NFT artwork found for this album on the selected wallet and network.</p>:covers.map(candidate=><div className="album-cover-option" key={candidate.brickAddress}>
    <img className="nft-cover-preview" src={publicCoverPath(candidate.imageURI)} alt={'Previous artwork for '+album}/>
    <code>{candidate.imageURI}</code>
    <button type="button" className="ms-outline" disabled={!!busy||value?.kind==='album'&&value.candidate.imageURI===candidate.imageURI} onClick={()=>void select(candidate)}>{busy===candidate.brickAddress?'Checking artwork…':value?.kind==='album'&&value.candidate.imageURI===candidate.imageURI?'Previous album artwork selected':'Use previous album artwork'}</button>

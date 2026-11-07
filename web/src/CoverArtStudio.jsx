@@ -1,3 +1,4 @@
+import RoadProgress from './RoadProgress.jsx';
 import {useEffect,useRef,useState} from 'react';
 import {Layers3,Music2,Move,Plus,Play,Square,Image as ImageIcon} from 'lucide-react';
 import '../../apps/ybr-player/public/artwork-model.js';
@@ -93,7 +94,7 @@ export default function CoverArtStudio({active=true,view='studio',onOpen=()=>{},
  return <section className="cover-studio" aria-label="Creator Cover Art Studio" hidden={!active}>
   <div className="cas-heading"><div><span className="eyebrow"><Layers3 size={15}/> AUDIO BUILDINGS</span><h2>{view==='buildings'?'Build with your uploaded audio.':'Turn your cover into an instrument.'}</h2><p>Create an audio Building, arrange its sounds on artwork, then commit a Playable Cover.</p></div><button className="quiet" type="button" onClick={()=>void refresh()} disabled={busy||loading}>Refresh uploads</button></div>
   {error&&<p className="cas-error" role="alert">{error}</p>}{message&&<p className="cas-success" role="status">{message}</p>}
-  {loading&&<p role="status">Loading your audio Buildings…</p>}
+  {loading&&<RoadProgress label="Loading your audio Buildings…"/>}{busy&&<RoadProgress size="compact" label="Preparing your Playable Cover…"/>}
   {!loading&&!catalog.uploads.length&&<div className="cas-empty"><Music2 size={30}/><h3>Your audio starts here.</h3><p>Add an Audio Preview in Mint Studio and share it with the Player. Your uploaded previews will be available here.</p><button className="gold-btn" onClick={onMint}>Open Mint Studio</button></div>}
   {!loading&&<section className="cas-created" aria-labelledby="cas-created-heading"><div className="cas-section-title"><h3 id="cas-created-heading">Your Buildings</h3><span>Created by you</span></div>
    {!created.length&&!referenceBuildings&&<p className="cas-group-note">Your own Buildings will appear here. Choose a release type and add your uploaded audio to get started.</p>}
