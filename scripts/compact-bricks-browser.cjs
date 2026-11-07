@@ -254,6 +254,6 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
  }catch(error){
   if(page){const out=path.join(ROOT,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'compact-views-failure.png'),fullPage:true}).catch(()=>{});}
   throw error;
- }finally{await browser.close();}
+ }finally{if(page&&!page.isClosed())await page.unrouteAll({behavior:'wait'});await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{for(const file of [html,jsx])fs.rmSync(file,{force:true});});
