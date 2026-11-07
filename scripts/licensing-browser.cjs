@@ -28,12 +28,13 @@ const original=window.fetch.bind(window);window.fetch=async(url,options={})=>{
  if(String(url).startsWith('/api/licensing/')){const route=String(url).slice('/api/licensing'.length).split('?')[0];const data=({'/config':profile,'/state':state,'/offers':{offers:[record]},'/challenge':{nonce:'test',message:'Sign in to test inbox'},'/session':{token:'fixture',address:account},'/asset':{address:zeroAddress,symbol:'ETH',decimals:18}})[route];if(!data)throw Error('Unexpected API '+route);return new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});}
  return original(url,options);
 };
-createRoot(document.getElementById('root')).render(<main style={{maxWidth:1150,margin:'auto',padding:20}}><LicensingWorkspace initialBrick={brick}/></main>);
+createRoot(document.getElementById('root')).render(<main style={{maxWidth:1150,margin:'auto',padding:20}}><LicensingWorkspace initialBrick={brick} initialScope="2"/></main>);
 `,{flag:'wx'});
  let browser;try{
   browser=await chromium.launch({headless:true,args:['--no-sandbox']});const page=await browser.newPage({viewport:{width:1280,height:1000}}),errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto((process.env.YBR_LICENSING_TEST_ORIGIN||'http://127.0.0.1:5173')+'/'+stem+'.html');await page.getByRole('button',{name:'Connect licensing wallet'}).click();await page.getByRole('button',{name:'Sign in to offer inbox'}).click();
   await page.getByRole('heading',{name:'Film publishing project'}).waitFor();
+  assert.equal(await page.getByLabel('Licensed use',{exact:true}).inputValue(),'2','Registry publishing intent preselects the offer scope');
   assert.equal(await page.getByRole('button',{name:'Approve terms',exact:true}).count(),0);
   assert.match(await page.locator('.lic-offer').innerText(),/0\.01 ETH × 10 licensed units = 0\.1 ETH prepaid/);
   await page.getByRole('button',{name:'Review & accept license'}).click();await page.getByRole('dialog',{name:'Review license payment'}).waitFor();

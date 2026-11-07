@@ -439,6 +439,8 @@ stores it in its own contract so systems can request approvals or agreements
 without decrypting the work. Set a reusable email under **Settings → Creator defaults**.
 Read or update a Brick's contact from **IP Registry** or **My Bricks → Edit Brick → Licensor contact**.
 
+**IP Registry** includes search by public labels and chain identity, work-type/preview/wallet/block filters, grid and list views, and a local shortlist. Work details lead into licensing offers or licensor contact for purchase inquiries. See [IP Registry search](docs/IP_REGISTRY_SEARCH.md) for current coverage and the public-listing extension points.
+
 **My Bricks** loads current registrations automatically on each visit. Network and discovery controls live under the collapsed **Advanced search**; **Refresh Bricks** reloads the current view.
 
 **My Bricks → Edit Brick** also provides verified private work-detail editing,

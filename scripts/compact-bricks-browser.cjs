@@ -200,6 +200,52 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.evaluate(()=>window.uiSwitchNetwork('0x53a'));await page.getByRole('alert').filter({hasText:'Choose a factory address in Advanced search'}).waitFor();assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);
   await page.evaluate(()=>{window.uiReleaseDiscovery();delete window.uiReleaseDiscovery;});await page.waitForTimeout(100);assert.equal(await page.locator('.br-grid .br-record').count(),0,'Late scan from previous network is ignored');
   await page.evaluate(()=>window.uiSwitchNetwork('0x539'));await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
+  // The licensing explorer searches only public catalog fields and verified identities.
+  await page.evaluate(()=>{
+   localStorage.removeItem('road:release-buildings:v1');window.dispatchEvent(new Event('ybr:release-buildings-changed'));
+   Object.assign(window.uiRegistry.bricks[0],{source:'road',type:'AudioBrick',title:'Night Train',creator:'Test Collective',description:'Ambient soundtrack for publishing.',streamAllowed:true});
+   window.addEventListener('ybr:license-brick',event=>{window.uiLicenseIntent=event.detail;});window.uiShow('registry');
+  });
+  await page.getByRole('heading',{name:'Night Train',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Filters',exact:true}).click();
+  await page.getByLabel('Work type',{exact:true}).selectOption('music');await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
+  await page.getByLabel('Public preview',{exact:true}).selectOption('unavailable');await page.getByText('No works match these filters.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();
+  await page.getByLabel('Wallet role',{exact:true}).selectOption('controller');await page.getByLabel('Wallet address',{exact:true}).fill('0x0000000000000000000000000000000000000099');await page.getByText('No works match these filters.',{exact:true}).waitFor();
+  await page.getByLabel('Wallet address',{exact:true}).fill('bad');await page.getByRole('alert').filter({hasText:'complete creator or controller'}).waitFor();
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();
+  await page.getByLabel('Registered from block',{exact:true}).fill('10');await page.getByLabel('Registered through block',{exact:true}).fill('8');await page.getByRole('alert').filter({hasText:'first block'}).waitFor();
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();
+  await page.getByLabel('Search on-chain registrations').fill('ambient soundtrack');await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
+  await page.getByRole('button',{name:'Shortlist Night Train',exact:true}).click();await page.getByRole('button',{name:'Shortlist (1)',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();await page.getByRole('button',{name:'Shortlist (1)',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
+  await page.getByRole('button',{name:'List view',exact:true}).click();assert.equal(await page.locator('.br-grid.rs-list').count(),1);
+  await page.getByRole('button',{name:'License for publishing',exact:true}).click();
+  const explore=page.getByRole('button',{name:'Explore this IP',exact:false}).first();await explore.click();
+  const workDialog=page.getByRole('dialog',{name:'Night Train',exact:true});await workDialog.waitFor();await workDialog.getByRole('link',{name:'licensing+sync@example.com',exact:true}).waitFor();
+  await workDialog.getByRole('button',{name:'Propose publishing license',exact:false}).click();
+  assert.deepEqual(await page.evaluate(()=>window.uiLicenseIntent),{brickAddress:'0x0000000000000000000000000000000000000064',scope:'2'});
+  await page.keyboard.press('Escape');await workDialog.waitFor({state:'detached'});assert.equal(await explore.evaluate(el=>el===document.activeElement),true);
+  await page.getByRole('button',{name:'Discuss a purchase',exact:true}).click();await explore.click();
+  await workDialog.getByRole('heading',{name:'Discuss acquiring this IP'}).waitFor();assert.equal(await workDialog.getByRole('button',{name:/Propose .*license/}).count(),0);
+  await workDialog.getByRole('link',{name:'licensing+sync@example.com',exact:true}).waitFor();
+  assert.equal(await workDialog.getByRole('link',{name:'licensing+sync@example.com',exact:true}).getAttribute('href'),'mailto:licensing%2Bsync@example.com');
+  await page.screenshot({path:path.join(out,'registry-purchase-mobile.png'),fullPage:true});
+  assert.ok(await workDialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Mobile work details must not overflow');
+  await page.getByRole('button',{name:'Close work details',exact:true}).click();
+  await page.evaluate(()=>window.uiShow('wallet'));await page.getByRole('heading',{name:'13 verified Bricks created',exact:true}).waitFor();
+  await page.evaluate(()=>window.uiShow('registry'));await page.getByRole('button',{name:'Shortlist (1)',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Shortlist (1)',exact:true}).click();await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===1);
+  // Private descriptions are excluded even if the API accidentally supplies one.
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();await page.getByLabel('Search on-chain registrations').fill('Private registered work');await page.getByText('No works match these filters.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Clear filters',exact:true}).click();await page.getByRole('button',{name:'Filters',exact:true}).click();
+  await page.setViewportSize({width:1440,height:1050});await page.screenshot({path:path.join(out,'registry-search-desktop.png'),fullPage:true});
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'registry-search-mobile.png'),fullPage:true});
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Mobile search must not overflow');
+  await page.getByRole('button',{name:'License for ingestion',exact:true}).click();await page.getByRole('button',{name:'Explore this IP',exact:false}).first().click();
+  await workDialog.getByRole('button',{name:'Propose ingestion license',exact:false}).click();assert.equal(await page.evaluate(()=>window.uiLicenseIntent.scope),'1');
+  await page.keyboard.press('Escape');
+  console.log('REGISTRY SEARCH PASS: public-field filters, unknown types, wallet/block constraints, local shortlist persistence, list/grid, focus return, purchase contact and scope handoff, mobile layout.');
   assert.equal(await page.evaluate(()=>window.uiWalletWrites),0,'Rendering and expanding never requests signing');
   assert.ok(!requests.some(r=>r.url.includes('/api/road-ipfs/content/')),'No encrypted originals or metadata are fetched for thumbnails');
   assert.ok(!requests.some(r=>r.url.includes('/api/road-ipfs/nft-cover')&&r.method==='POST'),'Rendering never publishes artwork');
@@ -208,6 +254,6 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
  }catch(error){
   if(page){const out=path.join(ROOT,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'compact-views-failure.png'),fullPage:true}).catch(()=>{});}
   throw error;
- }finally{await browser.close();}
+ }finally{if(page&&!page.isClosed())await page.unrouteAll({behavior:'wait'});await browser.close();}
 }
 main().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>{for(const file of [html,jsx])fs.rmSync(file,{force:true});});
