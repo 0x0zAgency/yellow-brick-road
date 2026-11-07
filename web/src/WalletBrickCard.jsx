@@ -1,21 +1,21 @@
 import {useRef} from 'react';
 import {RegistrationThumbnail,StatusPill} from './BrickPresentation.jsx';
-import {shortId} from './brick-presentation.js';
+import {displayWorkTitle} from './work-titles.js';
 import CopyField from './CopyField.jsx';
 import NftCoverPublisher from './NftCoverPublisher.jsx';
 import IpfsRecovery from './IpfsRecovery.jsx';
 import {validCid} from './ipfs-upload.js';
 
 export default function WalletBrickCard({brick,chainId,factoryAddress,wallet,client,recovering,onRecover,onCloseRecovery,onEdit}){
- const cover=useRef(null);
+ const cover=useRef(null),title=displayWorkTitle(brick);
  const nft=!!(brick.nftContractAddress&&brick.tokenId);
  const customize=()=>{if(cover.current){cover.current.open=true;cover.current.querySelector('summary')?.focus();}};
- return <article className="br-record" aria-label={'Brick '+shortId(brick.address)}>
+ return <article className="br-record" aria-label={title}>
   <div className="br-record-header">
-   <RegistrationThumbnail client={nft?client:null} title={'Brick '+shortId(brick.address)} identity={{chainId,factoryAddress,brickAddress:brick.address,ipId:brick.ipId,collection:brick.nftContractAddress,tokenId:brick.tokenId,originator:brick.originator}}/>
-   <div className="br-record-copy"><span className="br-kicker">REGISTERED WORK · BLOCK {brick.blockNumber}</span><h3>{shortId(brick.address)}</h3>
+   <RegistrationThumbnail client={nft?client:null} title={title} identity={{chainId,factoryAddress,brickAddress:brick.address,ipId:brick.ipId,collection:brick.nftContractAddress,tokenId:brick.tokenId,originator:brick.originator}}/>
+   <div className="br-record-copy"><span className="br-kicker">REGISTERED WORK · BLOCK {brick.blockNumber}</span><h3>{title}</h3>
     <StatusPill tone={brick.creatorIsController?'success':'warning'}>{brick.creatorIsController?'Creator controls':'Controller changed'}</StatusPill>
-    <p>Private work labels stay private.</p>
+    <p>{brick.workTitleSource==='local'?'Work title from this device':brick.workTitle?'Registered work':'Open Edit Brick to load the work title.'}</p>
    </div>
   </div>
   <div className="br-record-footer">{onEdit&&<button className="gold-btn" type="button" onClick={onEdit}>Edit Brick</button>}{nft?<button className="text-action" type="button" onClick={customize}>Customize NFT ↗</button>:<small>Legacy registration · no NFT receipt</small>}

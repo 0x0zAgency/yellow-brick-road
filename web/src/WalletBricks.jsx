@@ -74,7 +74,7 @@ export default function WalletBricks({wallet,onConnect}){
   }
   return()=>{requestId.current++;scanController.current?.abort();};
  },[wallet,chainId,networkReady,networkRevision]);
- const {items}=useBuildingRollup({rows:result?.bricks||[],client,chainId,factoryAddress:result?.verifiedFactory});
+ const {items}=useBuildingRollup({rows:result?.bricks||[],client,chainId,factoryAddress:result?.verifiedFactory,wallet});
  const pages=Math.max(1,Math.ceil(items.length/12)),currentPage=Math.min(page,pages-1);
  const renderPart=brick=><WalletBrickCard key={chainId+':'+result.verifiedFactory+':'+brick.address} brick={brick} chainId={chainId} wallet={wallet} client={client} factoryAddress={result.verifiedFactory} recovering={recoveryAddress===brick.address} onRecover={()=>setRecoveryAddress(brick.address)} onCloseRecovery={()=>setRecoveryAddress(null)} onEdit={()=>{setRecoveryAddress(null);setEditing(brick);}}/>;
  const saved=current=>{

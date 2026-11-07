@@ -1,3 +1,4 @@
+import {displayWorkTitle} from './work-titles.js';
 import RoadProgress from './RoadProgress.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
@@ -44,23 +45,23 @@ export default function LiveRegistry({wallet,onMint,onWallet,children}){
   document.addEventListener('visibilitychange',focus);window.addEventListener('focus',focus);
   return()=>{alive=false;clearInterval(timer);controller?.abort();document.removeEventListener('visibilitychange',focus);window.removeEventListener('focus',focus);refresh.current=()=>{};};
  },[]);
- const {items}=useBuildingRollup({rows:data?.bricks||[],client,chainId:data?.network?.chainId,factoryAddress:data?.network?.factoryAddress,anchor:data?.head});
+ const {items,rows:titledRows}=useBuildingRollup({rows:data?.bricks||[],client,chainId:data?.network?.chainId,factoryAddress:data?.network?.factoryAddress,anchor:data?.head,wallet});
  const context={wallet,shortlist,network:data?.network};
  // Retain the Building's associated parts when one work matches the search.
  const shown=searchRegistryItems(items,filters,context);
- const matching=(data?.bricks||[]).filter(brick=>matchesRegistrySearch(brick,filters,context)).length;
+ const matching=titledRows.filter(brick=>matchesRegistrySearch(brick,filters,context)).length;
  const savedCount=(data?.bricks||[]).filter(brick=>shortlist.includes(registrationKey(brick,data.network))).length;
- const selectedBrick=data?.bricks.find(brick=>registrationKey(brick,data.network)===selected);
+ const selectedBrick=titledRows.find(brick=>registrationKey(brick,data.network)===selected);
  useEffect(()=>{if(data&&selected&&!selectedBrick)setSelected('');},[data,selected,selectedBrick]);
  const pages=Math.max(1,Math.ceil(shown.length/12)),currentPage=Math.min(page,pages-1);
- const renderPart=brick=>{const r=brick.registration;return <article className="br-record" key={r.chainId+':'+r.factoryAddress+':'+r.brickAddress}>
-     <div className="br-record-header"><RegistrationThumbnail client={client} anchor={data.head} title={brick.title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/>
-      <div className="br-record-copy"><span className="br-kicker">ON-CHAIN BRICK · BLOCK {r.blockNumber}</span><h3>{brick.title}</h3><StatusPill tone={brick.streamAllowed?'success':'neutral'}>{brick.streamAllowed?'Public playback available':'Registered · private media'}</StatusPill>
-       <p>{brick.source==='road-registry'?'Private metadata · title not disclosed':brick.creator}</p><span className="rs-card-type">{publicWorkTypeLabel(brick)}</span>
+ const renderPart=brick=>{const r=brick.registration,title=displayWorkTitle(brick);return <article className="br-record" key={r.chainId+':'+r.factoryAddress+':'+r.brickAddress}>
+     <div className="br-record-header"><RegistrationThumbnail client={client} anchor={data.head} title={title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/>
+      <div className="br-record-copy"><span className="br-kicker">ON-CHAIN BRICK · BLOCK {r.blockNumber}</span><h3>{title}</h3><StatusPill tone={brick.streamAllowed?'success':'neutral'}>{brick.streamAllowed?'Public playback available':'Registered · private media'}</StatusPill>
+       <p>{brick.workTitleSource==='local'?'Work title from this device':brick.source==='road-registry'?'Public title not disclosed':brick.creator}</p><span className="rs-card-type">{publicWorkTypeLabel(brick)}</span>
       </div>
      </div>
      <div className="br-record-footer"><small title={r.brickAddress}>{shortId(r.brickAddress)}</small>{brick.streamAllowed?<a className="text-action" href="//127.0.0.1:4173/" target="_blank" rel="noreferrer">Open YBR Player ↗</a>:<span className="br-heading-count">Registration ≠ playback permission</span>}</div>
-     <div className="rs-result-actions"><button type="button" className="text-action" onClick={()=>setSelected(registrationKey(brick,data.network))}>Explore this IP →</button><button type="button" className="quiet" aria-label={'Shortlist '+brick.title} aria-pressed={shortlist.includes(registrationKey(brick,data.network))} onClick={()=>save(brick)}><Bookmark size={16}/></button></div>
+     <div className="rs-result-actions"><button type="button" className="text-action" onClick={()=>setSelected(registrationKey(brick,data.network))}>Explore this IP →</button><button type="button" className="quiet" aria-label={'Shortlist '+title} aria-pressed={shortlist.includes(registrationKey(brick,data.network))} onClick={()=>save(brick)}><Bookmark size={16}/></button></div>
      <details><summary>Licensor contact</summary><div className="br-details"><LicensingContactEditor wallet={wallet} client={client} chainId={r.chainId} factoryAddress={r.factoryAddress} brickAddress={r.brickAddress}/></div></details>
      <details><summary>On-chain details &amp; commitments</summary><div className="br-details">
       <p>{brick.source==='road-registry'?'A title and work type cannot be inferred from a commitment or encrypted metadata. The contract below is the authoritative identity.':brick.description}</p>

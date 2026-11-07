@@ -23,6 +23,7 @@ import {licensingContactAbi} from './licensing-contact.js';
 import {BRICK_READ_ABI} from './brick-viewer-model.js';
 import {buildingFromPacket,saveBuildingRecord} from './release-buildings.js';
 import {BUILDING_EVENT} from './ReleaseBuildingCard.jsx';
+import {saveRecoveryFile,listRecoveryTitles} from './recovery-vault.js';
 import {decodeFunctionData,encodeFunctionResult,encodeEventTopics,encodeAbiParameters,sha256,stringToHex} from 'viem';
 const address=n=>'0x'+n.toString(16).padStart(40,'0'),hash=n=>'0x'+n.toString(16).padStart(64,'0');
 const owner=address(1),factory=address(2),collection=address(3),implementation=address(4),headHash=hash(500);
@@ -61,12 +62,13 @@ packet.building={type:'music-release',name:'Midnight Transit',members:parts.map(
 for(let i=0;i<receipts.length;i++){receipts[i].metadataJson=JSON.stringify(packet.bricks[i].metadata);receipts[i].metadataDigest=sha256(stringToHex(receipts[i].metadataJson));records[i].metadataDigest=receipts[i].metadataDigest;registry.bricks[i].registration.metadataDigest=receipts[i].metadataDigest;}
 const mint={genesisHash:headHash,simulated:false,status:'confirmed',network:'Ganache',chainId:1337,factoryAddress:factory,receipts,nftCover:{status:'verified',imageURI:image}};
 window.uiBuildingPacket={...packet,onChainMint:mint};
+window.uiRememberRecovery=async()=>{await saveRecoveryFile({wallet:owner,kit:{format:'0x-road-ipfs-recovery-v2',key:'synthetic-title-fixture-key',assets:[],metadata:[]},bindings:[{chainId:1337,factoryAddress:factory,genesisHash:headHash,brickAddress:records[3].address,ipId:records[3].ipId,metadataDigest:records[3].metadataDigest,title:'Existing recovered work'}]});return listRecoveryTitles(owner);};
 window.uiRememberBuilding=async()=>{saveBuildingRecord(localStorage,await buildingFromPacket(packet,mint));window.dispatchEvent(new Event(BUILDING_EVENT));};
 const bytes=Uint8Array.from(atob('${png.toString('base64')}'),c=>c.charCodeAt(0));
 function App(){const [view,setView]=useState('mint'),[partial,setPartial]=useState(false),[connectedWallet,setConnectedWallet]=useState(owner);window.uiShow=setView;window.uiPartial=setPartial;window.uiSetWallet=value=>{window.uiAccount=value;setConnectedWallet(value);};
  return <main style={{maxWidth:1120,margin:'0 auto',padding:'24px',minHeight:'100vh'}}>
   <div className="br-kicker" style={{marginBottom:16}}>YELLOW BRICK ROAD / CREATOR WORKSPACE</div>
-  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={connectedWallet} onConnect={()=>{}}/>:<LiveRegistry wallet={owner} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
+  {view==='mint'?<div className="ms-wrap"><MintResults packet={packet} mint={partial?{...mint,status:'incomplete',receipts:[receipts[0],{...receipts[1],status:'pending'}]}:mint} vault={null} preparedCover={{bytes}} delivery={{status:'not-requested'}} onExportPacket={()=>{window.uiExported=true;}} onExportRecovery={()=>{}} onReset={()=>{}} onDownload={()=>{}}/></div>:view==='wallet'?<WalletBricks wallet={connectedWallet} onConnect={()=>{}}/>:<LiveRegistry wallet={connectedWallet} onMint={()=>{}} onWallet={()=>setView('wallet')}/>}
  </main>;
 }
 createRoot(document.getElementById('compact-root')).render(<App/>);
@@ -165,9 +167,10 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-building').length===1);
   assert.equal(await page.locator('.br-grid > .br-record').count(),10,'Three member Bricks become one Building plus ten standalone entries');
   assert.equal(await page.locator('.br-building-parts[open]').count(),0);
+  await page.locator('.br-building-header').getByRole('heading',{name:'Midnight Transit',exact:true}).waitFor();
   await page.getByText('Explore release parts',{exact:true}).click();
   assert.equal(await page.locator('.br-building-children .br-record').count(),3);
-  await page.getByLabel('Search on-chain registrations').fill('Registered Brick 02');
+  await page.getByLabel('Search on-chain registrations').fill('Midnight Transit / composition');
   await page.waitForFunction(()=>document.querySelectorAll('.br-grid > .br-record').length===0);
   assert.equal(await page.locator('.br-building-children .br-record').count(),3,'A child match keeps its whole parent');
   await page.getByLabel('Search on-chain registrations').fill('');
@@ -178,6 +181,16 @@ createRoot(document.getElementById('compact-root')).render(<App/>);
   assert.equal(await page.locator('.br-grid > .br-record').count(),10);
   await page.getByText('Explore release parts',{exact:true}).click();
   assert.equal(await page.locator('.br-building-children .br-record').count(),3);
+  await page.locator('.br-building-header').getByRole('heading',{name:'Midnight Transit',exact:true}).waitFor();
+  assert.deepEqual(await page.locator('.br-building-children h3').allTextContents(),['Midnight Transit','Midnight Transit / composition','Midnight Transit / cover']);
+  const labels=await page.evaluate(()=>window.uiRememberRecovery());assert.ok(!JSON.stringify(labels).includes('synthetic-title-fixture-key'),'Display queries never return recovery keys');
+  await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor();
+  await page.evaluate(()=>window.uiShow('registry'));await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor();
+  await page.evaluate(()=>window.uiSetWallet('0x0000000000000000000000000000000000000099'));await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor({state:'detached'});
+  assert.equal(await page.getByRole('heading',{name:'Midnight Transit',exact:true}).count(),0,'Another wallet cannot inherit private title labels');
+  await page.evaluate(()=>{window.uiSetWallet('0x0000000000000000000000000000000000000001');window.uiShow('wallet');});
+  await page.getByRole('heading',{name:'Existing recovered work',exact:true}).waitFor();
+  await page.getByText('Explore release parts',{exact:true}).click();
   await page.screenshot({path:path.join(out,'wallet-building-expanded.png'),fullPage:true});
   await page.setViewportSize({width:390,height:844});
   for(const view of ['mint','wallet','registry']){

@@ -3,6 +3,7 @@
  * A proposal is not a deployed YellowBrickBuilding contract.
  */
 import {sha256,stringToHex} from 'viem';
+import {cleanWorkTitle} from './work-titles.js';
 export const BUILDING_TYPES=Object.freeze(['music-release','work-bundle','album','compilation']);
 export const PART_LABELS=Object.freeze({master:'Recording / primary work',artwork:'Cover artwork',composition:'Songwriting / composition'});
 export const FILE_LABELS=Object.freeze({master:'Master recording',preview:'Audio Preview',artwork:'Artwork file',lyrics:'Lyrics',project:'Project file',metadata:'Metadata sidecar'});
@@ -75,11 +76,11 @@ function cleanRecord(record){
    !Object.hasOwn(PART_LABELS,m.part)||seen.has(lower(m.address))||roles.has(m.part)||
    !Array.isArray(m.files)||m.files.some(f=>!Object.hasOwn(FILE_LABELS,f))||new Set(m.files).size!==m.files.length)return null;
   seen.add(lower(m.address));roles.add(m.part);
-  members.push({address:lower(m.address),ipId:lower(m.ipId),transactionHash:lower(m.transactionHash),metadataDigest:lower(m.metadataDigest),part:m.part,files:[...m.files]});
+  members.push({address:lower(m.address),ipId:lower(m.ipId),transactionHash:lower(m.transactionHash),metadataDigest:lower(m.metadataDigest),part:m.part,title:cleanWorkTitle(m.title),files:[...m.files]});
  }
  if(!members.some(m=>m.part==='master'&&m.address===lower(record.root)))return null;
- // Whitelist only identifiers and file ROLES. Never persist names, file names,
- // raw metadata, URI payloads, keys, credentials or approved media copies here.
+ // Keep work titles for this device's cards alongside identifiers and file roles.
+ // Never persist file names, raw metadata, URI payloads, keys or media here.
  return {format:'ybr-release-group/1',id:record.id,type:record.type,chainId:Number(record.chainId),
   factoryAddress:lower(record.factoryAddress),genesisHash:lower(record.genesisHash),root:lower(record.root),
   evidence:'local-packet-association',members};
@@ -131,7 +132,7 @@ export async function buildingFromPacket(packet,mint=packet?.onChainMint){
    const member=building?.members?.find(m=>m.ref===existing.localId),c=existing.reuse;
    need(member&&lower(member.brickAddress)===lower(c.address)&&lower(member.ipId)===lower(c.ipId)&&lower(member.metadataDigest)===lower(c.metadataDigest),'Reused member differs from the committed Building reference.');
   }
-  members.push({address:r.contractAddress,ipId:r.id,transactionHash:r.transactionHash,metadataDigest:r.metadataDigest,part:b.localId,
+  members.push({address:r.contractAddress,ipId:r.id,transactionHash:r.transactionHash,metadataDigest:r.metadataDigest,part:b.localId,title:cleanWorkTitle(metadata.title),
    files:[...new Set((metadata.media||[]).map(f=>f.role).filter(role=>Object.hasOwn(FILE_LABELS,role)))]});
  }
  need(packet.building.members.length===members.length&&roles.has('master'),'Release membership must include the primary work exactly once.');

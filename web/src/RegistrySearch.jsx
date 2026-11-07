@@ -1,3 +1,4 @@
+import {displayWorkTitle} from './work-titles.js';
 import RoadProgress from './RoadProgress.jsx';
 import {Search,SlidersHorizontal,Bookmark,LayoutGrid,List,ArrowUpRight,X} from 'lucide-react';
 import {useEffect,useRef,useState} from 'react';
@@ -58,7 +59,7 @@ export function RegistryWorkDetails({brick,network,client,anchor,purpose,saved,s
  return <dialog className="rs-dialog" ref={dialog} aria-labelledby="registry-work-title" onCancel={onClose} onClick={e=>{if(e.target===e.currentTarget)onClose();}}>
   <div className="rs-dialog-body">
    <div className="rs-dialog-top"><span className="br-kicker">IP REGISTRY / WORK DETAILS</span><button type="button" className="quiet" aria-label="Close work details" onClick={onClose} autoFocus><X size={18}/></button></div>
-   <div className="br-record-header"><RegistrationThumbnail client={client} anchor={anchor} title={brick.title} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/><div className="br-record-copy"><h2 id="registry-work-title">{brick.title}</h2><p>{brick.source==='road'?brick.creator:'Public title not disclosed'}</p><StatusPill>{publicWorkTypeLabel(brick)}</StatusPill></div></div>
+   <div className="br-record-header"><RegistrationThumbnail client={client} anchor={anchor} title={displayWorkTitle(brick)} identity={{chainId:r.chainId,factoryAddress:r.factoryAddress,brickAddress:r.brickAddress,ipId:r.ipId,originator:r.originator}}/><div className="br-record-copy"><h2 id="registry-work-title">{displayWorkTitle(brick)}</h2><p>{brick.workTitleSource==='local'?'Work title from this device':brick.source==='road'?brick.creator:'Public title not disclosed'}</p><StatusPill>{publicWorkTypeLabel(brick)}</StatusPill></div></div>
    <p>{brick.source==='road'?brick.description:'This work is registered. Its private metadata is not opened by search.'}</p>
    <div className="rs-facts"><div><span>Registration</span><strong>Block {r.blockNumber}</strong></div><div><span>Network</span><strong>{network.label||'Chain '+r.chainId}</strong></div><div><span>Public preview</span><strong>{brick.streamAllowed?'Available in YBR Player':'Not published'}</strong></div><div><span>Licensing / sale terms</span><strong>Confirm with licensor</strong></div></div>
    <section className="rs-next"><h3>{purchase?'Discuss acquiring this IP':'Propose a license for this IP'}</h3><p>{purchase?'Contact the licensor about the rights you want to acquire. This is an inquiry; the registry does not provide purchase checkout.':'Bring this work into an ingestion or publishing project. Review its supported scopes, creator terms and approval requirements in the offer workspace.'}</p>

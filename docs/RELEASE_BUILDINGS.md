@@ -30,9 +30,9 @@ album/compilation references are a manifest-level foundation only. The current
 contract does not accept another Building as a member, so nested on-chain Building
 authoring requires further implementation and explicit creator authorization.
 
-The view caches only chain/genesis/factory/member identifiers and file roles under
+The view caches chain/genesis/factory/member identifiers, file roles and work titles under
 `road:release-buildings:v1`. It is a rebuildable display index, not a permission
-source. The cache holds no private names, file bytes, metadata packets or keys.
+source. Titles stay on this device; the cache holds no file names, file bytes, metadata packets or keys. Titles are displayed for the connected creator/controller only, and are never inferred from a reused Brick’s new parent.
 It is matched against the current verified scan, including IP ID, transaction and
 metadata commitment. Different histories, different factories or changed metadata
 cannot silently merge. Shared members are references in each parent, not a reason
