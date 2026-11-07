@@ -4,7 +4,15 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const os=require('node:os');
 const path=require('node:path');
-const {approvalArgs,npmHelp,projectDirs,readPolicy,prepareInstallScripts}=require('./dev-install-scripts.cjs');
+const {approvalArgs,npmHelp,projectDirs,readPolicy,missingDependencies,prepareInstallScripts}=require('./dev-install-scripts.cjs');
+
+function installedPackage(cwd,name){
+ const dir=path.join(cwd,'node_modules',name);fs.mkdirSync(dir,{recursive:true});
+ fs.writeFileSync(path.join(dir,'package.json'),JSON.stringify({name,version:'1.0.0',exports:'./index.js'}));
+}
+function declarePackages(cwd,fields){
+ const file=path.join(cwd,'package.json');fs.writeFileSync(file,JSON.stringify({...JSON.parse(fs.readFileSync(file)),...fields}));
+}
 
 function harness(t,{installed=true,policy={},help='All commands: install, install-scripts, rebuild',change=true}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-approve-test-'));
@@ -20,7 +28,10 @@ function harness(t,{installed=true,policy={},help='All commands: install, instal
   assert.equal(executable,'npm');assert.deepEqual(args,['--help']);assert.equal(opts.cwd,root);assert.equal(opts.env,env);return {stdout:help};
  },run:async(executable,args,opts)=>{
   calls.push({executable,args:[...args],cwd:opts.cwd,env:opts.env});
-  if(args[0]==='install')fs.mkdirSync(path.join(opts.cwd,'node_modules'),{recursive:true});
+  if(args[0]==='install'){
+   fs.mkdirSync(path.join(opts.cwd,'node_modules'),{recursive:true});
+   for(const name of missingDependencies(opts.cwd))installedPackage(opts.cwd,name);
+  }
   if(change&&(args.includes('approve')||args.includes('approve-scripts'))){
    const file=path.join(opts.cwd,'package.json'),pkg=JSON.parse(fs.readFileSync(file));
    pkg.allowScripts={...pkg.allowScripts,'test-native@1.0.0':true};fs.writeFileSync(file,JSON.stringify(pkg));
@@ -55,6 +66,46 @@ test('repeated startup still approves but does not reinstall or rebuild unchange
  const h=harness(t);await prepareInstallScripts(h.options);h.calls.length=0;
  await prepareInstallScripts(h.options);
  assert.equal(h.calls.length,3);assert.ok(h.calls.every(call=>call.args.join(' ')==='install-scripts approve --all'));
+});
+test('an older web installation with Vite but no MP3 tagger is repaired before startup',async t=>{
+ const h=harness(t,{change:false}),web=h.dirs[1];
+ declarePackages(web,{dependencies:{'mp3tag.js':'3.17.1'},devDependencies:{vite:'^8'}});installedPackage(web,'vite');
+ assert.deepEqual(missingDependencies(web),['mp3tag.js']);
+ await prepareInstallScripts(h.options);
+ assert.deepEqual(h.calls.filter(c=>c.cwd===web).map(c=>c.args),[['install'],['install-scripts','approve','--all'],['rebuild']]);
+ assert.ok(h.calls.filter(c=>c.cwd!==web).every(c=>c.args[0]==='install-scripts'));
+ assert.deepEqual(missingDependencies(web),[]);
+ h.calls.length=0;await prepareInstallScripts(h.options);
+ assert.equal(h.calls.length,3);assert.ok(h.calls.every(c=>c.args[0]==='install-scripts'));
+});
+test('scoped and broken package manifests are detected; absent optional packages are allowed',t=>{
+ const h=harness(t),web=h.dirs[1];
+ declarePackages(web,{dependencies:{'@scope/required':'1',optional:'1',broken:'1'},devDependencies:{build:'1'},optionalDependencies:{optional:'1'}});
+ installedPackage(web,'@scope/required');installedPackage(web,'build');installedPackage(web,'broken');
+ fs.writeFileSync(path.join(web,'node_modules','broken','package.json'),'{');
+ assert.deepEqual(missingDependencies(web),['broken']);
+});
+test('a repair that fails or leaves a package missing stops before approval and rebuild for that project',async t=>{
+ for(const exitCode of [7,0]){
+  const h=harness(t,{change:false}),web=h.dirs[1],run=h.options.run;
+  declarePackages(web,{dependencies:{'mp3tag.js':'3.17.1'}});
+  h.options.run=async(cmd,args,opts)=>{
+   if(args[0]==='install'){h.calls.push({args,cwd:opts.cwd});return exitCode;}
+   return run(cmd,args,opts);
+  };
+  await assert.rejects(prepareInstallScripts(h.options),exitCode?e=>e.exitCode===7:/still missing in web: mp3tag.js/);
+  assert.deepEqual(h.calls.filter(c=>c.cwd===web).map(c=>c.args),[['install']]);
+  assert.ok(h.calls.every(c=>c.cwd!==h.dirs[2]));
+ }
+});
+test('automatic dependency repair retains existing script denials and detects their removal',async t=>{
+ const h=harness(t,{policy:{denied:false},change:false}),web=h.dirs[1],run=h.options.run;
+ declarePackages(web,{dependencies:{'mp3tag.js':'3.17.1'}});await prepareInstallScripts(h.options);
+ assert.equal(readPolicy(web).denied,false);
+ fs.rmSync(path.join(web,'node_modules','mp3tag.js'),{recursive:true});h.calls.length=0;
+ h.options.run=async(cmd,args,opts)=>{const code=await run(cmd,args,opts);if(args[0]==='install')declarePackages(opts.cwd,{allowScripts:{}});return code;};
+ await assert.rejects(prepareInstallScripts(h.options),/explicit install-script denial/);
+ assert.ok(!h.calls.some(c=>c.cwd===web&&c.args[0]==='rebuild'));
 });
 test('setup installs, approves and rebuilds each project even when policy was already present',async t=>{
  const h=harness(t,{installed:false,change:false});await prepareInstallScripts({...h.options,setup:true});

@@ -25,15 +25,30 @@ async function npmHelp(npm,options,capture=exec){
   throw error;
  }
 }
+function readPackage(cwd){
+ try{return JSON.parse(fs.readFileSync(path.join(cwd,'package.json'),'utf8'));}
+ catch{throw Error('Cannot read package.json for dependency checks in '+cwd);}
+}
 function readPolicy(cwd){
- let pkg;
- try{pkg=JSON.parse(fs.readFileSync(path.join(cwd,'package.json'),'utf8'));}
- catch{throw Error('Cannot read package.json for install-script approval in '+cwd);}
+ const pkg=readPackage(cwd);
  const policy=pkg.allowScripts===undefined?{}:pkg.allowScripts;
  if(!policy||typeof policy!=='object'||Array.isArray(policy))throw Error('Invalid allowScripts policy in '+cwd);
  return policy;
 }
 const policyKey=policy=>JSON.stringify(Object.entries(policy).sort(([a],[b])=>a.localeCompare(b)));
+
+// An existing node_modules directory may predate a pull that added dependencies.
+// Read manifests directly: some packages deliberately do not export package.json.
+function missingDependencies(cwd){
+ const pkg=readPackage(cwd);
+ return Object.keys({...pkg.dependencies,...pkg.devDependencies}).filter(name=>{
+  if(Object.hasOwn(pkg.optionalDependencies||{},name))return false;
+  try{
+   const installed=JSON.parse(fs.readFileSync(path.join(cwd,'node_modules',name,'package.json'),'utf8'));
+   return typeof installed.version!=='string'||!installed.version;
+  }catch{return true;}
+ });
+}
 
 async function prepareInstallScripts({root,run,setup=false,env=process.env,
  npm=process.platform==='win32'?'npm.cmd':'npm',capture=exec,log=console.log}){
@@ -54,8 +69,14 @@ async function prepareInstallScripts({root,run,setup=false,env=process.env,
  }
  for(const cwd of dirs){
   const label=path.relative(root,cwd)||'root';
-  if(setup)await checked(['install'],cwd);
   const before=readPolicy(cwd);
+  const missing=missingDependencies(cwd),install=setup||missing.length>0;
+  if(install){
+   if(!setup)log('[YBR] '+label+': installing missing dependencies: '+missing.join(', '));
+   await checked(['install'],cwd);
+   const remaining=missingDependencies(cwd);
+   if(remaining.length)throw Error('Dependencies are still missing in '+label+': '+remaining.join(', ')+'. Run npm run setup:dev. Startup stopped.');
+  }
   log('[YBR] '+label+': npm '+approve.join(' '));
   await checked(approve,cwd);
   const after=readPolicy(cwd);
@@ -63,11 +84,11 @@ async function prepareInstallScripts({root,run,setup=false,env=process.env,
    if(value===false&&after[key]!==false)throw Error('npm changed an explicit install-script denial in '+label+'. Refusing to rebuild or start services.');
   }
   // Approval records policy; it does not build a previously blocked native addon.
-  // Setup always rebuilds. Ordinary startup rebuilds only after policy changes.
-  if(setup||policyKey(before)!==policyKey(after)){
+  // Rebuild after an install or policy change so repaired native addons are ready.
+  if(install||policyKey(before)!==policyKey(after)){
    log('[YBR] '+label+': rebuilding dependencies with the approved npm policy');
    await checked(['rebuild'],cwd);
   }
  }
 }
-module.exports={approvalArgs,npmHelp,readPolicy,projectDirs,prepareInstallScripts};
+module.exports={approvalArgs,npmHelp,readPolicy,missingDependencies,projectDirs,prepareInstallScripts};

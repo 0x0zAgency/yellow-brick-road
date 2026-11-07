@@ -74,7 +74,7 @@ async function main(args=process.argv.slice(2)){
   }
   const setup=args[0]==='--setup';
   const quiet=!setup&&!args.includes('--verbose')&&process.env.YBR_DEV_VERBOSE!=='1';
-  if(quiet)console.log('[YBR] Checking dependency script approvals...');
+  if(quiet)console.log('[YBR] Checking dependencies and script approvals...');
   await require('./dev-install-scripts.cjs').prepareInstallScripts({root:ROOT,setup,
    run:(cmd,argv,options)=>runChild(cmd,argv,{...options,quiet}),log:quiet?()=>{}:console.log});
   if(setup)return;
