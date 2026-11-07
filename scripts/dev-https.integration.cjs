@@ -69,7 +69,6 @@ async function worker(){
   assert.equal(publicImage.status,200);assert.equal(publicImage.headers.get('content-type'),'image/png');
   for(const view of ['My Bricks','IP Registry']){
    await page.getByRole('button',{name:view,exact:true}).click();
-   if(view==='My Bricks')await page.getByRole('button',{name:'Find my on-chain Bricks'}).click();
    try{
     // Each real NFT must load its approved CID. Bring each card into view:
     // thumbnails intentionally defer RPC/image requests until near the viewport.

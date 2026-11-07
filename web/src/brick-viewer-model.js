@@ -34,17 +34,21 @@ export function resolveScanStart(latest,requested){
  return {start,limited:start>0n};
 }
 
-export async function discoverWalletBricks({client,factoryAddress,wallet,startBlock='',onProgress=()=>{}}){
+export async function discoverWalletBricks({client,factoryAddress,wallet,startBlock='',onProgress=()=>{},signal}){
+ signal?.throwIfAborted();
  if(!isAddress(factoryAddress||'')||!isAddress(wallet||''))throw Error('A valid wallet and factory address are required.');
  const factoryCode=await client.getBytecode({address:factoryAddress});
+ signal?.throwIfAborted();
  if(!factoryCode||factoryCode==='0x')throw Error('No deployed contract at that factory address on this network.');
  let implementation;
  try{
   implementation=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'implementation'});
  }catch{throw Error('Contract is not a compatible YellowBrickFactory.');}
+ signal?.throwIfAborted();
  if(!isAddress(implementation)||implementation.toLowerCase()==='0x0000000000000000000000000000000000000000')
   throw Error('Factory implementation is invalid.');
  const implementationCode=await client.getBytecode({address:implementation});
+ signal?.throwIfAborted();
  if(!implementationCode||implementationCode==='0x')throw Error('Factory implementation is not deployed.');
 
  let receiptTokenAddress=null;
@@ -52,12 +56,16 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
   const candidate=await client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'receiptToken'});
   if(isAddress(candidate)&&await client.getBytecode({address:candidate}))receiptTokenAddress=candidate;
  }catch{/* Older factories have no ERC721 receipt collection. */}
+ signal?.throwIfAborted();
  const latest=await client.getBlockNumber();
+ signal?.throwIfAborted();
  const {start,limited}=resolveScanStart(latest,startBlock);
  const events=[];
  for(let from=start;from<=latest;from+=BLOCK_CHUNK){
+  signal?.throwIfAborted();
   const to=from+BLOCK_CHUNK-1n<latest?from+BLOCK_CHUNK-1n:latest;
   const page=await client.getContractEvents({address:factoryAddress,abi:factoryAbi,eventName:'BrickDeployed',args:{originator:wallet},fromBlock:from,toBlock:to});
+  signal?.throwIfAborted();
   events.push(...page);
   onProgress({from,to,latest,found:events.length});
  }
@@ -72,12 +80,14 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
  const bricks=[];
  // Bounded, serial reads to avoid overwhelming browser wallet RPC endpoints.
  for(const event of selected){
+  signal?.throwIfAborted();
   const address=event.args.brick;
   const get=functionName=>client.readContract({address,abi:BRICK_READ_ABI,functionName});
   const [originator,controller,ipId,contentHash,metadataDigest,metadataVersion,metadataURI,registered]=await Promise.all([
    get('originator'),get('controller'),get('ipId'),get('contentHash'),get('metadataDigest'),get('metadataVersion'),get('metadataURI'),
    client.readContract({address:factoryAddress,abi:factoryAbi,functionName:'isBrick',args:[address]})
   ]);
+  signal?.throwIfAborted();
   if(originator.toLowerCase()!==wallet.toLowerCase()||!registered||contentHash.toLowerCase()!==event.args.contentHash.toLowerCase()){
    throw Error('On-chain factory event and Brick contract do not match at '+address);
   }
@@ -88,11 +98,13 @@ export async function discoverWalletBricks({client,factoryAddress,wallet,startBl
     client.readContract({address:receiptTokenAddress,abi:RECEIPT_READ_ABI,functionName:'ownerOf',args:[expectedId]}),
     client.readContract({address:receiptTokenAddress,abi:RECEIPT_READ_ABI,functionName:'brickForToken',args:[expectedId]})
    ]);
+   signal?.throwIfAborted();
    if(tokenOwner.toLowerCase()!==originator.toLowerCase()||linkedBrick.toLowerCase()!==address.toLowerCase())throw Error('NFT receipt does not match Brick '+address);
    nftContractAddress=receiptTokenAddress;tokenId=expectedId.toString();
   }
   bricks.push({address,originator,controller,ipId,contentHash,metadataDigest,metadataVersion:metadataVersion.toString(),metadataURI,nftContractAddress,tokenId,
    transactionHash:event.transactionHash,blockNumber:event.blockNumber.toString(),creatorIsController:controller.toLowerCase()===wallet.toLowerCase()});
  }
+ signal?.throwIfAborted();
  return {bricks,matchingEvents:found.length,limitReached:found.length>MAX_RESULTS,fromBlock:start.toString(),toBlock:latest.toString(),limited,verifiedFactory:factoryAddress,receiptTokenAddress};
 }
