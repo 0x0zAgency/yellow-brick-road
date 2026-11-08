@@ -337,7 +337,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
    <label>Other cover artist wallet (required for wallet-signed minting)<input value={cover.wallet} onChange={e=>setCover(p=>({...p,wallet:e.target.value.trim()}))} placeholder="0x..."/></label>
    <small>If the collaborator uses a different wallet, they should mint the artwork using their wallet, then approve a linked Brick reference. You cannot mint their artwork as yours.</small>
   </>}
-  <label>Visual artwork category<select value={cover.ipCategory} onChange={e=>{if(isMintCoverCategoryEnabled(e.target.value)){setCover(p=>({...p,ipCategory:e.target.value}));setError('');}else setError(mintCategoryIssue(ipCategoryId,{hasNewCover:true,coverCategory:e.target.value}));}}>
+  <label>Visual artwork category<select aria-label="Visual artwork category" value={cover.ipCategory} onChange={e=>{if(isMintCoverCategoryEnabled(e.target.value)){setCover(p=>({...p,ipCategory:e.target.value}));setError('');}else setError(mintCategoryIssue(ipCategoryId,{hasNewCover:true,coverCategory:e.target.value}));}}>
    {['illustration','photograph','digital-art','painting'].map(id=><option key={id} value={id} disabled={!isMintCoverCategoryEnabled(id)}>{getIpCategory(id).label}{!isMintCoverCategoryEnabled(id)?' — Coming soon':''}</option>)}
   </select></label>
   <label>Description / creative provenance<textarea value={cover.description} rows={3} onChange={e=>setCover(p=>({...p,description:e.target.value}))}/></label>

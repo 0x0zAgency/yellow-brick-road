@@ -48,6 +48,7 @@ async function testMintCategories(browser,url){
   await page.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles({name:'cover.png',mimeType:'image/png',buffer:png});
   await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
   await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
+  await page.getByRole('heading',{name:'03. IP and licensing.',exact:true}).waitFor();
   const cover=page.getByLabel('Visual artwork category',{exact:true});await cover.waitFor();assert.equal(await cover.inputValue(),'painting');
   assert.deepEqual(await cover.locator('option:not(:disabled)').evaluateAll(nodes=>nodes.map(n=>n.value)),['illustration','photograph']);
   assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),true);
@@ -55,6 +56,9 @@ async function testMintCategories(browser,url){
   await cover.selectOption('photograph');assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),false);
   assert.equal(await page.evaluate(()=>window.setupWalletWrites),0);assert.deepEqual(errors,[]);
   console.log('MINT TYPES PASS: music and companion choices, visible disabled future types, forged selection guard, preserved blocked drafts, new-cover availability and zero wallet writes.');
+ }catch(error){
+  console.error('Mint type test state:',await page.locator('.ms-panel').innerText().catch(()=>''));
+  throw error;
  }finally{await context.close();}
 }
 async function main(){
