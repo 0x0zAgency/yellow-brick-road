@@ -49,3 +49,38 @@ test('image and graphic registrations retain file locking without inheriting mus
   assert.equal(metadata.media.length,1,ipCategory);
  }
 });
+
+test('new mint choices focus on music and cover art while preserving the full registry taxonomy',async()=>{
+ const {MINT_CATEGORY_IDS,MINT_COVER_CATEGORY_IDS,isMintCategoryEnabled,isMintCoverCategoryEnabled,mintCategoryIssue}=await import('../src/ip-catalog.js');
+ assert.deepEqual([...MINT_CATEGORY_IDS],['sound-recording','musical-work','song-lyrics','sound-design','photograph','illustration']);
+ assert.deepEqual([...MINT_COVER_CATEGORY_IDS],['illustration','photograph']);
+ for(const category of IP_CATEGORIES){
+  const enabled=MINT_CATEGORY_IDS.includes(category.id);
+  assert.equal(isMintCategoryEnabled(category.id),enabled);
+  assert.equal(mintCategoryIssue(category.id)==='',enabled);
+  assert.equal(getIpCategory(category.id).id,category.id,'Unavailable types remain readable for existing works');
+ }
+ for(const id of ['unknown','',null,undefined,'SOUND-RECORDING']){
+  assert.equal(isMintCategoryEnabled(id),false,'Unknown IDs must not inherit the taxonomy fallback');
+  assert.match(mintCategoryIssue(id),/coming soon/);
+ }
+ for(const id of ['illustration','photograph']){
+  assert.equal(isMintCoverCategoryEnabled(id),true);
+  assert.equal(mintCategoryIssue('sound-recording',{hasNewCover:true,coverCategory:id}),'');
+ }
+ for(const id of ['painting','digital-art','sound-recording','unknown']){
+  assert.equal(isMintCoverCategoryEnabled(id),false);
+  assert.match(mintCategoryIssue('sound-recording',{hasNewCover:true,coverCategory:id}),/cover artwork type is coming soon/);
+  assert.equal(mintCategoryIssue('sound-recording',{hasNewCover:false,coverCategory:id}),'','Unused or reused covers do not block a music registration');
+ }
+});
+
+test('saved unfinished types keep their identity and descriptive data until the creator chooses a supported flow',async()=>{
+ const {sanitizeMintForm}=await import('../src/mint-persistence.js');
+ const {mintCategoryIssue}=await import('../src/ip-catalog.js');
+ const draft=sanitizeMintForm({ipCategoryId:'dance-move',meta:{title:'Original dance',artist:'Original creator'},spatial:{captureFormat:'BVH'}});
+ assert.equal(draft.ipCategoryId,'dance-move');
+ assert.equal(draft.meta.title,'Original dance');
+ assert.equal(draft.spatial.captureFormat,'BVH');
+ assert.match(mintCategoryIssue(draft.ipCategoryId),/coming soon/);
+});

@@ -13,6 +13,54 @@ async function ready(){
  }
  throw Error('Mint Studio did not become ready for setup testing.');
 }
+async function testMintCategories(browser,url){
+ const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage(),errors=[];
+ page.on('pageerror',error=>errors.push(error.message));
+ try{
+  await page.goto(url);
+  const select=page.getByLabel('Select a type of intellectual property',{exact:true});
+  await select.waitFor();
+  const enabled=['sound-recording','musical-work','song-lyrics','sound-design','photograph','illustration'];
+  const options=await select.locator('option').evaluateAll(nodes=>nodes.map(n=>({id:n.value,disabled:n.disabled,groupDisabled:n.parentElement.disabled,label:n.textContent})));
+  assert.equal(options.length,35,'The full taxonomy stays visible');
+  assert.deepEqual(options.filter(n=>!n.disabled&&!n.groupDisabled).map(n=>n.id),enabled);
+  for(const option of options)if(!enabled.includes(option.id)){assert.equal(option.disabled,true);assert.match(option.label,/Coming soon/);}
+  assert.doesNotMatch(await page.locator('.ms-ip-choice').innerText(),/35 available/);
+  for(const id of enabled){await select.selectOption(id);assert.equal(await select.inputValue(),id);}
+  await select.selectOption('sound-recording');
+  // A forged change cannot activate a disabled flow or clear the selected flow.
+  await select.evaluate(node=>{node.value='software-code';node.dispatchEvent(new Event('change',{bubbles:true}));});
+  await page.getByRole('alert').filter({hasText:'coming soon'}).waitFor();assert.equal(await select.inputValue(),'sound-recording');
+  await page.evaluate(()=>localStorage.setItem('road:mint:form:v1',JSON.stringify({version:1,data:{ipCategoryId:'dance-move',meta:{title:'Saved dance draft',artist:'Saved creator'},spatial:{captureFormat:'BVH'}}})));
+  await page.reload();await select.waitFor();assert.equal(await select.inputValue(),'dance-move');
+  assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),true);
+  await page.getByRole('alert').filter({hasText:'coming soon'}).waitFor();
+  const saved=await page.evaluate(()=>JSON.parse(localStorage.getItem('road:mint:form:v1')).data);
+  assert.equal(saved.meta.title,'Saved dance draft');assert.equal(saved.ipCategoryId,'dance-move');assert.equal(saved.spatial.captureFormat,'BVH');
+  const out=path.join(root,'.road-local/player-browser-results');fs.mkdirSync(out,{recursive:true});
+  await page.screenshot({path:path.join(out,'mint-types-saved-mobile.png'),fullPage:true});
+  await select.selectOption('sound-recording');assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),false);
+  // A legacy cover category is preserved but must be replaced for a new artwork Brick.
+  await page.evaluate(()=>localStorage.setItem('road:mint:form:v1',JSON.stringify({version:1,data:{ipCategoryId:'sound-recording',meta:{title:'Saved music draft',artist:'Creator'},cover:{ipCategory:'painting',useMainArtist:true}}})));
+  await page.reload();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles({name:'music.mp3',mimeType:'audio/mpeg',buffer:taggedMp3()});
+  const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIUlEQVR4nGP8f9kpxjeSgYGBgYGBMVphNgMMMDEgARQOAMDRBDMbPbpyAAAAAElFTkSuQmCC','base64');
+  await page.getByLabel('Choose Cover artwork',{exact:true}).setInputFiles({name:'cover.png',mimeType:'image/png',buffer:png});
+  await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
+  await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
+  await page.getByRole('heading',{name:'03. IP and licensing.',exact:true}).waitFor();
+  const cover=page.getByLabel('Visual artwork category',{exact:true});await cover.waitFor();assert.equal(await cover.inputValue(),'painting');
+  assert.deepEqual(await cover.locator('option:not(:disabled)').evaluateAll(nodes=>nodes.map(n=>n.value)),['illustration','photograph']);
+  assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),true);
+  await page.getByRole('alert').filter({hasText:'cover artwork type is coming soon'}).waitFor();
+  await cover.selectOption('photograph');assert.equal(await page.getByRole('button',{name:'Continue →',exact:true}).isDisabled(),false);
+  assert.equal(await page.evaluate(()=>window.setupWalletWrites),0);assert.deepEqual(errors,[]);
+  console.log('MINT TYPES PASS: music and companion choices, visible disabled future types, forged selection guard, preserved blocked drafts, new-cover availability and zero wallet writes.');
+ }catch(error){
+  console.error('Mint type test state:',await page.locator('.ms-panel').innerText().catch(()=>''));
+  throw error;
+ }finally{await context.close();}
+}
 async function main(){
  if(!process.env.CI)throw Error('This read-only mock-wallet browser harness is CI only.');
  await ready();
@@ -39,6 +87,7 @@ createRoot(document.getElementById('setup-root')).render(<Test/>);
   await page.addInitScript(({old,sepolia})=>{
    localStorage.setItem('road:mint:network:v1',JSON.stringify({version:1,data:{factories:{'ganache:1337:http://127.0.0.1:8545':old,'sepolia:11155111':sepolia}}}));
   },{old,sepolia});
+  await testMintCategories(browser,'http://127.0.0.1:5173/'+stem+'.html');
   await page.goto('http://127.0.0.1:5173/'+stem+'.html');
   await page.getByRole('button',{name:'Continue →',exact:true}).click();
   const editor=page.getByRole('region',{name:'Pre-mint Player permissions and content lock'});

@@ -344,6 +344,17 @@ export const SPATIAL_FIELDS=[
 ];
 export function getIpCategory(id){return IP_CATEGORIES.find(c=>c.id===id)||IP_CATEGORIES[0];}
 export function groupedIpCategories(){const groups={};for(const category of IP_CATEGORIES)(groups[category.group]||=[]).push(category);return Object.entries(groups);}
+// Availability applies to new Mint Studio flows, not the taxonomy used to read
+// existing Bricks. New categories stay unavailable until explicitly enabled here.
+export const MINT_CATEGORY_IDS=Object.freeze(['sound-recording','musical-work','song-lyrics','sound-design','photograph','illustration']);
+export const MINT_COVER_CATEGORY_IDS=Object.freeze(['illustration','photograph']);
+export const isMintCategoryEnabled=id=>MINT_CATEGORY_IDS.includes(id);
+export const isMintCoverCategoryEnabled=id=>MINT_COVER_CATEGORY_IDS.includes(id);
+export function mintCategoryIssue(id,{hasNewCover=false,coverCategory='illustration'}={}){
+ if(!isMintCategoryEnabled(id))return (IP_CATEGORIES.find(category=>category.id===id)?.label||'This Brick type')+' is coming soon. Choose an available music or cover-art type to continue.';
+ if(hasNewCover&&!isMintCoverCategoryEnabled(coverCategory))return 'This cover artwork type is coming soon. Choose Illustration / graphic art or Photography to continue.';
+ return '';
+}
 export function spatialEvidence(claims={},registeredAt){
  const result={evidenceType:'creator-declared-spatial-fixation',claimsNotVerified:true,declaredAt:registeredAt,
   provenanceStandards:{c2pa:'reference-to-external-attestation-only',provO:'compatible-evidence-links-planned'}};
