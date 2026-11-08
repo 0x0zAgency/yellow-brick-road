@@ -26,7 +26,7 @@ export default function RequestNotifications({wallet,onConnect,onOffer}){
     if(active())setAuthenticated(signedIn);
     if(signedIn)remote=await client.api('/inbox');
     if(!active())return;
-    // A delivered answer is picked up by the original mint form, even after navigation.
+    // A delivered answer is picked up by the original mint form, while the artist reviews later mint steps.
     for(const record of remote.references)if(record.response&&localReferences().some(r=>r.id===record.id&&!r.response))updateReference(record.id,{response:record.response,status:record.status});
     const local=localReferences().filter(r=>!r.remote&&r.request.chainId===chainId&&sameAddress(r.controller,wallet));
     const {reader}=walletClientForLinks(window.ethereum,chainId);

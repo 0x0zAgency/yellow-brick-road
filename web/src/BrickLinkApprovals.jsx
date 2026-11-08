@@ -57,7 +57,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   forgetReference(link.request);
   rememberReference({request,controller:checked.controller,workTitle,brickTitle:link.title});
   update(link.id,{request,response:null,controller:checked.controller,sent:false});setApprovalId(same(checked.controller,wallet)?link.id:null);
-  setNotice(same(checked.controller,wallet)?'This wallet controls the selected Brick. Review its use below, then approve with your wallet.':'Request prepared. Share the request JSON with the Brick controller for approval.');
+  setNotice(same(checked.controller,wallet)?'This wallet controls the selected Brick. Review its use below, then approve with your wallet.':'Request prepared. Send it to the controller’s inbox for approval.');
  });
  const add=(candidate=null)=>{
   const link={id:crypto.randomUUID(),relation:'cover-art',targetBrick:candidate?.address||'',factory:candidate?.factory||factoryAddress||'',title:candidate?.title||'',scope:'Use as credited cover artwork in this release only.',request:null,response:null};
