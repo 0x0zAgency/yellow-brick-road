@@ -97,6 +97,28 @@ export async function verifyLinkResponse(client,request,response){
  return {status:'verified-current-controller',controller,request:req,signature:response.signature};
 }
 
+/** Both same-wallet and separate-wallet approvals require a fresh controller
+ * signature. Recheck the connected account, chain and controller after signing. */
+export async function signLinkApproval({reader,signer,provider,account,request,check=()=>{}}){
+ const req=normalizeLinkRequest(request);
+ const checkWallet=async()=>{
+  await check();
+  if(Number(BigInt(await provider.request({method:'eth_chainId'})))!==req.chainId)throw Error('Switch your wallet to the approval network.');
+  const accounts=await provider.request({method:'eth_accounts'});
+  if(!accounts.some(a=>a.toLowerCase()===account?.toLowerCase()))throw Error('Wallet disconnected or changed.');
+ };
+ await checkWallet();
+ const {controller}=await checkLinkedBrick(reader,req);
+ if(controller.toLowerCase()!==account?.toLowerCase())throw Error('This wallet is not the referenced Brick controller. Use its controlling wallet.');
+ await checkWallet();
+ const signature=await signer.signTypedData({account,...typedLinkData(req)});
+ await checkWallet();
+ const response=buildLinkResponse(req,signature,account);
+ await verifyLinkResponse(reader,req,response);
+ await checkWallet();
+ return response;
+}
+
 /** Reverify consent immediately before any wallet-signed mint. */
 export async function preflightLinkedBricks({client,account,chainId,sourceHash,links}){
  if(!links?.length)return [];
