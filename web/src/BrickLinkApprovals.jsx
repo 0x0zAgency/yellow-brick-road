@@ -1,6 +1,7 @@
 import StatusArea from './StatusArea.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl,requireActiveNetwork} from './active-network.js';
 import {useEffect,useRef,useState} from 'react';
+import BrickApprovalModal from './BrickApprovalModal.jsx';
 import WalletBrickReferencePicker from './WalletBrickReferencePicker.jsx';
 import {createPublicClient,createWalletClient,custom,http,defineChain,isAddress} from 'viem';
 import {checkLinkedBrick,newLinkRequest,signLinkApproval,verifyLinkResponse,decodeLinkPackage,LINK_RELATIONS,normalizeLinkRequest} from './brick-authorization.js';
@@ -11,14 +12,14 @@ export function walletClientForLinks(provider,id){
  return {reader:createPublicClient({chain,transport:ACTIVE_NETWORK?http(activeRpcUrl()):custom(provider)}),signer:createWalletClient({chain,transport:custom(provider)})};
 }
 export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect,chainId,factoryAddress,rpcUrl,network,workTitle}){
- const [busy,setBusy]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[picker,setPicker]=useState(false),[ack,setAck]=useState({});
+ const [busy,setBusy]=useState(null),[error,setError]=useState(''),[notice,setNotice]=useState(''),[picker,setPicker]=useState(false),[approvalId,setApprovalId]=useState(null);
  const operation=useRef(0),context=JSON.stringify([wallet,chainId,factoryAddress,rpcUrl,network,assets.master?.hash]),currentContext=useRef(context);
  currentContext.current=context;
- useEffect(()=>{operation.current++;setBusy(null);setError('');setNotice('');setAck({});},[context]);
+ useEffect(()=>{operation.current++;setBusy(null);setError('');setNotice('');setApprovalId(null);},[context]);
  useEffect(()=>()=>{operation.current++;},[]);
  const same=(a,b)=>!!a&&!!b&&a.toLowerCase()===b.toLowerCase();
  const update=(id,changes)=>onChange(previous=>previous.map(link=>link.id===id?{...link,...changes}:link));
- const edit=(id,changes)=>{update(id,{...changes,request:null,response:null,controller:null});setAck({});setError('');setNotice('');};
+ const edit=(id,changes)=>{update(id,{...changes,request:null,response:null,controller:null});setApprovalId(null);setError('');setNotice('');};
  const freshRequest=link=>link.request&&same(link.request.requester,wallet)&&link.request.chainId===Number(chainId)&&same(link.request.sourceCommitment,'0x'+assets.master?.hash);
  const run=async(link,task)=>{
   const revision=++operation.current,active=()=>operation.current===revision&&currentContext.current===context;
@@ -39,7 +40,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   const request=newLinkRequest({chainId:actualChain,requester:wallet,sourceCommitment:'0x'+assets.master.hash,targetBrick:link.targetBrick,
    targetIpId:ipId,factory:link.factory,relation:link.relation,scope:link.scope,deadline:Math.floor(Date.now()/1000)+30*86400});
   const checked=await checkLinkedBrick(reader,request);guard();
-  update(link.id,{request,response:null,controller:checked.controller});setAck({});
+  update(link.id,{request,response:null,controller:checked.controller});setApprovalId(same(checked.controller,wallet)?link.id:null);
   setNotice(same(checked.controller,wallet)?'This wallet controls the selected Brick. Review its use below, then approve with your wallet.':'Request prepared. Share the request JSON with the Brick controller for approval.');
  });
  const add=(candidate=null)=>{
@@ -49,10 +50,10 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   if(candidate){setPicker(false);void runRequest(link);}
  };
  const approveOwn=link=>run(link,async guard=>{
-  if(!freshRequest(link)||ack[link.id]!==link.request.nonce)throw Error('Review and confirm this exact use before approving.');
+  if(!freshRequest(link)||approvalId!==link.id)throw Error('Review this use before approving.');
   const provider=window.ethereum,{reader,signer}=walletClientForLinks(provider,link.request.chainId);
   const response=await signLinkApproval({reader,signer,provider,account:wallet,request:link.request,check:guard});guard();
-  update(link.id,{response,controller:response.controller});
+  update(link.id,{response,controller:response.controller});setApprovalId(null);
   setNotice('Approved by your wallet. This Building will reference the existing Brick; no duplicate artwork will be minted.');
  });
  const importResponse=(link,input)=>run(link,async guard=>{
@@ -68,7 +69,9 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
  const copy=async value=>{
   try{await navigator.clipboard.writeText(value);setNotice('Copied to clipboard.');setError('')}catch{setError('Clipboard unavailable. Select and copy the JSON manually.')}
  };
- return <details className="ms-link-panel ms-reference-tools">
+ const approval=links.find(link=>link.id===approvalId&&freshRequest(link)&&same(link.controller,wallet));
+ const closeApproval=()=>{operation.current++;setBusy(null);setError('');setApprovalId(null);};
+ return <><details className="ms-link-panel ms-reference-tools">
   <summary>Reference existing Bricks</summary>
   <p>Already registered your album art? Choose its Brick from your wallet and approve its use in this Building. You can also request approval from another controller.</p>
   {!wallet&&<button type="button" className="ms-outline" onClick={onConnect}>Connect artist wallet to request authorization</button>}
@@ -80,15 +83,13 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
     <label>Relationship<select aria-label="Relationship" disabled={busy!==null} value={link.relation} onChange={e=>edit(link.id,{relation:e.target.value})}>{LINK_RELATIONS.map(x=><option value={x.value} key={x.value}>{x.label}</option>)}</select></label>
     <label>Existing Brick contract address<input disabled={busy!==null} value={link.targetBrick} placeholder="0x..." onChange={e=>edit(link.id,{targetBrick:e.target.value.trim(),title:''})}/></label>
     <label>Its YellowBrickFactory contract address<input disabled={busy!==null} value={link.factory} placeholder="0x..." onChange={e=>edit(link.id,{factory:e.target.value.trim(),title:''})}/></label>
-    <label>Requested use / credit / scope<textarea disabled={busy!==null} rows={2} value={link.scope} maxLength={250} onChange={e=>edit(link.id,{scope:e.target.value})}/></label>
+    <label>Requested use / credit / scope<textarea aria-label="Requested use / credit / scope" disabled={busy!==null} rows={2} value={link.scope} maxLength={250} onChange={e=>edit(link.id,{scope:e.target.value})}/></label>
    </div>
    <button type="button" className="ms-outline" disabled={busy!==null||!wallet} onClick={()=>void runRequest(link)}>Verify Brick &amp; prepare approval request</button>
    {link.request&&!fresh&&<p>Work or wallet changed. Prepare a fresh approval request.</p>}
    {fresh&&own&&<div className="ms-link-review">
-    <strong>{link.response?'Approved by your wallet':'Approve with the controlling wallet'}</strong>
-    <p>Use: {link.scope}</p><p>Work: {workTitle||'This work'}</p><p>Controller: <code>{link.controller}</code></p>
-    {!link.response&&<><label className="ms-check"><input type="checkbox" disabled={busy!==null} checked={ack[link.id]===link.request.nonce} onChange={e=>setAck(previous=>({...previous,[link.id]:e.target.checked?link.request.nonce:null}))}/> I approve this Brick for the stated use in this Building.</label>
-    <button type="button" className="ms-outline" disabled={busy!==null||ack[link.id]!==link.request.nonce} onClick={()=>void approveOwn(link)}>Approve with my wallet</button><small>Signs an approval message. No transaction or ownership transfer.</small></>}
+    <strong>{link.response?'Approved by your wallet':'Awaiting your approval'}</strong>
+    {!link.response&&<button type="button" className="ms-outline" disabled={busy!==null} onClick={()=>{setError('');setApprovalId(link.id);}}>Review approval</button>}
     {link.response&&<p>Existing artwork will be referenced. Its controller and approval are checked again before minting.</p>}
    </div>}
    {fresh&&<details className="ms-link-json" open={own?undefined:true}><summary>{own?'Approval details / export':'Exchange approval with the controller'}</summary>
@@ -99,42 +100,46 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   <button type="button" className="ms-outline" disabled={busy!==null} onClick={()=>add()}>+ Add existing Brick reference</button>
   <p className="ms-link-note">A reference approves only the stated use. For a Safe or other contract-wallet controller, use an ERC-1271-compatible signature and import the response.</p>
   <StatusArea busy={busy!==null} label="Checking Brick approval…" error={error} message={notice} name="Reference request status"/>
- </details>;
+ </details>{approval&&<BrickApprovalModal key={approval.request.nonce} request={approval.request} controller={approval.controller} brickTitle={approval.title} workTitle={workTitle} busy={busy!==null} error={error} onClose={closeApproval} onApprove={()=>void approveOwn(approval)}/>}</>;
 }
 export function BrickOwnerApprovals({wallet,onConnect}){
- const [text,setText]=useState(''),[result,setResult]=useState(''),[error,setError]=useState(''),[working,setWorking]=useState(false),[ack,setAck]=useState(false);
- let preview=null;
- try{if(text.trim())preview=normalizeLinkRequest(decodeLinkPackage(text))}catch{/* Invalid JSON is shown when validation is requested. */}
- const approve=async()=>{
-  setWorking(true);setError('');setResult('');
-  try{
-   if(!wallet)throw Error('Connect the controlling wallet first.');
+ const [text,setText]=useState(''),[result,setResult]=useState(''),[error,setError]=useState(''),[working,setWorking]=useState(false),[verified,setVerified]=useState(null),[review,setReview]=useState(null);
+ const generation=useRef(0),context=JSON.stringify([wallet,text]),current=useRef(context);current.current=context;
+ useEffect(()=>{
+  const id=++generation.current;setResult('');setError('');setVerified(null);setReview(null);setWorking(false);
+  if(!wallet||!text.trim())return;
+  let request;try{request=normalizeLinkRequest(decodeLinkPackage(text));}catch{return;}
+  setWorking(true);
+  void (async()=>{
    const provider=window.ethereum;
    if(!provider?.request)throw Error('A browser wallet is required.');
-   const request=decodeLinkPackage(text),currentChain=Number(BigInt(await provider.request({method:'eth_chainId'})));
-   const {reader,signer}=walletClientForLinks(provider,currentChain);
-   const response=await signLinkApproval({reader,signer,provider,account:wallet,request});
-   setResult(JSON.stringify(response,null,2));
-  }catch(e){setError(e.shortMessage||e.message||'Approval failed')}finally{setWorking(false)}
+   const chainId=Number(BigInt(await provider.request({method:'eth_chainId'}))),{reader}=walletClientForLinks(provider,chainId);
+   const checked=await checkLinkedBrick(reader,request);
+   if(checked.controller.toLowerCase()!==wallet.toLowerCase())throw Error('This wallet is not the referenced Brick controller. Use its controlling wallet.');
+   if(id===generation.current&&current.current===context){setVerified(request);setReview(request);}
+  })().catch(e=>{if(id===generation.current)setError(e.shortMessage||e.message);}).finally(()=>{if(id===generation.current)setWorking(false);});
+  return()=>{generation.current++;};
+ },[context]);
+ const close=()=>{generation.current++;setReview(null);setWorking(false);setError('');};
+ const approve=async()=>{
+  const id=++generation.current,request=review;
+  const check=()=>{if(id!==generation.current||current.current!==context)throw Error('Approval request or wallet changed.');};
+  setWorking(true);setError('');setResult('');
+  try{
+   const provider=window.ethereum,{reader,signer}=walletClientForLinks(provider,request.chainId);
+   const response=await signLinkApproval({reader,signer,provider,account:wallet,request,check});check();
+   setResult(JSON.stringify(response,null,2));setReview(null);
+  }catch(e){if(id===generation.current)setError(e.shortMessage||e.message||'Approval failed');}finally{if(id===generation.current)setWorking(false);}
  };
  return <section className="ms-link-panel">
   <h3>Approve a Brick reference request</h3>
-  <p>Read the request and confirm that the source commitment, relationship and proposed scope are correct. Approval signs a narrowly scoped message; it does not send a transaction or transfer ownership.</p>
-  <textarea className="ms-link-paste" aria-label="Received Brick link request" rows={7} placeholder="Paste creator's link-request JSON…" value={text} onChange={e=>{setText(e.target.value);setResult('');setError('');setAck(false)}}/>
-  {preview&&<div className="ms-link-review">
-   <strong>Review exactly what you are being asked to authorize</strong>
-   <p>Requesting wallet: <code>{preview.requester}</code></p>
-   <p>Referenced Brick: <code>{preview.targetBrick}</code></p>
-   <p>Source work commitment: <code>{preview.sourceCommitment}</code></p>
-   <p>Relationship: <strong>{preview.relation}</strong></p>
-   <p>Scope: <strong>{preview.scope}</strong></p>
-   <p>Network: chain {preview.chainId}; expires {new Date(preview.deadline*1000).toLocaleString()}</p>
-   <label><input type="checkbox" checked={ack} onChange={e=>setAck(e.target.checked)}/> I approve this exact relationship and scope as controller of the referenced Brick.</label>
-  </div>}
-  {wallet?<p>Signing wallet: {wallet}</p>:<button className="ms-outline" type="button" onClick={onConnect}>Connect owner wallet</button>}
-  <button type="button" className="ms-outline" disabled={!preview||!ack||working||!wallet} onClick={()=>void approve()}>Validate controller and sign approval</button>
-  {result&&<div className="ms-link-json"><strong>Signed response · send this back to requester</strong><textarea rows={7} readOnly value={result}/><button onClick={()=>void navigator.clipboard.writeText(result)} type="button">Copy signed response</button></div>}
+  <p>Paste a request to review it in an approval window. The connected wallet must control the referenced Brick.</p>
+  <textarea className="ms-link-paste" aria-label="Received Brick link request" rows={7} placeholder="Paste creator's link-request JSON…" value={text} onChange={e=>setText(e.target.value)}/>
+  {!wallet&&<button className="ms-outline" type="button" onClick={onConnect}>Connect owner wallet</button>}
+  {verified&&!result&&<button type="button" className="ms-outline" disabled={working} onClick={()=>{setError('');setReview(verified);}}>Review approval</button>}
+  {result&&<div className="ms-link-json"><strong>Signed response · send this back to requester</strong><textarea rows={7} readOnly aria-label="Signed Brick approval" value={result}/><button onClick={()=>void navigator.clipboard.writeText(result)} type="button">Copy signed response</button></div>}
   <StatusArea busy={working} label="Checking controller and requesting approval…" error={error} name="Reference approval status"/>
-  <p className="ms-link-note">Signatures are not uploaded or stored by the Road. The requester must receive this response and revalidate it before minting. For smart-contract multisigs, use a compatible ERC-1271 signing workflow.</p>
+  <p className="ms-link-note">Signatures stay in this session. Send the response to the requester; it is checked again before minting.</p>
+  {review&&<BrickApprovalModal key={review.nonce} request={review} controller={wallet} busy={working} error={error} onClose={close} onApprove={()=>void approve()}/>}
  </section>;
 }
