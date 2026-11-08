@@ -28,6 +28,7 @@ async function main(){
 window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
  if(/send|sign/i.test(method)){window.walletWrites++;if(!window.allowTestMint)throw Error('No browser writes in this test');}
  if(method==='eth_accounts')return ['${account.address}'];
+ if(method==='eth_signTypedData_v4'&&typeof params[1]==='string')params=[params[0],JSON.parse(params[1])];
  const r=await fetch('${rpcUrl}',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method,params})});const j=await r.json();if(j.error)throw Error(j.error.message);return j.result;
 }};createRoot(document.getElementById('root')).render(<MintStudioDemo wallet="${account.address}"/>);`,{flag:'wx'});
   const {createServer}=await import(require.resolve('vite',{paths:[web]})),{default:react}=await import(require.resolve('@vitejs/plugin-react',{paths:[web]}));
@@ -113,6 +114,48 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
   const reusedPacket=await readPacket(),reusedReceipt=reusedPacket.onChainMint.receipts[0];
   for(const key of ['contractAddress','nftContractAddress','tokenId','transactionHash'])assert.equal(reusedReceipt[key],originalReceipt[key],key);
   assert.equal(reusedReceipt.reused,true);assert.equal(await page.evaluate(()=>window.walletWrites),0);assert.deepEqual(uploads,[]);assert.deepEqual(errors,[]);
+  // Album-art-first case: pick the separately minted graphic from this wallet,
+  // sign its exact use, then mint only the new recording. Never attach the art again.
+  await page.evaluate(()=>{localStorage.setItem('road:mint:form:v1',JSON.stringify({version:1,data:{ipCategoryId:'sound-recording',composition:false,meta:{title:'Album track with existing art',artist:'Writer A',songwriters:'Writer A'}}}));localStorage.removeItem('road:creator-defaults:v1');});
+  await page.reload();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles({name:'album-track.wav',mimeType:'audio/wav',buffer:Buffer.from('album track original')});
+  await page.getByText('✓ Ready',{exact:true}).waitFor();await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();
+  const references=page.locator('details.ms-reference-tools');await references.locator(':scope > summary').click();
+  await references.getByRole('button',{name:'Choose from my Bricks',exact:true}).click();
+  const ownPicker=references.getByLabel('Bricks in my wallet',{exact:true});
+  await ownPicker.locator('option').filter({hasText:'Visual illustration'}).first().waitFor({state:'attached'});
+  assert.match(await ownPicker.locator('option').filter({hasText:'Visual illustration'}).first().textContent(),/Visual illustration/);
+  await ownPicker.selectOption(originalReceipt.contractAddress);
+  await references.getByRole('button',{name:'Use selected Brick',exact:true}).click();
+  const selfApproval=references.getByRole('button',{name:'Approve with my wallet',exact:true});await selfApproval.waitFor();assert.equal(await selfApproval.isDisabled(),true);
+  assert.equal(await page.evaluate(()=>window.walletWrites),0,'Selecting existing artwork only reads the chain');
+  await references.getByRole('checkbox',{name:'I approve this Brick for the stated use in this Building.',exact:true}).check();
+  await page.evaluate(()=>{window.allowTestMint=true;});await selfApproval.click();
+  await references.getByText('Approved by your wallet',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>window.walletWrites),1,'One explicit approval signature');
+  // Editing use invalidates the first approval and requires a fresh signature.
+  await references.getByLabel('Requested use / credit / scope',{exact:true}).fill('Use as cover artwork for this album track only.');
+  assert.equal(await references.getByText('Approved by your wallet',{exact:true}).count(),0);
+  await references.getByRole('button',{name:'Verify Brick & prepare approval request',exact:true}).click();await selfApproval.waitFor();assert.equal(await selfApproval.isDisabled(),true);
+  await references.getByRole('checkbox',{name:'I approve this Brick for the stated use in this Building.',exact:true}).check();await selfApproval.click();
+  await references.getByText('Approved by your wallet',{exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});await page.screenshot({path:path.join(out,'own-art-reference-mobile.png'),fullPage:true});
+  assert.ok(await references.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'Reference approval fits mobile');
+  await page.setViewportSize({width:1280,height:1000});await page.screenshot({path:path.join(out,'own-art-reference-desktop.png'),fullPage:true});
+  await page.getByRole('button',{name:'Continue →',exact:true}).click();await page.getByRole('button',{name:'Review wallet mint →',exact:true}).click();
+  await confirmation.getByRole('heading',{name:'Mint 1 Brick',exact:true}).waitFor();await confirmation.getByRole('button',{name:'Mint Bricks',exact:true}).click();
+  await confirmation.getByRole('heading',{name:'Registration complete',exact:true}).waitFor();await confirmation.getByRole('button',{name:'View receipts →',exact:true}).click();
+  const albumPacket=await readPacket(),albumReceipt=albumPacket.onChainMint.receipts[0];
+  assert.equal(albumPacket.onChainMint.receipts.length,1);assert.notEqual(albumReceipt.contractAddress,originalReceipt.contractAddress);
+  assert.equal(albumPacket.bricks.length,1);assert.equal(albumPacket.bricks[0].metadata.media.some(f=>f.role==='artwork'),false);
+  const relation=albumPacket.bricks[0].metadata.relationships.find(r=>r.type==='cover-art');assert.equal(relation.targetBrick.toLowerCase(),originalReceipt.contractAddress.toLowerCase());
+  const approval=albumPacket.linkAuthorizations[0];assert.equal(approval.request.requester.toLowerCase(),account.address.toLowerCase());assert.equal(approval.response.controller.toLowerCase(),account.address.toLowerCase());
+  const {verifyLinkResponse}=await load('brick-authorization.js');await verifyLinkResponse(client,approval.request,approval.response);
+  const {BRICK_READ_ABI}=await load('brick-viewer-model.js');
+  assert.equal(await client.readContract({address:originalReceipt.contractAddress,abi:BRICK_READ_ABI,functionName:'metadataDigest'}),originalReceipt.metadataDigest);
+  assert.deepEqual(await readBrickPolicy({provider,chainId:1337,factoryAddress,brickAddress:originalReceipt.contractAddress}),visualPolicy);
+  assert.equal(await page.evaluate(()=>window.walletWrites),3,'Two explicit approval signatures and one new recording mint');
+  assert.deepEqual(uploads,[]);assert.deepEqual(errors,[]);
+  console.log('OWN ART REFERENCE PASS: separate graphic mint, wallet title discovery, explicit same-wallet approval, edited-scope invalidation, one new recording, verified reference, unchanged original artwork, no artwork upload, desktop/mobile.');
   console.log('PASS: exact artwork reuse survives composition changes; songwriter splits; visual category controls, thumbnail preview, saved-default isolation, real graphic mint and original-NFT reuse without another transaction; desktop/mobile coverage.');
  }catch(error){if(page){fs.mkdirSync(path.join(root,'.road-local/player-browser-results'),{recursive:true});await page.screenshot({path:path.join(root,'.road-local/player-browser-results/reuse-bricks-failure.png'),fullPage:true}).catch(()=>{});}throw error;}
  finally{await browser?.close();await vite?.close();await server.close();fs.rmSync(html,{force:true});fs.rmSync(jsx,{force:true});}

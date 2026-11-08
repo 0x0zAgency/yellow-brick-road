@@ -143,3 +143,29 @@ Saved drafts keep their original type and fields. An unavailable saved type
 blocks continuation until the creator explicitly chooses a supported type;
 it is never silently relabeled as a sound recording. An unavailable cover type
 blocks new cover creation, while an existing reused Brick keeps its original type.
+
+
+## Album artwork registered first
+
+An artist can register an illustration or photograph first, then use that Brick
+as artwork for a later music release without attaching the artwork file again.
+
+1. Mint the artwork from the artist wallet.
+2. Start a music registration and attach the new recording.
+3. Under **Reference existing Bricks**, choose **Choose from my Bricks**, select
+   the artwork by its work title, and choose **Use selected Brick**.
+4. Review the intended use, confirm the checkbox, and choose **Approve with my
+   wallet**. This signs a scoped approval message; it is not a transaction.
+5. Complete the recording registration. Only the new recording and any selected
+   new composition are minted. The artwork remains its original Brick.
+
+The picker verifies the selected deployment and current controller; locally
+available work titles are display labels. Approval binds the recording's source
+commitment, target Brick, chain, requesting wallet, use, nonce and expiration.
+Changing the use requires fresh approval. Wallet, chain and controller changes
+are rejected before/after signing and again before minting. Approval records and
+the target reference are included in the registration packet. Referencing artwork
+does not copy its files or change its permissions, metadata, payouts or ownership.
+Another controller can still approve through the JSON exchange, including a
+compatible contract-wallet signature. The reference tool remains collapsed until
+opened. Older or other-deployment Bricks can be entered by contract address.

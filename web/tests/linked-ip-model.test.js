@@ -56,6 +56,21 @@ test('existing owner-controlled cover and composition are references, not duplic
  assert.equal(packet.bricks[0].metadata.relationships[0].authorization,'pending-current-controller-signature');
  assert.equal(packet.linkAuthorizations[0].response,null);
 });
+
+test('separately minted album artwork remains a signed reference in a later music packet',()=>{
+ const artwork=makeRegistrationPacket({...core,metadata:{ipCategory:'illustration',title:'Album art',artist:'Recording Artist'},composition:false});
+ const original=JSON.stringify(artwork);
+ const link={id:'own-art',relation:'cover-art',targetBrick:artistWallet,factory,scope:'Album cover only',request:{requester:wallet},response:{controller:wallet}};
+ const input={...core,composition:false,linkedBricks:[link]};
+ assert.deepEqual(validateMintInput(input),[]);
+ const packet=makeRegistrationPacket(input);
+ assert.equal(packet.bricks.length,1);assert.equal(packet.bricks[0].localId,'master');
+ assert.equal(packet.bricks[0].metadata.relationships[0].targetBrick,artistWallet);
+ assert.match(packet.bricks[0].metadata.relationships[0].authorization,/controller-signature/);
+ assert.equal(packet.linkAuthorizations[0].response.controller,wallet);
+ assert.equal(packet.bricks[0].metadata.media.some(file=>file.role==='artwork'),false);
+ assert.equal(JSON.stringify(artwork),original);
+});
 test('lyrics evidence is attached through a separate songwriting/lyrics Brick, not the recording upload flow',()=>{
  const input={...core,metadata:{...core.metadata,ipCategory:'musical-work'},assets:{...core.assets,lyrics:{name:'lyrics.txt',hash:'c'.repeat(64),size:300,type:'text/plain'}}};
  const packet=makeRegistrationPacket(input);

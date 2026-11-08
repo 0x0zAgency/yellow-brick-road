@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {privateKeyToAccount} from 'viem/accounts';
 import {verifyTypedData} from 'viem';
 import {webcrypto} from 'node:crypto';
-import {buildLinkResponse,newLinkRequest,normalizeLinkRequest,typedLinkData,verifyLinkResponse,preflightLinkedBricks,linkRequestDigest,checkLinkedBrick} from '../src/brick-authorization.js';
+import {buildLinkResponse,newLinkRequest,normalizeLinkRequest,typedLinkData,verifyLinkResponse,preflightLinkedBricks,linkRequestDigest,checkLinkedBrick,signLinkApproval} from '../src/brick-authorization.js';
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
 const owner=privateKeyToAccount('0x'+'11'.repeat(32));
 const requester=privateKeyToAccount('0x'+'22'.repeat(32));
@@ -58,4 +58,29 @@ test('preflight blocks unsigned references and source changes before any mint',a
  await assert.rejects(preflightLinkedBricks({...options,links:[{...link,response:null}]}),/approval missing/);
  await assert.rejects(preflightLinkedBricks({...options,sourceHash:'cd'.repeat(32),links:[link]}),/Source file changed/);
  await assert.rejects(preflightLinkedBricks({...options,links:[{...link,scope:'New scope'}]}),/changed after/);
+});
+
+test('an artist signs for separately registered artwork from the same wallet without a transaction',async()=>{
+ const request={...make(),requester:owner.address},methods=[];
+ const provider={request:async({method})=>{methods.push(method);return method==='eth_chainId'?'0x539':[owner.address];}};
+ let signatures=0;
+ const response=await signLinkApproval({reader:client(),provider,account:owner.address,request,signer:{signTypedData:async data=>{signatures++;return owner.signTypedData(data);}}});
+ assert.equal(signatures,1);assert.equal(response.controller,owner.address);
+ assert.ok(methods.every(method=>['eth_accounts','eth_chainId'].includes(method)));
+ const link={targetBrick:brick,factory,relation:request.relation,scope:request.scope,request,response};
+ assert.equal((await preflightLinkedBricks({client:client(),account:owner.address,chainId:1337,sourceHash:hash,links:[link]})).length,1);
+});
+
+test('approval refuses another controller and invalidates wallet, network or controller changes during signing',async()=>{
+ for(const scenario of ['wrong-controller','account-change','chain-change','controller-change','cancel','source-change']){
+  let signed=false,calls=0;
+  const request={...make(),requester:owner.address};
+  const provider={request:async({method})=>method==='eth_chainId'?(signed&&scenario==='chain-change'?'0xaa36a7':'0x539'):[signed&&scenario==='account-change'?requester.address:owner.address]};
+  const reader={...client(),readContract:async input=>client(scenario==='wrong-controller'||signed&&scenario==='controller-change'?requester.address:owner.address).readContract(input)};
+  await assert.rejects(signLinkApproval({reader,provider,account:owner.address,request,
+   check:()=>{if(signed&&scenario==='source-change')throw Error('Source changed');},
+   signer:{signTypedData:async data=>{calls++;signed=true;if(scenario==='cancel')throw Error('User rejected signature');return owner.signTypedData(data);}}
+  }),/controller|Wallet disconnected|approval network|User rejected|Source changed/);
+  assert.equal(calls,scenario==='wrong-controller'?0:1,scenario);
+ }
 });
