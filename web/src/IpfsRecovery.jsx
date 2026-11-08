@@ -21,7 +21,7 @@ function verificationMessage(verification){
 }
 
 /** Private creator recovery. Keys and decrypted content stay on this device. */
-export default function IpfsRecovery({brick=null,onClose,wallet}){
+export default function IpfsRecovery({brick=null,onClose,wallet,recoveryFile=null}){
  const [kit,setKit]=useState(null),[backupName,setBackupName]=useState('');
  const [busy,setBusy]=useState(''),[error,setError]=useState(''),[status,setStatus]=useState('');
  const [localNotice,setLocalNotice]=useState('');
@@ -31,7 +31,15 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
  const cancelWork=()=>{operation.current++;controller.current?.abort();controller.current=null;};
  const releaseDownloads=()=>{for(const url of downloads.current)URL.revokeObjectURL(url);downloads.current.clear();};
  useEffect(()=>()=>{cancelWork();releaseDownloads();},[]);
- useEffect(()=>{clear();setLocalNotice('');},[wallet]);
+ useEffect(()=>{
+  clear();setLocalNotice('');
+  if(!recoveryFile)return;
+  try{
+   if(!wallet||recoveryFile.wallet!==wallet.toLowerCase())throw Error('This recovery file belongs to another wallet.');
+   const parsed=parseRecoveryFile(JSON.stringify(recoveryFile.kit));
+   setKit(parsed);setBackupName(recoveryFile.name);setStatus('Saved recovery file loaded. Choose a file to recover.');
+  }catch(e){setError(e.message||'Unable to load the saved recovery file.');}
+ },[wallet,recoveryFile]);
  const clear=()=>{
   cancelWork();releaseDownloads();setKit(null);setBackupName('');setBusy('');setError('');setStatus('');
   setCompleted({});setChainAssets(null);setWorkTitle('');if(fileInput.current)fileInput.current.value='';
@@ -44,7 +52,7 @@ export default function IpfsRecovery({brick=null,onClose,wallet}){
    const parsed=parseRecoveryFile(await file.text());
    if(id!==operation.current)return;
    setKit(parsed);setBackupName(file.name);setStatus('Recovery key loaded in this browser session.');
-   if(wallet){try{await saveRecoveryFile({wallet,kit:parsed,name:file.name});if(id===operation.current)setLocalNotice('Saved in Tools → Recovery files on this browser.');}catch{if(id===operation.current)setLocalNotice('Local recovery storage is unavailable or full. Keep your downloaded recovery JSON.');}}
+   if(wallet){try{await saveRecoveryFile({wallet,kit:parsed,name:file.name});if(id===operation.current)setLocalNotice('Saved in Tools → File Recovery on this browser.');}catch{if(id===operation.current)setLocalNotice('Local recovery storage is unavailable or full. Keep your downloaded recovery JSON.');}}
   }catch(e){if(id===operation.current)setError(e.message||'Unable to read the recovery file.');}
   finally{if(id===operation.current)setBusy('');}
  };

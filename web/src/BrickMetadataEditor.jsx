@@ -20,7 +20,7 @@ export default function BrickMetadataEditor({wallet,chainId,factoryAddress,brick
  const begin=()=>{mutex.current=true;setBusy(true);setError('');const id=++generation.current;return {id,assertActive:()=>{if(id!==generation.current)throw Error('Editor session changed. Reopen the Brick.');}};};
  const finish=id=>{if(id===generation.current){mutex.current=false;setBusy(false);}};
  const remember=async(kit,review,title,name,id)=>{
-  try{await saveRecoveryFile({wallet,kit,title,name:name||'brick-'+brick.address.slice(2,10)+'-recovery.json',bindings:[{...review,title}]});if(id===generation.current)setLocalNotice('Recovery file saved in this browser. Manage copies in Tools → Recovery files.');}
+  try{await saveRecoveryFile({wallet,kit,title,name:name||'brick-'+brick.address.slice(2,10)+'-recovery.json',bindings:[{...review,title}]});if(id===generation.current)setLocalNotice('Recovery file saved in this browser. Manage copies in Tools → File Recovery.');}
   catch{if(id===generation.current)setLocalNotice('Local recovery storage is unavailable or full. Download your recovery file to keep a copy.');}
  };
  async function loadLocal(){

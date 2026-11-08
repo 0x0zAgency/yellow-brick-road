@@ -78,6 +78,19 @@ const root=createRoot(document.getElementById('root'));window.showRecovery=walle
   assert.equal(uploads,vaultUploads);assert.deepEqual(requests.filter(r=>r.method==='POST'),[],'Collecting/exporting keys never sends them to a server');page.off('request',watch);
   await page.reload();await page.evaluate(wallet=>window.showRecovery(wallet),account);await collection.getByText(/4 saved files/).waitFor();
   await page.setViewportSize({width:1280,height:1000});await page.screenshot({path:path.join(out,'recovery-files-desktop.png'),fullPage:true});await page.setViewportSize({width:390,height:844});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);await page.screenshot({path:path.join(out,'recovery-files-mobile.png'),fullPage:true});
+  // Load a saved private backup directly into the integrated recovery panel.
+  const restore=page.getByRole('region',{name:'Recover IPFS files',exact:true});
+  const editedFile=collection.locator('.rv-file').filter({hasText:'Edited artwork title'});
+  const recoveryRequests=[];const recoveryWatch=r=>recoveryRequests.push({method:r.method(),url:r.url()});page.on('request',recoveryWatch);
+  await editedFile.getByRole('button',{name:'Recover files',exact:true}).click();
+  await restore.getByRole('status').filter({hasText:'Saved recovery file loaded'}).waitFor();
+  assert.deepEqual(recoveryRequests,[],'Loading a saved recovery file stays local');
+  const recoveredEvent=page.waitForEvent('download');await restore.getByRole('button',{name:'Recover & download',exact:true}).click();
+  const recoveredMetadata=JSON.parse(fs.readFileSync(await (await recoveredEvent).path()));assert.equal(recoveredMetadata.title,'Edited artwork title');
+  assert.ok(recoveryRequests.some(r=>r.method==='GET'&&r.url.includes('/api/road-ipfs/content/')));assert.ok(recoveryRequests.every(r=>r.method==='GET'));
+  page.off('request',recoveryWatch);
+  await page.evaluate(wallet=>window.showRecovery(wallet),other);await collection.getByText(/4 saved files/).waitFor();
+  assert.equal(await restore.getByRole('button',{name:'Clear recovery session',exact:true}).count(),0,'Wallet changes clear the loaded private backup');
   // The actual IPFS mint saves recovery before the wallet write and binds it after confirmation.
   await page.evaluate(()=>{window.checkMintRecovery=true;window.showMint();});
   await page.getByLabel('Select a type of intellectual property',{exact:true}).selectOption('illustration');await page.getByRole('button',{name:'Continue →',exact:true}).click();
@@ -90,6 +103,15 @@ const root=createRoot(document.getElementById('root'));window.showRecovery=walle
   const minted=await page.evaluate(async wallet=>{const {listRecoveryFiles}=await import('/src/recovery-vault.js');return (await listRecoveryFiles(wallet)).filter(r=>r.title==='Auto saved mint');},account);
   assert.equal(minted.length,1,'Binding enrichment must not duplicate the saved file');assert.equal(minted[0].bindings.length,1);assert.equal(minted[0].kit.assets.length,1);assert.equal(minted[0].kit.metadata.length,1);
   assert.equal(minted[0].bindings[0].factoryAddress,factoryAddress.toLowerCase());
+  // Recover the actual original PNG from the automatically saved mint backup.
+  const writesBeforeRecovery=await page.evaluate(()=>window.walletWrites),uploadsBeforeRecovery=uploads;
+  await page.evaluate(wallet=>window.showRecovery(wallet),account);
+  const autoFile=collection.locator('.rv-file').filter({hasText:'Auto saved mint'});await autoFile.getByRole('button',{name:'Recover files',exact:true}).click();
+  await restore.getByRole('status').filter({hasText:'Saved recovery file loaded'}).waitFor();
+  const originalEvent=page.waitForEvent('download');await restore.locator('.ir-section').filter({has:page.getByRole('heading',{name:'Original files',exact:true})}).getByRole('button',{name:'Recover & download',exact:true}).click();
+  assert.deepEqual(fs.readFileSync(await (await originalEvent).path()),png);
+  assert.equal(await page.evaluate(()=>window.walletWrites),writesBeforeRecovery);assert.equal(uploads,uploadsBeforeRecovery);
+  console.log('FILE RECOVERY PASS: saved backup opens directly, no network on selection, verified metadata and original PNG downloads, wallet change clears session, zero upload or wallet writes.');
   await page.reload();await page.getByRole('heading',{name:'2 verified Bricks created',exact:true}).waitFor();assert.equal(await page.locator('.wb-advanced').evaluate(el=>el.open),false);assert.deepEqual(errors,[]);
   console.log('BRICK EDITOR PASS: My Bricks entry, live commitment + private recovery verification, locked visual-work edits, no Player controls, review, rejected-wallet retry, exact chain save, recovery export, automatic reopen/reload, account invalidation, wallet-scoped bulk collection, atomic import, concurrent storage, downloads/removal, IPFS mint auto-save and mobile layouts.');
  }catch(error){if(page){fs.mkdirSync(out,{recursive:true});await page.screenshot({path:path.join(out,'brick-editor-failure.png'),fullPage:true}).catch(()=>{});}throw Error([error.shortMessage||error.message,error.details].filter(Boolean).join('\n'));}
