@@ -67,7 +67,8 @@ async function main(){
   const {verifyLinkResponse}=await load('src/brick-authorization.js');await verifyLinkResponse(reader,request,response);
   const second=await send({...request,nonce:textHash('second')});await bell.waitFor();await creator.getByRole('tooltip').waitFor();await creator.getByRole('button',{name:'Dismiss notification tooltip'}).click();
   await creator.waitForTimeout(5500);assert.equal(await creator.getByRole('tooltip').count(),0,'Polling does not repeat the same arrival alert');
-  await creator.setViewportSize({width:390,height:844});await bell.click();await creator.screenshot({path:path.join(output,'notifications-inbox-mobile.png'),fullPage:false});
+  await creator.setViewportSize({width:390,height:844});await creator.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);await creator.evaluate(()=>window.scrollTo({left:0,top:0,behavior:'instant'}));await bell.click();
+  assert.ok(await creator.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'App header and page fit mobile');await creator.screenshot({path:path.join(output,'notifications-inbox-mobile.png'),fullPage:false});
   assert.ok(await creator.locator('.request-inbox-panel').evaluate(el=>{const r=el.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.bottom<=innerHeight&&el.scrollWidth<=el.clientWidth+1;}));
   await creator.keyboard.press('Escape');assert.equal(await bell.evaluate(el=>el===document.activeElement),true);
   await creator.emulateMedia({reducedMotion:'reduce'});await send({...request,nonce:textHash('third')});await creator.getByRole('button',{name:'Notifications, 2 waiting requests',exact:true}).waitFor();assert.equal(await creator.locator('.request-bell svg').evaluate(el=>getComputedStyle(el).animationName),'none');
