@@ -36,6 +36,7 @@ export function createLicensingClient({provider=globalThis.ethereum,fetcher=glob
  async function login(){
   const current=revision,expected=account;
   await guard();const challenge=await api('/challenge',{method:'POST',body:{address:account}});
+  await guard();if(current!==revision||!sameAddress(expected,account))throw Error('Wallet changed during sign-in.');
   const signature=await wallet.signMessage({account,message:challenge.message});await guard();
   const response=await api('/session',{method:'POST',body:{nonce:challenge.nonce,signature}});await guard();if(current!==revision||!sameAddress(expected,account)||!sameAddress(response.address,account))throw Error('Wallet changed during sign-in.');session=response.token;emit();return response;
  }

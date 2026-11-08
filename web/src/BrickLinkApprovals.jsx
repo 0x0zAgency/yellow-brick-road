@@ -91,13 +91,13 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
  const sendRequest=link=>run(link,async guard=>{
   if(!freshRequest(link))throw Error('Prepare a fresh request first.');
   const inbox=workspaceInbox();await inbox.initialize();guard();
-  if(!inbox.authenticated||!same(inbox.account,wallet)){await inbox.connect();await inbox.login();guard();}
+  if(!inbox.authenticated||!same(inbox.account,wallet)){await inbox.connect();guard();await inbox.login();guard();}
   const record=await inbox.api('/references',{method:'POST',body:{request:link.request,workTitle,brickTitle:link.title}});guard();
   rememberReference({...record,remote:true});update(link.id,{sent:true});setNotice('Request sent. The controller will see it in their notifications.');
  });
  const withdrawRequest=link=>run(link,async guard=>{
   const inbox=workspaceInbox();await inbox.initialize();guard();
-  if(!inbox.authenticated||!same(inbox.account,wallet)){await inbox.connect();await inbox.login();guard();}
+  if(!inbox.authenticated||!same(inbox.account,wallet)){await inbox.connect();guard();await inbox.login();guard();}
   await inbox.api('/references/'+linkRequestDigest(link.request)+'/decision',{method:'POST',body:{action:'withdraw'}});guard();
   forgetReference(link.request);update(link.id,{sent:false,request:null,response:null,controller:null});setNotice('Request withdrawn. You can edit or remove this reference.');
  });

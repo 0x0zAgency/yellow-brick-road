@@ -130,11 +130,34 @@ jobs:
           npm run compile
           node scripts/reuse-bricks-browser.cjs
           node scripts/brick-editor-browser.cjs
-          node scripts/request-notifications-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: player-release-browser-results
           path: .road-local/player-browser-results/
+          retention-days: 3
+          if-no-files-found: ignore
+  request-notifications:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install contract, web and browser dependencies
+        run: |
+          npm install --no-audit --no-fund
+          npm install --prefix web --no-package-lock --no-audit --no-fund
+          npm install --prefix /tmp/ybr-browser playwright@1.56.1 --no-audit --no-fund
+          /tmp/ybr-browser/node_modules/.bin/playwright install --with-deps chromium
+          npm run compile
+      - name: Exercise live notifications between two wallets
+        run: node scripts/request-notifications-browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: request-notifications-browser-results
+          path: .road-local/player-browser-results/notifications-*.png
           retention-days: 3
           if-no-files-found: ignore

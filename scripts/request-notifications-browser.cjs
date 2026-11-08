@@ -50,6 +50,7 @@ async function main(){
   const creator=await pageFor(owner),sender=await pageFor(buyer);
   await creator.getByRole('button',{name:'Notifications',exact:true}).click();await creator.getByRole('button',{name:'Sign in to requests'}).click();await creator.getByText('You’re all caught up.').waitFor();await creator.getByRole('button',{name:'Close notifications'}).click();
   const baseline=await creator.evaluate(()=>window.walletSigns);
+  await creator.evaluate(address=>window.switchWallet(address),owner.address);
   await sender.getByRole('button',{name:'Notifications',exact:true}).click();await sender.getByRole('button',{name:'Sign in to requests'}).click();await sender.getByText('You’re all caught up.').waitFor();
   const send=async req=>sender.evaluate(async request=>{const {workspaceInbox}=await import('/src/request-inbox.js');return workspaceInbox().api('/references',{method:'POST',body:{request,workTitle:'Midnight EP',brickTitle:'Moonlit artwork'}});},req);
   const record=await send(request);

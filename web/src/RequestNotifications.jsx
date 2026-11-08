@@ -47,7 +47,7 @@ export default function RequestNotifications({wallet,onConnect,onOffer}){
   const changed=()=>{operation.current++;client.disconnect();setReview(null);setItems([]);setArrival(null);setAuthenticated(false);setOnline(false);setBusy(false);tracker.current.reset();};
   const networkChanged=()=>{changed();stopped=true;clearTimeout(timer);};
   // The parent remounts this component on wallet changes; chain changes also invalidate in-flight work.
-  const accountChanged=()=>{changed();stopped=true;clearTimeout(timer);};
+  const accountChanged=accounts=>{if(sameAddress(accounts?.[0],wallet))return;changed();stopped=true;clearTimeout(timer);};
   window.ethereum?.on?.('accountsChanged',accountChanged);window.ethereum?.on?.('disconnect',accountChanged);
   const chainChanged=()=>{networkChanged();window.dispatchEvent(new Event('ybr:notification-network-change'));};
   window.ethereum?.on?.('chainChanged',chainChanged);
@@ -63,7 +63,8 @@ export default function RequestNotifications({wallet,onConnect,onOffer}){
  },[open]);
  async function login(){
   const id=++operation.current;setBusy(true);setError('');
-  try{await client.initialize();await client.connect();await client.login();if(id===operation.current)await poll.current();}
+  const check=()=>{if(id!==operation.current)throw Error('Wallet changed. Open requests again.');};
+  try{await client.initialize();check();await client.connect();check();await client.login();check();await poll.current();}
   catch(e){if(id===operation.current)setError(e.shortMessage||e.message);}
   finally{if(id===operation.current)setBusy(false);}
  }
