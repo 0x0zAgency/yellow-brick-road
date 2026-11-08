@@ -24,6 +24,8 @@ export async function openStore(root,profile){
  const file=path.join(dir,'offers.json');let data;
  try{data=await privateRead(file);}catch(error){if(error.code!=='ENOENT')throw error;data={version:1,offers:[],policies:{}};}
  if(data.version!==1||!Array.isArray(data.offers)||data.offers.length>1000||!data.policies||typeof data.policies!=='object')throw Error('Invalid licensing ledger.');
+ data.references ||= [];
+ if(!Array.isArray(data.references)||data.references.length>1000)throw Error('Invalid reference inbox.');
  let tail=Promise.resolve();
  return {walletAddress,snapshot:()=>structuredClone(data),mutate(fn){
   const task=tail.then(async()=>{const next=structuredClone(data),result=await fn(next),content=json(next);if(Buffer.byteLength(content)>32*1024*1024)throw Error('This deployment inbox has reached its 32 MiB storage limit. Archive the ledger before adding more offers.');const temp=file+'.'+randomBytes(8).toString('hex')+'.tmp';await writeFile(temp,content,{flag:'wx',mode:0o600});await rename(temp,file);data=next;return result;});

@@ -4,6 +4,7 @@ import {createSiweMessage} from 'viem/siwe';
 import {licensingAbi,normalizeEnvelope,offerId,offerArgs,typedOffer,sameAddress,validateOfferTime,textHash} from '../../src/licensing/protocol.js';
 import {readLicensingState,readAsset,verifyNetwork} from '../../src/licensing/reader.js';
 import {openStore} from './store.js';
+import {createReferenceInbox} from './references.js';
 
 const token=()=>randomBytes(32).toString('hex');
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
@@ -13,6 +14,7 @@ export async function createLicensingService({root,profile,client,store,now=()=>
  store ||= await openStore(root,profile);
  const publicProfile={chainId:profile.chainId,factoryAddress:profile.factoryAddress,genesisHash:profile.genesisHash,walletAddress:store.walletAddress};
  const challenges=new Map(),sessions=new Map(),csrf=token();
+ const references=createReferenceInbox({client,store,profile,now});
  const read=(brick,name,args=[])=>client.readContract({address:brick,abi:licensingAbi,functionName:name,args});
  const prune=map=>{for(const [key,value] of map)if(value.expires<=now())map.delete(key);};
  const session=key=>{prune(sessions);const s=sessions.get(key);if(!s)fail('Sign in to the licensing inbox again.',401);return s.address;};
@@ -60,6 +62,15 @@ export async function createLicensingService({root,profile,client,store,now=()=>
    const key=token();sessions.set(key,{address:c.address,expires:now()+1800000});return {token:key,address:c.address};
   }
   const address=session(authorization);
+  if(method==='GET'&&route==='/inbox'){
+   // Check only records involving this wallet; never return another party's inbox.
+   const rows=store.snapshot().offers.filter(r=>sameAddress(r.envelope.offer.controller,address)||sameAddress(r.envelope.offer.licensee,address));
+   const offers=[];for(const row of rows){const current=await decorate(row);if(['pending','approved'].includes(current.status))offers.push(current);}
+   return {references:await references.list(address),offers:offers.reverse()};
+  }
+  if(method==='POST'&&route==='/references')return references.submit(address,body);
+  const referenceDecision=route.match(/^\/references\/(0x[0-9a-f]{64})\/decision$/i);
+  if(method==='POST'&&referenceDecision)return references.decide(address,referenceDecision[1].toLowerCase(),body);
   if(method==='GET'&&route==='/offers'){
    const brick=url.searchParams.get('brick'),state=await readLicensingState(client,profile,brick);
    const rows=store.snapshot().offers.filter(r=>sameAddress(r.envelope.brick,brick)&&(sameAddress(r.envelope.offer.licensee,address)||sameAddress(state.controller,address)));

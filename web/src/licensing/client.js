@@ -4,10 +4,13 @@ import {licensingAbi,tokenAbi,typedOffer,offerArgs,offerId,json,sameAddress,norm
 import {verifyNetwork,readLicensingState} from './reader.js';
 
 export function createLicensingClient({provider=globalThis.ethereum,fetcher=globalThis.fetch,client:injectedClient}={}){
- let profile,session,account,client,wallet;
+ let profile,session,account,client,wallet,revision=0;
+ const listeners=new Set(),emit=()=>listeners.forEach(fn=>fn());
+ const disconnect=()=>{revision++;session=null;account=null;emit();};
  async function api(path,{method='GET',body}={}){
+  const activeSession=session;
   const response=await fetcher('/api/licensing'+path,{method,headers:{...(method==='POST'?{'Content-Type':'application/json','X-YBR-CSRF':profile?.csrf}:{}),...(session?{Authorization:'Bearer '+session}:{})},...(body?{body:json(body)}:{})});
-  const data=await response.json();if(!response.ok)throw Object.assign(Error(data.error||'Licensing request failed.'),{status:response.status});return data;
+  const data=await response.json();if(!response.ok){if(response.status===401&&activeSession===session){session=null;emit();}throw Object.assign(Error(data.error||'Licensing request failed.'),{status:response.status});}if(method==='POST')emit();return data;
  }
  async function initialize(){
   profile=await api('/config');
@@ -28,12 +31,14 @@ export function createLicensingClient({provider=globalThis.ethereum,fetcher=glob
  }
  async function connect(){
   if(!provider)throw Error('Install or open an Ethereum wallet to continue.');
-  const accounts=await provider.request({method:'eth_requestAccounts'});account=accounts[0];session=null;await guard();return account;
+  const current=revision,accounts=await provider.request({method:'eth_requestAccounts'});if(current!==revision)throw Error('Wallet changed. Connect again.');account=accounts[0];session=null;await guard();emit();return account;
  }
  async function login(){
+  const current=revision,expected=account;
   await guard();const challenge=await api('/challenge',{method:'POST',body:{address:account}});
+  await guard();if(current!==revision||!sameAddress(expected,account))throw Error('Wallet changed during sign-in.');
   const signature=await wallet.signMessage({account,message:challenge.message});await guard();
-  const response=await api('/session',{method:'POST',body:{nonce:challenge.nonce,signature}});session=response.token;return response;
+  const response=await api('/session',{method:'POST',body:{nonce:challenge.nonce,signature}});await guard();if(current!==revision||!sameAddress(expected,account)||!sameAddress(response.address,account))throw Error('Wallet changed during sign-in.');session=response.token;emit();return response;
  }
  function checkEnvelope(envelope){
   const e=normalizeEnvelope(envelope);
@@ -80,5 +85,5 @@ export function createLicensingClient({provider=globalThis.ethereum,fetcher=glob
   const [balance,allocated,claimable]=await Promise.all([sameAddress(asset,zeroAddress)?client.getBalance({address:brick}):client.readContract({address:asset,abi:tokenAbi,functionName:'balanceOf',args:[brick]}),read('totalLicenseClaimable',[asset]),account?read('licenseClaimable',[asset,account]):0n]);
   return {balance,allocated,claimable};
  }
- return {initialize,api,connect,login,sign,transact,accept,funds,get account(){return account;},disconnect(){session=null;account=null;}};
+ return {initialize,api,connect,login,sign,transact,accept,funds,disconnect,subscribe(fn){listeners.add(fn);return()=>listeners.delete(fn);},get authenticated(){return Boolean(session);},get profile(){return profile;},get account(){return account;}};
 }

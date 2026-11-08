@@ -1,3 +1,4 @@
+import {newLinkRequest,typedLinkData,buildLinkResponse,LINK_BRICK_ABI} from '../src/brick-authorization.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -33,6 +34,14 @@ test('signed inbox → creator counter → direct Brick payment → collaborator
    return provider.request({method,params});
   }};const browser=createLicensingClient({provider:bridge,fetcher:transport,client:publicClient});await browser.initialize();await browser.connect();await browser.login();return browser;}
   const creator=await browser(owner),licensee=await browser(buyer),outsider=await browser(stranger);
+  const reference=newLinkRequest({chainId:11155111,requester:buyer.address,sourceCommitment:textHash('source'),targetBrick:brick,targetIpId:await publicClient.readContract({address:brick,abi:LINK_BRICK_ABI,functionName:'ipId'}),factory:factoryAddress,relation:'cover-art',scope:'Cover for this album only',deadline:Math.floor(Date.now()/1000)+3600});
+  await assert.rejects(service.dispatch({method:'GET',path:'/inbox',origin}),/Sign in/);
+  await assert.rejects(outsider.api('/references',{method:'POST',body:{request:reference}}),/Only the requesting/);
+  const referenceRecord=await licensee.api('/references',{method:'POST',body:{request:reference,workTitle:'Album using existing art',brickTitle:'Original art'}});
+  assert.equal((await creator.api('/inbox')).references.length,1);assert.equal((await outsider.api('/inbox')).references.length,0);
+  const referenceResponse=buildLinkResponse(reference,await owner.signTypedData(typedLinkData(reference)),owner.address);
+  await creator.api('/references/'+referenceRecord.id+'/decision',{method:'POST',body:{action:'approve',response:referenceResponse}});
+  assert.equal((await licensee.api('/inbox')).references[0].response.signature,referenceResponse.signature);
   await creator.transact(brick,'configureLicensePayout',[[owner.address,collaborator.address],[8000,2000],0n,0n]);
   let state=await creator.api('/state?brick='+brick);assert.equal(state.policies[1].enabled,false);assert.equal(state.epoch,'1');
   const config=await licensee.api('/config'),publicAddress=config.walletAddress;
@@ -43,7 +52,7 @@ test('signed inbox → creator counter → direct Brick payment → collaborator
   const signature=await licensee.sign(envelope);
   await assert.rejects(licensee.api('/offers',{method:'POST',body:{envelope:{...envelope,terms:'Tampered'},signature}}),/does not match/);
   await assert.rejects(outsider.api('/offers',{method:'POST',body:{envelope,signature}}),/Only the licensee/);
-  const pending=await licensee.api('/offers',{method:'POST',body:{envelope,signature}});assert.equal(pending.ready,false);
+  const pending=await licensee.api('/offers',{method:'POST',body:{envelope,signature}});assert.equal(pending.ready,false);assert.equal((await creator.api('/inbox')).offers.length,1);assert.equal((await outsider.api('/inbox')).offers.length,0);
   await assert.rejects(licensee.api('/offers',{method:'POST',body:{envelope,signature}}),/already exists/);
   assert.equal((await outsider.api('/offers?brick='+brick)).offers.length,0);assert.equal((await creator.api('/offers?brick='+brick)).offers.length,1);
   const counter=makeEnvelope({profile:config,state,licensee:buyer.address,project:envelope.project,terms:'One licensed unit permits one publishing project placement, with attribution to the creator.',unitPrice:200n,units:5,expiresAt:now+3600,deadline:now+1800,scope:2,nonce:textHash('counter')});

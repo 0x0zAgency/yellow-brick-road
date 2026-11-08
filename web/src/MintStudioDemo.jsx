@@ -1,3 +1,4 @@
+import {subscribeReferences,getReferenceResponse} from './request-inbox.js';
 import RoadProgress from './RoadProgress.jsx';
 import StatusArea from './StatusArea.jsx';
 import ExistingFileBricks from './ExistingFileBricks.jsx';
@@ -79,6 +80,10 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  const [cover,setCover]=useState(saved.form.cover||{useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});
  // Signed responses and local cross-wallet requests remain in volatile React state, not localStorage.
  const [linkedBricks,setLinkedBricks]=useState([]);
+ useEffect(()=>{
+  const receive=()=>setLinkedBricks(previous=>{let changed=false;const next=previous.map(link=>{const response=!link.response&&getReferenceResponse(link.request);if(!response)return link;changed=true;return {...link,response,controller:response.controller};});return changed?next:previous;});
+  receive();return subscribeReferences(receive);
+ },[]);
  const [reusedBricks,setReusedBricks]=useState({}),[songwriterSplits,setSongwriterSplits]=useState(null),[showSplits,setShowSplits]=useState(false);
  const writers=songwriterNames(meta.songwriters);
  const needsSplits=isMusic&&composition&&!reusedBricks.composition&&!linkedBricks.some(l=>l.relation==='embodies-composition')&&writers.length>1;
