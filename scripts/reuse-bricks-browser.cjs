@@ -64,7 +64,7 @@ window.walletWrites=0;window.ethereum={request:async({method,params=[]})=>{
   // Saved music approvals must not appear in visual IP registration, including results.
   await page.evaluate(()=>{localStorage.removeItem('road:mint:form:v1');localStorage.setItem('road:creator-defaults:v1',JSON.stringify({version:1,data:{enabled:true,delivery:true,contentPolicy:{locked:true,preview:true,artwork:true,lyrics:true}}}));});
   const {getIpCategory}=await load('ip-catalog.js');
-  for(const id of ['photograph','painting','digital-art','illustration']){
+  for(const id of ['photograph','illustration']){
    await page.reload();await page.getByLabel('Select a type of intellectual property',{exact:true}).selectOption(id);
    await page.getByRole('button',{name:'Continue →',exact:true}).click();
    assert.equal(await page.getByLabel('Choose Audio preview',{exact:true}).count(),0);

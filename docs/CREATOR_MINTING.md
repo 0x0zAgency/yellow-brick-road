@@ -126,3 +126,20 @@ Choosing an existing cover keeps its original Brick and NFT identity; changing
 the composition option preserves that choice. Existing references are excluded
 from minting, repeated IPFS uploads and this batch's NFT appearance updates. A
 Building made entirely from existing references requires no mint transaction.
+
+
+## Current Brick type availability
+
+Mint Studio currently enables sound recordings, composition/songwriting, song
+lyrics, sound design/effects, photography, and illustration/graphic art. These
+cover the music ingestion flow and its supporting writing, audio and cover-art
+Bricks. Other taxonomy entries remain visible as **Coming soon**, with native
+select options disabled. New cover artwork can use illustration or photography.
+
+The allowlists live in `web/src/ip-catalog.js`; a newly added taxonomy entry stays
+disabled until explicitly enabled for minting. This is a creator-workspace rollout
+setting, not a contract restriction or a change to existing registered works.
+Saved drafts keep their original type and fields. An unavailable saved type
+blocks continuation until the creator explicitly chooses a supported type;
+it is never silently relabeled as a sound recording. An unavailable cover type
+blocks new cover creation, while an existing reused Brick keeps its original type.
