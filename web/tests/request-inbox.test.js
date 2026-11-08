@@ -1,0 +1,50 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {pendingNotifications,createArrivalTracker} from '../src/request-inbox.js';
+import {newLinkRequest,linkRequestDigest,typedLinkData,buildLinkResponse} from '../src/brick-authorization.js';
+import {createReferenceInbox} from '../scripts/licensing/references.js';
+import {privateKeyToAccount} from 'viem/accounts';
+import {verifyTypedData} from 'viem';
+
+const address=n=>'0x'+n.toString(16).padStart(40,'0'),hash=n=>'0x'+n.toString(16).padStart(64,'0');
+const owner=privateKeyToAccount(hash(1)),requester=privateKeyToAccount(hash(2));
+const request=()=>newLinkRequest({chainId:1337,requester:requester.address,sourceCommitment:hash(3),targetBrick:address(4),targetIpId:hash(5),factory:address(6),relation:'cover-art',scope:'Cover for the album',deadline:Math.floor(Date.now()/1000)+3600});
+test('bell counts waiting actions, deduplicates references, and isolates account/network/expiry',()=>{
+ const r=request(),ref={id:linkRequestDigest(r),request:r,controller:owner.address,status:'pending',createdAt:1};
+ assert.equal(pendingNotifications({references:[ref,ref]},owner.address,1337).length,1);
+ for(const status of ['approved','declined','stale','expired','withdrawn'])assert.equal(pendingNotifications({references:[{...ref,status}]},owner.address,1337).length,0);
+ assert.equal(pendingNotifications({references:[ref]},requester.address,1337).length,0);
+ assert.equal(pendingNotifications({references:[ref]},owner.address,11155111).length,0);
+ assert.equal(pendingNotifications({references:[ref]},owner.address,1337,r.deadline*1000).length,0);
+ const offer={id:'offer',status:'pending',ready:false,envelope:{chainId:1337,project:{title:'Film'},offer:{controller:owner.address,licensee:requester.address,deadline:r.deadline,expiresAt:r.deadline}}};
+ assert.equal(pendingNotifications({offers:[offer]},owner.address,1337)[0].action,'approve');
+ assert.equal(pendingNotifications({offers:[offer]},requester.address,1337).length,0);
+ assert.equal(pendingNotifications({offers:[{...offer,status:'approved',ready:true}]},owner.address,1337).length,0);
+ assert.equal(pendingNotifications({offers:[{...offer,status:'approved',ready:true}]},requester.address,1337)[0].action,'accept');
+});
+test('arrival animation fires for new identities, not initial load, repeat polls or reopened panels',()=>{
+ const tracker=createArrivalTracker(),a={key:'a'},b={key:'b'};
+ assert.deepEqual(tracker.observe([a]),[]);assert.deepEqual(tracker.observe([a]),[]);assert.deepEqual(tracker.observe([a,b]),[b]);
+ tracker.observe([]);assert.deepEqual(tracker.observe([b]),[]);
+ tracker.reset();assert.deepEqual(tracker.observe([b]),[]);
+});
+test('reference delivery verifies requester, factory, current controller and exact signed scope',async()=>{
+ let controller=owner.address,data={references:[]};
+ const store={snapshot:()=>structuredClone(data),mutate:async fn=>{const copy=structuredClone(data),result=await fn(copy);data=copy;return result;}};
+ const client={getChainId:async()=>1337,getBytecode:async()=> '0x1234',readContract:async({functionName})=>({isBrick:true,ipId:hash(5),controller}[functionName]),verifyTypedData};
+ const inbox=createReferenceInbox({client,store,profile:{chainId:1337,factoryAddress:address(6)}}),r=request();
+ await assert.rejects(inbox.submit(owner.address,{request:r}),/Only the requesting/);
+ await assert.rejects(inbox.submit(requester.address,{request:{...r,factory:address(9)}}),/another deployment/);
+ const record=await inbox.submit(requester.address,{request:r,workTitle:'Album',brickTitle:'Artwork'});
+ await inbox.submit(requester.address,{request:r});assert.equal(data.references.length,1);
+ assert.equal((await inbox.list(address(99))).length,0);assert.equal((await inbox.list(owner.address)).length,1);
+ await assert.rejects(inbox.decide(requester.address,record.id,{action:'approve'}),/Only the current controller/);
+ const signature=await owner.signTypedData(typedLinkData(r)),response=buildLinkResponse(r,signature,owner.address);
+ await assert.rejects(inbox.decide(owner.address,record.id,{action:'approve',response:{...response,request:{...r,scope:'Everything'}}}),/different request/);
+ controller=address(9);assert.equal((await inbox.list(owner.address))[0].status,'stale');
+ await assert.rejects(inbox.decide(owner.address,record.id,{action:'approve',response}),/no longer pending/);
+ controller=owner.address;await inbox.decide(owner.address,record.id,{action:'approve',response:{...response,unexpected:'must not persist'}});
+ const delivered=(await inbox.list(requester.address))[0];assert.equal(delivered.status,'approved');assert.equal(delivered.response.signature,signature);assert.equal(delivered.response.unexpected,undefined);
+ await assert.rejects(inbox.decide(owner.address,record.id,{action:'approve',response}),/no longer pending/);
+ const second=await inbox.submit(requester.address,{request:request()});await inbox.decide(requester.address,second.id,{action:'withdraw'});assert.equal((await inbox.list(owner.address))[0].status,'withdrawn');
+});

@@ -54,6 +54,9 @@ Requests must use the deployment origin, with JSON and a CSRF token for writes. 
 | `GET /asset?address=…` | Currency symbol and decimals; zero address denotes native ETH |
 | `POST /challenge`, `POST /session` | Wallet-signature authentication |
 | `GET /offers?brick=…` | Authenticated incoming/outgoing offers, reconciled with the Brick |
+| `GET /inbox` | Authenticated wallet-wide reference requests and open license offers |
+| `POST /references` | Send a scoped reference request to its verified current controller |
+| `POST /references/:id/decision` | Signed approval, controller decline or requester withdrawal |
 | `POST /offers` | Signed licensee proposal |
 | `POST /offers/:id/decision` | Controller approval/counter or party closure |
 | `POST /policy-document` | Controller publishes a document matching its on-chain terms hash |
