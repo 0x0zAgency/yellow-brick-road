@@ -17,8 +17,8 @@ async function main(){
   assert.equal(await tools.getAttribute('aria-expanded'),'false');assert.equal(await nav.getByRole('button',{name:'Settings',exact:true}).count(),0);
   await tools.click();assert.equal(await tools.getAttribute('aria-expanded'),'true');
   assert.ok(await page.evaluate(()=>{const nav=document.querySelector('.sidebar nav'),player=nav.nextElementSibling;return nav.getBoundingClientRect().bottom<=player.getBoundingClientRect().top+1;}),'Expanded Tools must not overlap the Player shortcut');await nav.getByRole('button',{name:'Settings',exact:true}).click();await page.getByRole('region',{name:'Workspace settings'}).waitFor();
-  await nav.getByRole('button',{name:'Recovery files',exact:true}).click();await page.getByRole('region',{name:'Local recovery files'}).waitFor();await page.getByText('Connect the wallet whose recovery files you want to collect.',{exact:true}).waitFor();
-  await nav.getByRole('button',{name:'Recover files',exact:true}).click();await page.getByRole('heading',{name:'Recover your originals.',exact:true}).waitFor();
+  await nav.getByRole('button',{name:'File Recovery',exact:true}).click();await page.getByRole('region',{name:'Local recovery files'}).waitFor();await page.getByText('Connect the wallet whose recovery files you want to collect.',{exact:true}).waitFor();
+  await page.getByRole('heading',{name:'File Recovery',exact:true}).waitFor();await page.getByRole('region',{name:'Recover IPFS files',exact:true}).waitFor();assert.equal(await nav.getByRole('button',{name:'File Recovery',exact:true}).count(),1);assert.equal(await nav.getByRole('button',{name:/^Recover(y)? files$/}).count(),0);
   await nav.getByRole('button',{name:'MP3 Tags',exact:true}).click();await page.getByRole('region',{name:'MP3 tag reader and updater'}).waitFor();
   await page.getByLabel('MP3 file',{exact:true}).setInputFiles({name:'synthetic-tags.mp3',mimeType:'audio/mpeg',buffer:fixture()});
   await page.waitForFunction(()=>document.querySelector('[aria-label="Album / release"]')?.value==='Original album');
@@ -40,7 +40,8 @@ async function main(){
   assert.equal(imported.fields.release,'Mañana — Road tests');assert.match(imported.fields.songwriters,/New writer/);
   fs.mkdirSync(out,{recursive:true});await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.screenshot({path:path.join(out,'tools-mp3-desktop.png'),fullPage:true});
   await page.getByLabel('Title',{exact:true}).fill('Another edit');assert.equal(await link.count(),0,'Any edit invalidates the prepared download');assert.equal(await page.getByLabel('Approve MP3 copy export',{exact:true}).isChecked(),false);
-  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Open navigation',exact:true}).click();await nav.getByRole('button',{name:'Recover files',exact:true}).click();await page.getByRole('heading',{name:'Recover your originals.',exact:true}).waitFor();
+  await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Open navigation',exact:true}).click();await nav.getByRole('button',{name:'File Recovery',exact:true}).click();await page.getByRole('heading',{name:'File Recovery',exact:true}).waitFor();
+  await page.getByRole('region',{name:'Recover IPFS files',exact:true}).waitFor();await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);await page.screenshot({path:path.join(out,'file-recovery-mobile.png'),fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'File Recovery fits mobile');
   await page.getByRole('button',{name:'Open navigation',exact:true}).click();await nav.getByRole('button',{name:'MP3 Tags',exact:true}).click();assert.equal(await page.getByLabel('Title',{exact:true}).inputValue(),'Another edit');
   await page.waitForFunction(()=>document.querySelector('.sidebar').getBoundingClientRect().right<=0);
   await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));await page.screenshot({path:path.join(out,'tools-mp3-mobile.png'),fullPage:true});

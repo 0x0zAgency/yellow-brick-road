@@ -36,5 +36,19 @@ Roomy terminals show the creator-supplied, 72-column framed **YBR** artwork on t
 
 ## Tools navigation
 
-Workspace Settings now lives under **Tools → Settings**; **Recover files** and the
+Workspace Settings now lives under **Tools → Settings**; **File Recovery** and the
 local **MP3 Tags** reader/updater are in the same menu. See [Workspace Tools](TOOLS.md).
+
+
+### File Recovery
+
+Tools → **File Recovery** combines the saved recovery collection and original-file
+recovery. Settings has the same single shortcut. Import or download private
+backups as before, or choose **Recover files** on a saved entry to load it directly
+into the recovery panel. No export and reimport are needed. Selecting a saved
+entry does not retrieve files until **Recover & download** is clicked.
+
+The panel also accepts a private recovery JSON from disk, including while no
+wallet is connected. Saved entries remain local and scoped to their wallet;
+changing wallets clears the loaded recovery session and cancels pending reads.
+Recovery from My Bricks continues to verify that Brick's on-chain commitment.
