@@ -98,7 +98,13 @@ async function main(){
   await page.getByLabel('Licensor email',{exact:true}).fill('per-work@example.com');
   await delivery.uncheck();await page.getByLabel('Track title',{exact:true}).fill('Per-work delivery opt-out');assert.equal(await delivery.isChecked(),false);
   await openSettings();await page.getByRole('tab',{name:'Creator defaults',exact:true}).click();await enable.uncheck();await page.getByRole('button',{name:'Save creator defaults',exact:true}).click();
-  await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();await page.getByRole('button',{name:'Continue →',exact:true}).click();
+  await page.getByRole('tab',{name:'Tools & status'}).click();await page.getByRole('button',{name:/^Mint Studio Register/}).click();
+  // Navigation now preserves the work in progress; changed defaults apply to new work only.
+  assert.equal(await page.getByLabel('Track title',{exact:true}).inputValue(),'Per-work delivery opt-out');
+  assert.equal(await page.getByLabel('Licensor email',{exact:true}).inputValue(),'per-work@example.com');
+  await page.locator('.mint-workbench-toolbar').getByRole('button',{name:'Start a new mint',exact:true}).click();
+  await page.getByRole('heading',{name:'01. Identify the creator.',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Continue →',exact:true}).click();
   await page.getByLabel('Choose Master recording',{exact:true}).setInputFiles(path.join(root,'apps/ybr-player/media/golden-hour.wav'));await page.waitForFunction(()=>!document.body.innerText.includes('Hashing…'));
   await page.getByRole('button',{name:'Encrypt & Continue →',exact:true}).click();await page.getByRole('switch',{name:'Content locked',exact:false}).waitFor();assert.equal(await page.getByRole('switch',{name:'Content locked',exact:false}).isChecked(),false);
   assert.equal(await page.evaluate(()=>localStorage.getItem('road:keep-recovery-sentinel')),'PRIVATE-SENTINEL');assert.equal(await page.evaluate(()=>window.settingsWalletWrites),0);assert.deepEqual(errors,[]);
