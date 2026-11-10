@@ -1,3 +1,4 @@
+import BricksInProgress from './BricksInProgress.jsx';
 import StatusArea from './StatusArea.jsx';
 import {ACTIVE_NETWORK,activeRpcUrl} from './active-network.js';
 import {useBuildingRollup,ReleaseBuildingCard,ImportBuildingPacket} from './ReleaseBuildingCard.jsx';
@@ -82,7 +83,7 @@ export default function WalletBricks({wallet,onConnect}){
   setResult(old=>old?{...old,bricks:old.bricks.map(update)}:old);setEditing(old=>old?update(old):old);
  };
  if(editing&&result)return <BrickEditor key={wallet+':'+chainId+':'+result.verifiedFactory+':'+editing.address} brick={editing} wallet={wallet} chainId={chainId} factoryAddress={result.verifiedFactory} client={client} onSaved={saved} onClose={()=>setEditing(null)}/>;
- return <section className="wb br-collection">
+ return <section className="wb br-collection"><BricksInProgress wallet={wallet} onConnect={onConnect}/>
   <div className="wb-intro"><span className="br-kicker">YOUR WALLET / YOUR WORK</span><h2>My Bricks</h2><p>Your registered works load automatically. Open Edit Brick to update a work.</p></div>
   {!wallet?<div className="wb-empty"><h3>Connect your wallet</h3><p>Connect the creator wallet to discover its registrations. No transaction or signature is required to view them.</p><button className="gold-btn" onClick={onConnect}>Connect wallet</button></div>:<>
    <div className="wb-controls">

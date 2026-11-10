@@ -1,4 +1,5 @@
-import {subscribeReferences,getReferenceResponse} from './request-inbox.js';
+import {subscribeReferences,localReferences} from './request-inbox.js';
+import {applyReferenceUpdates,approvalProgress} from './mint-drafts.js';
 import RoadProgress from './RoadProgress.jsx';
 import StatusArea from './StatusArea.jsx';
 import ExistingFileBricks from './ExistingFileBricks.jsx';
@@ -47,47 +48,49 @@ function UploadSectionHeading({slotId,category}){
  const section=uploadSectionBefore(slotId,category);
  return section?<div className="ms-file-heading"><h3>{section.title}</h3><p>{section.description}</p></div>:null;
 }
-export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFactory=import.meta.env.VITE_ROAD_GANACHE_FACTORY||''}){
+export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,fresh=false,onDraftChange,onBeforeMint,onPause,onNewMint,ganacheFactory=import.meta.env.VITE_ROAD_GANACHE_FACTORY||''}){
  const [saved]=useState(()=>{
   const store=typeof window==='undefined'?null:window.localStorage;
-  const settings=loadMintNetwork(store);
+  const settings=draft?.state.settings||loadMintNetwork(store);
   if(ACTIVE_NETWORK){settings.network=ACTIVE_NETWORK.network;settings.useStartupFactory=true;if(ACTIVE_NETWORK.network==='ganache'){settings.rpcUrl='http://127.0.0.1:8545';settings.ganacheChainId='1337';}}
   const defaults=loadCreatorDefaults(store);
-  return {form:applyCreatorDefaults(loadMintForm(store)||defaultMintForm(),defaults),settings,defaults};
+  return {form:draft?.state.form||applyCreatorDefaults(fresh?defaultMintForm():loadMintForm(store)||defaultMintForm(),defaults),settings,defaults:draft?.state.creatorDefaults||defaults};
  });
- const [step,setStep]=useState(0),[assets,setAssets]=useState({});
+ const restored=draft?.state;
+ const [step,setStep]=useState(restored?.submissionPending?4:restored?.step||0),[assets,setAssets]=useState(restored?.assets||{});
+ const [genesisHash,setGenesisHash]=useState(restored?.genesisHash||ACTIVE_NETWORK?.genesisHash||'');
  const autofill=useUploadMetadata(saved.form.meta);
  const {meta}=autofill;
  const [ipCategoryId,setIpCategoryId]=useState(saved.form.ipCategoryId),[spatial,setSpatial]=useState(saved.form.spatial);
  const category=getIpCategory(ipCategoryId),isMusic=!!category.musical,playerEnabled=category.group==='Music & audio';
  const visibleSlots=availableAssetSlots(ipCategoryId);
  const slotLabel=id=>id==='master'?category.primary:id==='project'&&category.spatial?'Spatial / skeletal tracking data':labels[id];
- const refs=useRef({}),vault=useRef({secret:null,encrypted:new Map()}),fileGeneration=useRef(0);
+ const refs=useRef(draft?.files?.originals||{}),vault=useRef(draft?.files?.vault||{secret:null,encrypted:new Map()}),fileGeneration=useRef(0);
  const deliveryWork=useRef(null),reviewedDelivery=useRef(null),deliveryJob=useRef(null);
  useEffect(()=>()=>{fileGeneration.current++;refs.current={};deliveryWork.current?.abort();},[]);
  const [busy,setBusy]=useState(false),[status,setStatus]=useState(''),[error,setError]=useState(''),[encryptionProgress,setEncryptionProgress]=useState(null);
  const [recoveryNotice,setRecoveryNotice]=useState('');
- const [ipfsEnabled,setIpfsEnabled]=useState(false),[ipfsHealth,setIpfsHealth]=useState('');
+ const [ipfsEnabled,setIpfsEnabled]=useState(restored?.ipfsEnabled||false),[ipfsHealth,setIpfsHealth]=useState('');
  const [creatorDefaults,setCreatorDefaults]=useState(saved.defaults);
- const [contentPolicy,setContentPolicy]=useState(()=>initialContentPolicy(saved.defaults));
- const [deliveryChoice,setDeliveryChoice]=useState('default');
- const [nftCover,setNftCover]=useState(null);
- const [deliveryConsent,setDeliveryConsent]=useState(null),[playerDelivery,setPlayerDelivery]=useState({status:'not-requested'});
+ const [contentPolicy,setContentPolicy]=useState(()=>restored?.contentPolicy||initialContentPolicy(saved.defaults));
+ const [deliveryChoice,setDeliveryChoice]=useState(restored?.deliveryChoice||'default');
+ const [nftCover,setNftCover]=useState(draft?.files?.nftCover||null);
+ const [deliveryConsent,setDeliveryConsent]=useState(restored?.deliveryConsent||null),[playerDelivery,setPlayerDelivery]=useState({status:'not-requested'});
  const [composition,setComposition]=useState(saved.form.composition),[training,setTraining]=useState(saved.form.training),[share,setShare]=useState(saved.form.share);
  const [currency,setCurrency]=useState(saved.form.currency),[unit,setUnit]=useState(saved.form.unit);
  const [fees,setFees]=useState(saved.form.fees);
  const [licensingEmail,setLicensingEmail]=useState(saved.form.licensingEmail||'');
  const [cover,setCover]=useState(saved.form.cover||{useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});
- // Signed responses and local cross-wallet requests remain in volatile React state, not localStorage.
- const [linkedBricks,setLinkedBricks]=useState([]);
+ // Requests and responses are saved with this wallet's local draft; mint preflight remains authoritative.
+ const [linkedBricks,setLinkedBricks]=useState(restored?.linkedBricks||[]);
  useEffect(()=>{
-  const receive=()=>setLinkedBricks(previous=>{let changed=false;const next=previous.map(link=>{const response=!link.response&&getReferenceResponse(link.request);if(!response)return link;changed=true;return {...link,response,controller:response.controller};});return changed?next:previous;});
+  const receive=()=>setLinkedBricks(previous=>applyReferenceUpdates({wallet,chainId:previous.find(link=>link.request)?.request.chainId,linkedBricks:previous},localReferences()).linkedBricks);
   receive();return subscribeReferences(receive);
  },[]);
- const [reusedBricks,setReusedBricks]=useState({}),[songwriterSplits,setSongwriterSplits]=useState(null),[showSplits,setShowSplits]=useState(false);
+ const [reusedBricks,setReusedBricks]=useState(restored?.reusedBricks||{}),[songwriterSplits,setSongwriterSplits]=useState(restored?.songwriterSplits||null),[showSplits,setShowSplits]=useState(false);
  const writers=songwriterNames(meta.songwriters);
  const needsSplits=isMusic&&composition&&!reusedBricks.composition&&!linkedBricks.some(l=>l.relation==='embodies-composition')&&writers.length>1;
- const [packet,setPacket]=useState(null),[mint,setMint]=useState(null),[dialog,setDialog]=useState(''),[stage,setStage]=useState(0);
+ const [packet,setPacket]=useState(restored?.packet||null),[mint,setMint]=useState(restored?.submissionPending?{simulated:false,status:'submission-unknown',receipts:[],...restored.mint}:restored?.mint||null),[dialog,setDialog]=useState(''),[stage,setStage]=useState(0);
  const stepPanel=useRef(null),stepNavigation=useRef(null);
  if(stepNavigation.current===null)stepNavigation.current=createMintStepNavigator(step);
  useLayoutEffect(()=>{
@@ -117,14 +120,25 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  const setFactoryAddress=value=>setFactories(old=>({...old,[factoryKey]:value}));
  const execution=mintMode(wallet,network);
  const reuseScope=JSON.stringify([wallet,chainId,factoryAddress,rpcUrl,network,ipCategoryId]);
- useEffect(()=>{setReusedBricks({});},[reuseScope]);
+ const previousReuseScope=useRef(reuseScope);
+ useEffect(()=>{if(previousReuseScope.current!==reuseScope)setReusedBricks({});previousReuseScope.current=reuseScope;},[reuseScope]);
+ useEffect(()=>{
+  let active=true;if(!onDraftChange||!wallet||!window.ethereum?.request)return;
+  if(ACTIVE_NETWORK){setGenesisHash(ACTIVE_NETWORK.genesisHash);return;}
+  setGenesisHash('');
+  const {reader}=walletClientForLinks(window.ethereum,Number(chainId));
+  reader.getBlock({blockNumber:0n}).then(block=>{if(active)setGenesisHash(block.hash);}).catch(()=>{});
+  return()=>{active=false;};
+ },[wallet,chainId,rpcUrl,factoryAddress,onDraftChange]);
  useEffect(()=>{setReusedBricks(previous=>retainMatchingReuse(previous,assets,{composition:composition&&isMusic}));},[composition,isMusic]);
  const plannedParts=[{id:'master',label:category.label},...(visibleSlots.some(s=>s.id==='artwork')&&assets.artwork?.hash?[{id:'artwork',label:'Cover artwork'}]:[]),...(isMusic&&composition&&!linkedBricks.some(l=>l.relation==='embodies-composition')?[{id:'composition',label:'Songwriting'}]:[])];
  const newParts=plannedParts.filter(part=>!reusedBricks[part.id]),referenceParts=plannedParts.filter(part=>reusedBricks[part.id]);
- useEffect(()=>{setSongwriterSplits(value=>value?{...value,confirmed:false}:null);},[wallet]);
+ const previousSplitWallet=useRef(wallet);
+ useEffect(()=>{if(previousSplitWallet.current!==wallet)setSongwriterSplits(value=>value?{...value,confirmed:false}:null);previousSplitWallet.current=wallet;},[wallet]);
  const album=previewAlbum(assets);
  const albumScope=JSON.stringify([album,assets.preview?.hash,wallet,chainId,factoryAddress,rpcUrl,network]);
- useEffect(()=>{setNftCover(current=>current?.kind==='album'?null:current);},[albumScope]);
+ const previousAlbumScope=useRef(albumScope);
+ useEffect(()=>{if(previousAlbumScope.current!==albumScope)setNftCover(current=>current?.kind==='album'?null:current);previousAlbumScope.current=albumScope;},[albumScope]);
  useEffect(()=>{
   if(album&&packet&&mint)void rememberAlbumCover(window.localStorage,{album,packet,mint}).catch(()=>{});
  },[album,packet,mint]);
@@ -145,6 +159,14 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  useEffect(()=>{if(dialog==='confirm'&&reviewContext.current!==context){setDialog('');setError('Wallet, network, files or Player approval changed. Review the mint again.')}},[context,dialog]);
  const identity={mode:wallet?'external':'assisted',connected:!!wallet,address:wallet||''};
  const payload={metadata:{...meta,ipCategory:ipCategoryId,spatial:category.spatial?spatial:{}},assets,identity,royalties:{creatorBps:share},training,composition:composition&&isMusic,storage:ipfsEnabled?'ipfs-encrypted-pilot':'demo-encrypted-in-browser',licensing:{currency,useUnit:unit,...fees,email:licensingEmail},cover,linkedBricks,contentPolicy,reusedBricks,songwriterSplits};
+ const pendingApprovals=approvalProgress({linkedBricks,wallet,chainId,assets});
+ useEffect(()=>{
+  onDraftChange?.({busy:busy||Object.values(assets).some(a=>a.status==='hashing'),state:{wallet,chainId:Number(chainId),factoryAddress,genesisHash,network,rpcUrl,step,assets,
+   form:{meta,ipCategoryId,spatial,composition,training,share,currency,unit,fees,cover,licensingEmail},
+   settings:{network,rpcUrl,ganacheChainId,factories,rememberForm,useStartupFactory},creatorDefaults,contentPolicy,deliveryChoice,deliveryConsent,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,
+   packet:step===4?packet:null,mint,submissionPending:!!restored?.submissionPending&&!mint?.transactionHash&&step===4},
+   files:{originals:{...refs.current},vault:{secret:vault.current.secret,encrypted:new Map(vault.current.encrypted)},nftCover}});
+ },[wallet,chainId,factoryAddress,genesisHash,network,rpcUrl,step,assets,meta,ipCategoryId,spatial,composition,training,share,currency,unit,fees,cover,licensingEmail,ganacheChainId,factories,rememberForm,useStartupFactory,creatorDefaults,contentPolicy,deliveryChoice,deliveryConsent,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,packet,mint,nftCover,busy,onDraftChange]);
  const categoryIssue=mintCategoryIssue(ipCategoryId,{hasNewCover:step>=2&&playerEnabled&&!!assets.artwork?.hash&&!reusedBricks.artwork,coverCategory:cover.ipCategory});
  const chooseCategory=id=>{
   if(!isMintCategoryEnabled(id)){setError(mintCategoryIssue(id));return;}
@@ -206,6 +228,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
   if(step===1){void encryptAndAdvance();return}
   if(step===2){if(needsSplits&&validateSongwriterSplits(songwriterSplits,writers,{walletRequired:!!wallet}).length){setShowSplits(true);return;}const errors=validateMintInput(payload);if(errors.length){setError(errors.join(' '));return}}
   if(step===3){
+   if(pendingApprovals.waiting||pendingApprovals.attention){setError('Resolve the reference approvals before minting. Save & pause to return later.');return;}
    const errors=validateMintInput(payload);if(errors.length){setError(errors.join(' '));return}
    try{
     const prepared=makeRegistrationPacket(payload,new Date().toISOString());
@@ -235,6 +258,11 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
    if(execution!=='simulated'){
     await preflightPolicyMint({packet,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress});
     await preflightMintCover({packet,nftCover,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress});
+    // Waiting/expired approvals must block publication as well as the wallet mint.
+    if(linkedBricks.length){
+     const {reader}=walletClientForLinks(window.ethereum,Number(chainId));
+     await preflightLinkedBricks({client:reader,account:wallet,chainId:Number(chainId),sourceHash:assets.master.hash,links:linkedBricks});
+    }
    }
    const uploadRoles=newUploadRoles(packet);
    if(ipfsEnabled&&packet.bricks.some(b=>!b.reuse)){
@@ -264,6 +292,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
      const {reader}=walletClientForLinks(window.ethereum,Number(chainId));
      await preflightLinkedBricks({client:reader,account:wallet,chainId:Number(chainId),sourceHash:assets.master.hash,links:linkedBricks});
     }
+    await onBeforeMint?.(uploadedPacket);
     receipt=await mintWithReviewedCover({packet:uploadedPacket,nftCover,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress,onUpdate:setStatus,result});
    }
    else {for(let i=0;i<4;i++){setStage(i);setStatus(['Validating rights declarations','Preparing separate IP Bricks','Preparing contextual Building','Simulating confirmation'][i]);await wait(750)}receipt=simulateMintReceipts(uploadedPacket);}
@@ -311,11 +340,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
   }catch(e){setError(e.message||'Unable to export the private recovery file.');}
  };
  const exportPacket=()=>{const url=URL.createObjectURL(new Blob([JSON.stringify(packet,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download='road-demo-mint.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),5000)};
- const reset=()=>{setRecoveryNotice('');const defaults=loadCreatorDefaults(window.localStorage),form=applyCreatorDefaults(defaultMintForm(),defaults);setCreatorDefaults(defaults);setLicensingEmail(form.licensingEmail);setDeliveryChoice('default');setContentPolicy(initialContentPolicy(defaults));if(defaults.enabled){setComposition(form.composition);setTraining(form.training);setShare(form.share);setCurrency(form.currency);setUnit(form.unit);setFees(form.fees);}deliveryWork.current?.abort();deliveryJob.current=null;reviewedDelivery.current=null;setDeliveryConsent(null);setPlayerDelivery({status:'not-requested'});setNftCover(null);fileGeneration.current+=1;vault.current={secret:null,encrypted:new Map()};refs.current={};autofill.reset(initial);setAssets({});setReusedBricks({});setSongwriterSplits(null);setShowSplits(false);setPacket(null);setMint(null);setDialog('');setStatus('');setError('');setStep(0);setIpCategoryId('sound-recording');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpfsEnabled(false);setIpfsHealth('')};
+ const reset=()=>{if(onNewMint){onNewMint();return;}setRecoveryNotice('');const defaults=loadCreatorDefaults(window.localStorage),form=applyCreatorDefaults(defaultMintForm(),defaults);setCreatorDefaults(defaults);setLicensingEmail(form.licensingEmail);setDeliveryChoice('default');setContentPolicy(initialContentPolicy(defaults));if(defaults.enabled){setComposition(form.composition);setTraining(form.training);setShare(form.share);setCurrency(form.currency);setUnit(form.unit);setFees(form.fees);}deliveryWork.current?.abort();deliveryJob.current=null;reviewedDelivery.current=null;setDeliveryConsent(null);setPlayerDelivery({status:'not-requested'});setNftCover(null);fileGeneration.current+=1;vault.current={secret:null,encrypted:new Map()};refs.current={};autofill.reset(initial);setAssets({});setReusedBricks({});setSongwriterSplits(null);setShowSplits(false);setPacket(null);setMint(null);setDialog('');setStatus('');setError('');setStep(0);setIpCategoryId('sound-recording');setSpatial({});setLinkedBricks([]);setCover({useMainArtist:true,artist:'',title:'',description:'',wallet:'',ipCategory:'illustration'});setIpfsEnabled(false);setIpfsHealth('')};
  return <div className="ms-wrap"><section className="ms-hero"><span>0x🟨 ROAD / CREATOR STUDIO</span><h2>Your studio → Yellow Bricks.</h2><p>Register original works while keeping originals and encryption keys private in your browser. Optionally pin encrypted files to YBR IPFS, then use a simulated or wallet-signed test mint.</p><b>{execution==='simulated'?'SIMULATED · NO ON-CHAIN MINT':network==='sepolia'?'SEPOLIA · WALLET-SIGNED TRANSACTIONS':'GANACHE · REAL LOCAL TRANSACTIONS'}</b></section>
+ {step<4&&pendingApprovals.total>0&&(pendingApprovals.waiting>0||pendingApprovals.attention>0)&&<section className="mint-pending-banner" aria-label="Pending Brick approvals"><div><strong>{pendingApprovals.attention?'References need attention':`Waiting for ${pendingApprovals.waiting} approval${pendingApprovals.waiting===1?'':'s'}`}</strong><p>Save this Brick and return when its references are approved.</p></div>{onPause&&<button className="mint-pause-button" type="button" disabled={busy} onClick={onPause}>Save &amp; pause</button>}</section>}
  <div className="ms-progress">{stages.map((s,i)=><div key={s} className={step===i?'active':step>i?'done':''}><span>{i+1}</span>{s}</div>)}</div>
  <div className={'ms-grid'+(step===4?' ms-grid--results':'')} inert={dialog?true:undefined}><section className="ms-panel" ref={stepPanel} style={{scrollMarginBlockStart:16}}>
- {step===0&&<><h2>01. Identify the creator.</h2><p>{wallet?`Connected: ${displayName||wallet}. You’ll configure the mint network in Step 4.`:'Continue with the simulation, or connect a wallet for real minting. Network setup comes in Step 4.'}</p><div className="ms-ip-choice"><label htmlFor="road-ip-category">Select a type of intellectual property</label><select id="road-ip-category" value={ipCategoryId} onChange={e=>chooseCategory(e.target.value)}>{groupedIpCategories().map(([group,entries])=><optgroup key={group} label={group} disabled={!entries.some(entry=>isMintCategoryEnabled(entry.id))}>{entries.map(entry=><option key={entry.id} value={entry.id} disabled={!isMintCategoryEnabled(entry.id)}>{entry.label}{!isMintCategoryEnabled(entry.id)?' — Coming soon':''}</option>)}</optgroup>)}</select><small>{category.examples} · {MINT_CATEGORY_IDS.length} available types</small><small>Music ingestion and supporting artwork are available. Other flows are coming soon.</small><small>Switching IP categories clears attached demo files to prevent accidental reuse under the wrong rights category.</small>{category.notice&&<p className="ms-ip-warning">{category.notice}</p>}</div>{!wallet&&<button className="ms-primary" onClick={onConnect}>Connect wallet</button>}<div className="ms-local-pref"><label><input type="checkbox" checked={rememberForm} onChange={e=>setRememberForm(e.target.checked)}/> Remember form fields on this device</label><small>Local browser storage, not encrypted. This saves form fields only. Private recovery files are saved separately under Tools → File Recovery. Ganache network and factory settings remain saved separately.</small><button type="button" onClick={()=>{setRememberForm(false);clearMintForm(window.localStorage)}}>Clear saved form</button></div><div className="ms-highlight"><strong>Creator alias</strong><code>{aliasFor(meta.artist||'artist')}</code><p>Separate from ENS and Ethereum addresses.</p></div></>}
+ {step===0&&<><h2>01. Identify the creator.</h2><p>{wallet?`Connected: ${displayName||wallet}. You’ll configure the mint network in Step 4.`:'Continue with the simulation, or connect a wallet for real minting. Network setup comes in Step 4.'}</p><div className="ms-ip-choice"><label htmlFor="road-ip-category">Select a type of intellectual property</label><select id="road-ip-category" value={ipCategoryId} onChange={e=>chooseCategory(e.target.value)}>{groupedIpCategories().map(([group,entries])=><optgroup key={group} label={group} disabled={!entries.some(entry=>isMintCategoryEnabled(entry.id))}>{entries.map(entry=><option key={entry.id} value={entry.id} disabled={!isMintCategoryEnabled(entry.id)}>{entry.label}{!isMintCategoryEnabled(entry.id)?' — Coming soon':''}</option>)}</optgroup>)}</select><small>{category.examples} · {MINT_CATEGORY_IDS.length} available types</small><small>Music ingestion and supporting artwork are available. Other flows are coming soon.</small><small>Switching IP categories clears attached demo files to prevent accidental reuse under the wrong rights category.</small>{category.notice&&<p className="ms-ip-warning">{category.notice}</p>}</div>{!wallet&&<button className="ms-primary" onClick={onConnect}>Connect wallet</button>}<div className="ms-local-pref"><label><input type="checkbox" checked={rememberForm} onChange={e=>setRememberForm(e.target.checked)}/> Remember form fields on this device</label><small>Local browser storage, not encrypted. This preference saves form fields only. Connected-wallet work in progress is saved separately with its files. Private recovery files are saved separately under Tools → File Recovery. Ganache network and factory settings remain saved separately.</small><button type="button" onClick={()=>{setRememberForm(false);clearMintForm(window.localStorage)}}>Clear saved form</button></div><div className="ms-highlight"><strong>Creator alias</strong><code>{aliasFor(meta.artist||'artist')}</code><p>Separate from ENS and Ethereum addresses.</p></div></>}
  {step===1&&<><h2>02. Attach files.</h2><p>{playerEnabled?'Choose files for each role. Master recordings support WAV and other audio formats; Audio Preview uses MP3 with ID3 tags.':'Attach your original '+category.label.toLowerCase()+' and any supporting source files.'} Filenames supply title defaults. Supported embedded metadata fills descriptive fields locally without replacing your edits. Files are encrypted in your browser; optional IPFS upload requires your final confirmation.</p><div className="ms-files">{visibleSlots.map(slot=><Fragment key={slot.id}><UploadSectionHeading slotId={slot.id} category={category}/><label><div><strong>{slotLabel(slot.id)}{slot.required?' *':''}</strong><small>{assets[slot.id]?.name||uploadFilter(slot.id,category).hint}</small><StatusArea size="inline" busy={assets[slot.id]?.status==='hashing'} label="Hashing…" error={assets[slot.id]?.error} message={assets[slot.id]?.ipfsUpload?.verified?'🔒 Pinned to IPFS · '+assets[slot.id].ipfsUpload.cid:assets[slot.id]?.demoUpload?'🔒 Encrypted / DEMO receipt '+assets[slot.id].demoUpload.receiptId:assets[slot.id]?.hash?'✓ Ready':''} name={slotLabel(slot.id)+' file status'}/>{assets[slot.id]?.extracted&&<small>Title: {assets[slot.id].extracted.fields.title} · {assets[slot.id].extracted.parser}{assets[slot.id].extracted.fields.release?' · Album: '+assets[slot.id].extracted.fields.release:''}{assets[slot.id].extracted.fields.songwriters?' · Songwriters: '+assets[slot.id].extracted.fields.songwriters:''}{assets[slot.id].extracted.notice?' · '+assets[slot.id].extracted.notice:''}</small>}</div><span>Browse</span><input type="file" accept={uploadFilter(slot.id,category).accept||undefined} aria-label={'Choose '+slotLabel(slot.id)} onChange={e=>{if(e.target.files[0])void attach(slot.id,e.target.files[0]);e.target.value=''}}/></label></Fragment>)}</div><ExistingFileBricks key={reuseScope} assets={assets} composition={composition&&isMusic} wallet={wallet} chainId={chainId} factoryAddress={factoryAddress} rpcUrl={rpcUrl} network={network} value={reusedBricks} onChange={setReusedBricks}/><section className="ms-encrypt"><h3>🔒 Browser encryption &amp; IPFS</h3>
  <p>All originals are encrypted locally with AES-256-GCM. Choose whether to pin the encrypted files to your own YBR IPFS node, or use the offline demonstration.</p>
  <label className="ms-ipfs-option"><input type="checkbox" checked={ipfsEnabled} onChange={e=>{setIpfsEnabled(e.target.checked);setIpfsHealth('')}}/>
@@ -363,7 +393,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,ganacheFact
  {ACTIVE_NETWORK&&<p>All application components use {ACTIVE_NETWORK.label} (chain {ACTIVE_NETWORK.chainId}). Change networks in Dev Control. Your wallet must be on this same network before signing.</p>}<p>{network==='sepolia'?'Switch your wallet to Sepolia (11155111) and enter a deployed YellowBrickFactory address. Each confirmed mint spends Sepolia test ETH for gas.':automaticFactory?'Factory supplied by the running development stack. No copy/paste needed. Turn off automatic selection to enter another factory. Wallet and RPC must still match; the contract is verified before signing.':startupFactory?'Manual override is active. Enable automatic selection to follow the current development stack. Saved manual addresses are retained.':'No startup factory is available for this RPC and chain. Start npm run dev for automatic local setup, or enter a deployed factory for this network.'}</p></div>:<p>No wallet connected — the original simulation will run. Connect a wallet for real minting.</p>}{!wallet&&<button type="button" className="ms-outline" onClick={onConnect}>Connect wallet for real minting</button>}</section><aside>{execution==='simulated'?'No blockchain transaction or wallet signature occurs.':'Real transactions require wallet approval and gas on the selected network. IPFS is optional: when enabled, encrypted metadata CIDs are committed, not readable plaintext. No paid licenses or payout rules are installed.'}</aside></>}
  {step===4&&packet&&<MintResults packet={packet} mint={mint} vault={vault.current} preparedCover={nftCover} delivery={playerDelivery} onRetry={()=>void retryPlayerDelivery()} busy={busy} onCoverVerified={recordNftCover} onExportPacket={exportPacket} onExportRecovery={exportRecovery} onReset={reset} onDownload={download} downloadSlots={visibleSlots.filter(x=>vault.current.encrypted.has(x.id)).map(x=>({...x,label:slotLabel(x.id)}))}/>}
  <StatusArea size="normal" busy={busy&&!dialog} label={status||'Encrypting files…'} value={encryptionProgress?.value} max={encryptionProgress?.max} message={step===1?status:''} error={categoryIssue||error} name="Mint status"/>
- {step<4&&<div className="ms-actions">{step>0&&<button className="ms-outline" disabled={busy} onClick={()=>{setStep(i=>i-1);setError('')}}>← Back</button>}<button className="ms-primary" disabled={busy||!!categoryIssue} onClick={next}>{step===1?'Encrypt & Continue →':step===3?(execution==='simulated'?'Simulate mint →':'Review wallet mint →'):'Continue →'}</button></div>}
+ {step<4&&<div className="ms-actions">{step>0&&<button className="ms-outline" disabled={busy} onClick={()=>{setStep(i=>i-1);setError('')}}>← Back</button>}<button className="ms-primary" disabled={busy||!!categoryIssue||step===3&&(pendingApprovals.waiting>0||pendingApprovals.attention>0)} onClick={next}>{step===1?'Encrypt & Continue →':step===3?(pendingApprovals.waiting||pendingApprovals.attention?'Waiting for reference approvals':execution==='simulated'?'Simulate mint →':'Review wallet mint →'):'Continue →'}</button></div>}
  </section><aside className="ms-side"><strong>THE CREATOR'S ROAD</strong><ol><li>Connect a wallet or continue with simulation</li><li>Attach all source files</li><li>Automatic client-side encryption</li><li>Separate Bricks for applicable creative rights</li><li>Draft dataset ingestion and use fees</li><li>Confirm simulation or one wallet mint transaction</li><li>Decrypt after simulated authorization</li></ol><p>PILOT ONLY. Decryption keys stay in the browser. {playerEnabled?'Originals remain private unless you explicitly share selected preview copies with the local Player.':'Originals remain private. Public NFT thumbnails require separate approval.'} Optional ciphertext pinning uses your local YBR IPFS node. Authorized remote delivery, managed key recovery and royalty payouts are not implemented. Wallets deploy test Bricks on Ganache or Sepolia.</p></aside></div>
  {showSplits&&<SongwriterSplits key={JSON.stringify(writers)} names={writers} value={songwriterSplits} wallet={wallet} onClose={()=>setShowSplits(false)} onSave={value=>{setSongwriterSplits(value);setShowSplits(false);setError('');}}/>}
  {recoveryNotice&&<p className="ms-highlight" role="status">{recoveryNotice}</p>}
