@@ -154,10 +154,14 @@ jobs:
           npm run compile
       - name: Exercise live notifications between two wallets
         run: node scripts/request-notifications-browser.cjs
+      - name: Save and resume Bricks while awaiting approval
+        run: node scripts/mint-drafts-browser.cjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: request-notifications-browser-results
-          path: .road-local/player-browser-results/notifications-*.png
+          path: |
+            .road-local/player-browser-results/notifications-*.png
+            .road-local/player-browser-results/drafts-*.png
           retention-days: 3
           if-no-files-found: ignore

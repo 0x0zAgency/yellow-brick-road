@@ -1,3 +1,4 @@
+import {mergeDraftReferences} from './mint-drafts.js';
 import {useEffect,useRef,useState} from 'react';
 import {Bell,X,ArrowRight} from 'lucide-react';
 import {sameAddress} from './licensing/protocol.js';
@@ -20,14 +21,16 @@ export default function RequestNotifications({wallet,onConnect,onOffer}){
    if(running){rerun=true;return;}running=true;clearTimeout(timer);
    try{
     chainId=Number(await window.ethereum.request({method:'eth_chainId'}));
-    let remote={references:[],offers:[]};
+    let remote={references:[],offers:[]},draftWarning='';
     const signedIn=client.authenticated&&sameAddress(client.account,wallet)&&client.profile?.chainId===chainId;
     if(signedIn!==lastAuth){tracker.current.reset();lastAuth=signedIn;}
     if(active())setAuthenticated(signedIn);
     if(signedIn)remote=await client.api('/inbox');
     if(!active())return;
+    if(signedIn)await mergeDraftReferences({wallet,chainId,genesisHash:client.profile.genesisHash,records:remote.references}).catch(()=>{draftWarning='Requests are current, but saved Bricks could not be updated on this device. Retry after freeing browser storage.';});
+    if(!active())return;
     // A delivered answer is picked up by the original mint form, while the artist reviews later mint steps.
-    for(const record of remote.references)if(record.response&&localReferences().some(r=>r.id===record.id&&!r.response))updateReference(record.id,{response:record.response,status:record.status});
+    for(const record of remote.references)if(localReferences().some(r=>r.id===record.id&&(r.status!==record.status||JSON.stringify(r.response||null)!==JSON.stringify(record.response||null))))updateReference(record.id,{response:record.status==='approved'?record.response:null,status:record.status});
     const local=localReferences().filter(r=>!r.remote&&r.request.chainId===chainId&&sameAddress(r.controller,wallet));
     const {reader}=walletClientForLinks(window.ethereum,chainId);
     for(const record of local.filter(r=>r.status==='pending'&&r.request.deadline*1000>Date.now())){
@@ -37,7 +40,7 @@ export default function RequestNotifications({wallet,onConnect,onOffer}){
     }
     if(!active())return;
     const next=pendingNotifications({references:[...local,...remote.references.map(r=>({...r,remote:true}))],offers:remote.offers},wallet,chainId);
-    const arrivals=tracker.current.observe(next);setItems(next);setOnline(signedIn);setError('');
+    const arrivals=tracker.current.observe(next);setItems(next);setOnline(signedIn);setError(draftWarning);
     if(arrivals.length)setArrival({id:Date.now(),count:arrivals.length,title:arrivals[0].title});
    }catch(e){if(active()){setOnline(false);setAuthenticated(client.authenticated&&sameAddress(client.account,wallet));if(e.status===401){setItems(current=>current.filter(item=>item.kind==='reference'&&!item.remote));setReview(current=>current?.remote?null:current);}setError(e.status===401?'Sign in again to receive requests.':'Unable to update requests. Your pending approvals will refresh when the connection returns.');}}
    finally{running=false;if(active()){if(rerun){rerun=false;void refresh();}else if(!document.hidden)timer=setTimeout(refresh,5000);}}

@@ -26,7 +26,8 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
  useEffect(()=>()=>{operation.current++;},[]);
  const same=(a,b)=>!!a&&!!b&&a.toLowerCase()===b.toLowerCase();
  const update=(id,changes)=>onChange(previous=>previous.map(link=>link.id===id?{...link,...changes}:link));
- const edit=(id,changes)=>{forgetReference(links.find(link=>link.id===id)?.request);update(id,{...changes,request:null,response:null,controller:null,sent:false});setApprovalId(null);setError('');setNotice('');};
+ const terminal=link=>['declined','withdrawn','stale','expired'].includes(link.requestStatus)||link.request&&link.request.deadline*1000<=Date.now();
+ const edit=(id,changes)=>{forgetReference(links.find(link=>link.id===id)?.request);update(id,{...changes,request:null,response:null,controller:null,sent:false,requestStatus:null});setApprovalId(null);setError('');setNotice('');};
  const freshRequest=link=>link.request&&same(link.request.requester,wallet)&&link.request.chainId===Number(chainId)&&same(link.request.sourceCommitment,'0x'+assets.master?.hash);
  useEffect(()=>{
   for(const link of links){
@@ -56,7 +57,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   const checked=await checkLinkedBrick(reader,request);guard();
   forgetReference(link.request);
   rememberReference({request,controller:checked.controller,workTitle,brickTitle:link.title});
-  update(link.id,{request,response:null,controller:checked.controller,sent:false});setApprovalId(same(checked.controller,wallet)?link.id:null);
+  update(link.id,{request,response:null,controller:checked.controller,sent:false,requestStatus:'pending'});setApprovalId(same(checked.controller,wallet)?link.id:null);
   setNotice(same(checked.controller,wallet)?'This wallet controls the selected Brick. Review its use below, then approve with your wallet.':'Request prepared. Send it to the controller’s inbox for approval.');
  });
  const add=(candidate=null)=>{
@@ -93,7 +94,7 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   const inbox=workspaceInbox();await inbox.initialize();guard();
   if(!inbox.authenticated||!same(inbox.account,wallet)){await inbox.connect();guard();await inbox.login();guard();}
   const record=await inbox.api('/references',{method:'POST',body:{request:link.request,workTitle,brickTitle:link.title}});guard();
-  rememberReference({...record,remote:true});update(link.id,{sent:true});setNotice('Request sent. The controller will see it in their notifications.');
+  rememberReference({...record,remote:true});update(link.id,{sent:true,requestStatus:'pending'});setNotice('Request sent. The controller will see it in their notifications.');
  });
  const withdrawRequest=link=>run(link,async guard=>{
   const inbox=workspaceInbox();await inbox.initialize();guard();
@@ -109,14 +110,15 @@ export function LinkAuthorizationCreator({wallet,assets,links,onChange,onConnect
   {wallet&&<button type="button" className="ms-outline" disabled={busy!==null} onClick={()=>setPicker(value=>!value)}>{picker?'Close my Bricks':'Choose from my Bricks'}</button>}
   {picker&&<WalletBrickReferencePicker key={context} wallet={wallet} chainId={chainId} factoryAddress={factoryAddress} rpcUrl={rpcUrl} network={network} disabled={busy!==null} onSelect={add}/>}
   {links.map(link=>{const own=same(link.controller,wallet),fresh=freshRequest(link);return <article className="ms-link" key={link.id} aria-label={link.title||'Brick reference'}>
-   <div className="ms-link-header"><strong>{link.title||LINK_RELATIONS.find(x=>x.value===link.relation)?.label||'Reference'}</strong><button type="button" disabled={busy!==null||!!link.sent} onClick={()=>{forgetReference(link.request);onChange(previous=>previous.filter(x=>x.id!==link.id));}}>Remove</button></div>
+   <div className="ms-link-header"><strong>{link.title||LINK_RELATIONS.find(x=>x.value===link.relation)?.label||'Reference'}</strong><button type="button" disabled={busy!==null||!!link.sent&&!terminal(link)} onClick={()=>{forgetReference(link.request);onChange(previous=>previous.filter(x=>x.id!==link.id));}}>Remove</button></div>
    <div className="ms-fields">
-    <label>Relationship<select aria-label="Relationship" disabled={busy!==null||!!link.sent} value={link.relation} onChange={e=>edit(link.id,{relation:e.target.value})}>{LINK_RELATIONS.map(x=><option value={x.value} key={x.value}>{x.label}</option>)}</select></label>
-    <label>Existing Brick contract address<input disabled={busy!==null||!!link.sent} value={link.targetBrick} placeholder="0x..." onChange={e=>edit(link.id,{targetBrick:e.target.value.trim(),title:''})}/></label>
-    <label>Its YellowBrickFactory contract address<input disabled={busy!==null||!!link.sent} value={link.factory} placeholder="0x..." onChange={e=>edit(link.id,{factory:e.target.value.trim(),title:''})}/></label>
-    <label>Requested use / credit / scope<textarea aria-label="Requested use / credit / scope" disabled={busy!==null||!!link.sent} rows={2} value={link.scope} maxLength={250} onChange={e=>edit(link.id,{scope:e.target.value})}/></label>
+    <label>Relationship<select aria-label="Relationship" disabled={busy!==null||!!link.sent&&!terminal(link)} value={link.relation} onChange={e=>edit(link.id,{relation:e.target.value})}>{LINK_RELATIONS.map(x=><option value={x.value} key={x.value}>{x.label}</option>)}</select></label>
+    <label>Existing Brick contract address<input disabled={busy!==null||!!link.sent&&!terminal(link)} value={link.targetBrick} placeholder="0x..." onChange={e=>edit(link.id,{targetBrick:e.target.value.trim(),title:''})}/></label>
+    <label>Its YellowBrickFactory contract address<input disabled={busy!==null||!!link.sent&&!terminal(link)} value={link.factory} placeholder="0x..." onChange={e=>edit(link.id,{factory:e.target.value.trim(),title:''})}/></label>
+    <label>Requested use / credit / scope<textarea aria-label="Requested use / credit / scope" disabled={busy!==null||!!link.sent&&!terminal(link)} rows={2} value={link.scope} maxLength={250} onChange={e=>edit(link.id,{scope:e.target.value})}/></label>
    </div>
-   <button type="button" className="ms-outline" disabled={busy!==null||!wallet||!!link.sent} onClick={()=>void runRequest(link)}>Verify Brick &amp; prepare approval request</button>
+   <button type="button" className="ms-outline" disabled={busy!==null||!wallet||!!link.sent&&!terminal(link)} onClick={()=>void runRequest(link)}>Verify Brick &amp; prepare approval request</button>
+   {terminal(link)&&<p role="status">This request is {link.request.deadline*1000<=Date.now()?'expired':link.requestStatus}. Prepare a new request before continuing.</p>}
    {link.request&&!fresh&&<p>Work or wallet changed. Prepare a fresh approval request.</p>}
    {fresh&&own&&<div className="ms-link-review">
     <strong>{link.response?'Approved by your wallet':'Awaiting your approval'}</strong>
