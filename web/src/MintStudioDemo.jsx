@@ -123,13 +123,13 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
  const previousReuseScope=useRef(reuseScope);
  useEffect(()=>{if(previousReuseScope.current!==reuseScope)setReusedBricks({});previousReuseScope.current=reuseScope;},[reuseScope]);
  useEffect(()=>{
-  let active=true;if(!wallet||!window.ethereum?.request)return;
+  let active=true;if(!onDraftChange||!wallet||!window.ethereum?.request)return;
   if(ACTIVE_NETWORK){setGenesisHash(ACTIVE_NETWORK.genesisHash);return;}
   setGenesisHash('');
   const {reader}=walletClientForLinks(window.ethereum,Number(chainId));
   reader.getBlock({blockNumber:0n}).then(block=>{if(active)setGenesisHash(block.hash);}).catch(()=>{});
   return()=>{active=false;};
- },[wallet,chainId,rpcUrl,factoryAddress]);
+ },[wallet,chainId,rpcUrl,factoryAddress,onDraftChange]);
  useEffect(()=>{setReusedBricks(previous=>retainMatchingReuse(previous,assets,{composition:composition&&isMusic}));},[composition,isMusic]);
  const plannedParts=[{id:'master',label:category.label},...(visibleSlots.some(s=>s.id==='artwork')&&assets.artwork?.hash?[{id:'artwork',label:'Cover artwork'}]:[]),...(isMusic&&composition&&!linkedBricks.some(l=>l.relation==='embodies-composition')?[{id:'composition',label:'Songwriting'}]:[])];
  const newParts=plannedParts.filter(part=>!reusedBricks[part.id]),referenceParts=plannedParts.filter(part=>reusedBricks[part.id]);
@@ -226,6 +226,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
   if(step===1){void encryptAndAdvance();return}
   if(step===2){if(needsSplits&&validateSongwriterSplits(songwriterSplits,writers,{walletRequired:!!wallet}).length){setShowSplits(true);return;}const errors=validateMintInput(payload);if(errors.length){setError(errors.join(' '));return}}
   if(step===3){
+   if(pendingApprovals.waiting||pendingApprovals.attention){setError('Resolve the reference approvals before minting. Save & pause to return later.');return;}
    const errors=validateMintInput(payload);if(errors.length){setError(errors.join(' '));return}
    try{
     const prepared=makeRegistrationPacket(payload,new Date().toISOString());
@@ -255,6 +256,11 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
    if(execution!=='simulated'){
     await preflightPolicyMint({packet,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress});
     await preflightMintCover({packet,nftCover,provider:window.ethereum,rpcUrl,chainId,network,factoryAddress});
+    // Waiting/expired approvals must block publication as well as the wallet mint.
+    if(linkedBricks.length){
+     const {reader}=walletClientForLinks(window.ethereum,Number(chainId));
+     await preflightLinkedBricks({client:reader,account:wallet,chainId:Number(chainId),sourceHash:assets.master.hash,links:linkedBricks});
+    }
    }
    const uploadRoles=newUploadRoles(packet);
    if(ipfsEnabled&&packet.bricks.some(b=>!b.reuse)){
@@ -385,7 +391,7 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
  {ACTIVE_NETWORK&&<p>All application components use {ACTIVE_NETWORK.label} (chain {ACTIVE_NETWORK.chainId}). Change networks in Dev Control. Your wallet must be on this same network before signing.</p>}<p>{network==='sepolia'?'Switch your wallet to Sepolia (11155111) and enter a deployed YellowBrickFactory address. Each confirmed mint spends Sepolia test ETH for gas.':automaticFactory?'Factory supplied by the running development stack. No copy/paste needed. Turn off automatic selection to enter another factory. Wallet and RPC must still match; the contract is verified before signing.':startupFactory?'Manual override is active. Enable automatic selection to follow the current development stack. Saved manual addresses are retained.':'No startup factory is available for this RPC and chain. Start npm run dev for automatic local setup, or enter a deployed factory for this network.'}</p></div>:<p>No wallet connected — the original simulation will run. Connect a wallet for real minting.</p>}{!wallet&&<button type="button" className="ms-outline" onClick={onConnect}>Connect wallet for real minting</button>}</section><aside>{execution==='simulated'?'No blockchain transaction or wallet signature occurs.':'Real transactions require wallet approval and gas on the selected network. IPFS is optional: when enabled, encrypted metadata CIDs are committed, not readable plaintext. No paid licenses or payout rules are installed.'}</aside></>}
  {step===4&&packet&&<MintResults packet={packet} mint={mint} vault={vault.current} preparedCover={nftCover} delivery={playerDelivery} onRetry={()=>void retryPlayerDelivery()} busy={busy} onCoverVerified={recordNftCover} onExportPacket={exportPacket} onExportRecovery={exportRecovery} onReset={reset} onDownload={download} downloadSlots={visibleSlots.filter(x=>vault.current.encrypted.has(x.id)).map(x=>({...x,label:slotLabel(x.id)}))}/>}
  <StatusArea size="normal" busy={busy&&!dialog} label={status||'Encrypting files…'} value={encryptionProgress?.value} max={encryptionProgress?.max} message={step===1?status:''} error={categoryIssue||error} name="Mint status"/>
- {step<4&&<div className="ms-actions">{step>0&&<button className="ms-outline" disabled={busy} onClick={()=>{setStep(i=>i-1);setError('')}}>← Back</button>}<button className="ms-primary" disabled={busy||!!categoryIssue} onClick={next}>{step===1?'Encrypt & Continue →':step===3?(execution==='simulated'?'Simulate mint →':'Review wallet mint →'):'Continue →'}</button></div>}
+ {step<4&&<div className="ms-actions">{step>0&&<button className="ms-outline" disabled={busy} onClick={()=>{setStep(i=>i-1);setError('')}}>← Back</button>}<button className="ms-primary" disabled={busy||!!categoryIssue||step===3&&(pendingApprovals.waiting>0||pendingApprovals.attention>0)} onClick={next}>{step===1?'Encrypt & Continue →':step===3?(pendingApprovals.waiting||pendingApprovals.attention?'Waiting for reference approvals':execution==='simulated'?'Simulate mint →':'Review wallet mint →'):'Continue →'}</button></div>}
  </section><aside className="ms-side"><strong>THE CREATOR'S ROAD</strong><ol><li>Connect a wallet or continue with simulation</li><li>Attach all source files</li><li>Automatic client-side encryption</li><li>Separate Bricks for applicable creative rights</li><li>Draft dataset ingestion and use fees</li><li>Confirm simulation or one wallet mint transaction</li><li>Decrypt after simulated authorization</li></ol><p>PILOT ONLY. Decryption keys stay in the browser. {playerEnabled?'Originals remain private unless you explicitly share selected preview copies with the local Player.':'Originals remain private. Public NFT thumbnails require separate approval.'} Optional ciphertext pinning uses your local YBR IPFS node. Authorized remote delivery, managed key recovery and royalty payouts are not implemented. Wallets deploy test Bricks on Ganache or Sepolia.</p></aside></div>
  {showSplits&&<SongwriterSplits key={JSON.stringify(writers)} names={writers} value={songwriterSplits} wallet={wallet} onClose={()=>setShowSplits(false)} onSave={value=>{setSongwriterSplits(value);setShowSplits(false);setError('');}}/>}
  {recoveryNotice&&<p className="ms-highlight" role="status">{recoveryNotice}</p>}
