@@ -69,6 +69,7 @@ async function main(){
   await sender.getByRole('button',{name:'Resume Brick'}).click();
   await sender.getByRole('button',{name:'Encrypt & Continue →'}).click();
   await sender.getByLabel('Track title',{exact:true}).fill('Midnight EP');
+  await sender.getByLabel('Licensor email',{exact:true}).fill('licensing@example.test');
   await sender.getByLabel('Recording artist / claimant',{exact:true}).fill('Test artist');
   await sender.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Test artist');
   await sender.getByText('Reference existing Bricks',{exact:true}).click();
@@ -98,6 +99,7 @@ async function main(){
   await sender.screenshot({path:path.join(output,'drafts-ready-desktop.png'),fullPage:false});
   await sender.getByRole('article',{name:'Midnight EP'}).getByRole('button',{name:'Resume Brick'}).click();
   assert.equal(await sender.getByLabel('Track title',{exact:true}).inputValue(),'Midnight EP');
+  assert.equal(await sender.getByLabel('Licensor email',{exact:true}).inputValue(),'licensing@example.test');
   await sender.getByText('Reference existing Bricks',{exact:true}).click();
   assert.ok(await sender.getByLabel('Signed approval response JSON').inputValue());
   assert.equal((await readDraft()).size,wav.length);

@@ -74,8 +74,8 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
  const [creatorDefaults,setCreatorDefaults]=useState(saved.defaults);
  const [contentPolicy,setContentPolicy]=useState(()=>restored?.contentPolicy||initialContentPolicy(saved.defaults));
  const [deliveryChoice,setDeliveryChoice]=useState(restored?.deliveryChoice||'default');
- const [nftCover,setNftCover]=useState(draft?.files?.nftCover?{...draft.files.nftCover,consent:false}:null);
- const [deliveryConsent,setDeliveryConsent]=useState(null),[playerDelivery,setPlayerDelivery]=useState({status:'not-requested'});
+ const [nftCover,setNftCover]=useState(draft?.files?.nftCover||null);
+ const [deliveryConsent,setDeliveryConsent]=useState(restored?.deliveryConsent||null),[playerDelivery,setPlayerDelivery]=useState({status:'not-requested'});
  const [composition,setComposition]=useState(saved.form.composition),[training,setTraining]=useState(saved.form.training),[share,setShare]=useState(saved.form.share);
  const [currency,setCurrency]=useState(saved.form.currency),[unit,setUnit]=useState(saved.form.unit);
  const [fees,setFees]=useState(saved.form.fees);
@@ -133,10 +133,12 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
  useEffect(()=>{setReusedBricks(previous=>retainMatchingReuse(previous,assets,{composition:composition&&isMusic}));},[composition,isMusic]);
  const plannedParts=[{id:'master',label:category.label},...(visibleSlots.some(s=>s.id==='artwork')&&assets.artwork?.hash?[{id:'artwork',label:'Cover artwork'}]:[]),...(isMusic&&composition&&!linkedBricks.some(l=>l.relation==='embodies-composition')?[{id:'composition',label:'Songwriting'}]:[])];
  const newParts=plannedParts.filter(part=>!reusedBricks[part.id]),referenceParts=plannedParts.filter(part=>reusedBricks[part.id]);
- useEffect(()=>{setSongwriterSplits(value=>value?{...value,confirmed:false}:null);},[wallet]);
+ const previousSplitWallet=useRef(wallet);
+ useEffect(()=>{if(previousSplitWallet.current!==wallet)setSongwriterSplits(value=>value?{...value,confirmed:false}:null);previousSplitWallet.current=wallet;},[wallet]);
  const album=previewAlbum(assets);
  const albumScope=JSON.stringify([album,assets.preview?.hash,wallet,chainId,factoryAddress,rpcUrl,network]);
- useEffect(()=>{setNftCover(current=>current?.kind==='album'?null:current);},[albumScope]);
+ const previousAlbumScope=useRef(albumScope);
+ useEffect(()=>{if(previousAlbumScope.current!==albumScope)setNftCover(current=>current?.kind==='album'?null:current);previousAlbumScope.current=albumScope;},[albumScope]);
  useEffect(()=>{
   if(album&&packet&&mint)void rememberAlbumCover(window.localStorage,{album,packet,mint}).catch(()=>{});
  },[album,packet,mint]);
@@ -161,10 +163,10 @@ export default function MintStudioDemo({wallet,displayName,onConnect,draft=null,
  useEffect(()=>{
   onDraftChange?.({busy:busy||Object.values(assets).some(a=>a.status==='hashing'),state:{wallet,chainId:Number(chainId),factoryAddress,genesisHash,network,rpcUrl,step,assets,
    form:{meta,ipCategoryId,spatial,composition,training,share,currency,unit,fees,cover,licensingEmail},
-   settings:{network,rpcUrl,ganacheChainId,factories,rememberForm,useStartupFactory},creatorDefaults,contentPolicy,deliveryChoice,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,
+   settings:{network,rpcUrl,ganacheChainId,factories,rememberForm,useStartupFactory},creatorDefaults,contentPolicy,deliveryChoice,deliveryConsent,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,
    packet:step===4?packet:null,mint,submissionPending:!!restored?.submissionPending&&!mint?.transactionHash&&step===4},
    files:{originals:{...refs.current},vault:{secret:vault.current.secret,encrypted:new Map(vault.current.encrypted)},nftCover}});
- },[wallet,chainId,factoryAddress,genesisHash,network,rpcUrl,step,assets,meta,ipCategoryId,spatial,composition,training,share,currency,unit,fees,cover,licensingEmail,ganacheChainId,factories,rememberForm,useStartupFactory,creatorDefaults,contentPolicy,deliveryChoice,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,packet,mint,nftCover,busy,onDraftChange]);
+ },[wallet,chainId,factoryAddress,genesisHash,network,rpcUrl,step,assets,meta,ipCategoryId,spatial,composition,training,share,currency,unit,fees,cover,licensingEmail,ganacheChainId,factories,rememberForm,useStartupFactory,creatorDefaults,contentPolicy,deliveryChoice,deliveryConsent,ipfsEnabled,linkedBricks,reusedBricks,songwriterSplits,packet,mint,nftCover,busy,onDraftChange]);
  const categoryIssue=mintCategoryIssue(ipCategoryId,{hasNewCover:step>=2&&playerEnabled&&!!assets.artwork?.hash&&!reusedBricks.artwork,coverCategory:cover.ipCategory});
  const chooseCategory=id=>{
   if(!isMintCategoryEnabled(id)){setError(mintCategoryIssue(id));return;}
