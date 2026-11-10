@@ -70,7 +70,7 @@ async function main(){
   await sender.getByRole('button',{name:'Encrypt & Continue →'}).click();
   await sender.getByLabel('Track title',{exact:true}).fill('Midnight EP');
   await sender.getByLabel('Recording artist / claimant',{exact:true}).fill('Test artist');
-  await sender.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Test writer');
+  await sender.getByLabel('Songwriters / composers (comma-separated)',{exact:true}).fill('Test artist');
   await sender.getByText('Reference existing Bricks',{exact:true}).click();
   await sender.getByRole('button',{name:'+ Add existing Brick reference',exact:true}).click();
   await sender.getByLabel('Existing Brick contract address',{exact:true}).fill(brick);
@@ -78,6 +78,9 @@ async function main(){
   await sender.getByRole('button',{name:'Verify Brick & prepare approval request',exact:true}).click();
   await sender.getByRole('button',{name:'Send to controller inbox',exact:true}).click();
   await sender.getByRole('button',{name:'Request sent to inbox',exact:true}).waitFor();
+  await sender.getByRole('button',{name:'Continue →',exact:true}).click();
+  assert.equal(await sender.getByRole('button',{name:'Waiting for reference approvals',exact:true}).isDisabled(),true);
+  await sender.getByRole('button',{name:'← Back',exact:true}).click();
   await sender.locator('.mint-workbench-toolbar').getByRole('button',{name:'Save & pause'}).click();
   const pending=sender.getByRole('article',{name:'Midnight EP'});await pending.getByText('Waiting for approval',{exact:true}).waitFor();
   const readDraft=()=>sender.evaluate(async({wallet,id})=>{const {loadMintDraft}=await import('/src/mint-drafts.js');const row=await loadMintDraft(wallet,id);const {openDemoDownload}=await import('/src/demo-vault.js');const decrypted=await openDemoDownload({entry:row.files.vault.encrypted.get('master'),secret:row.files.vault.secret,authorized:true});return {size:decrypted.bytes.length,text:row.state.form.meta.title,links:row.state.linkedBricks,genesisHash:row.state.genesisHash};},{wallet:buyer.address,id:draftId});

@@ -24,7 +24,8 @@ export default function BricksInProgress({wallet,onResume=openMintDraft,onNew=st
  </article>;};
  return <section className="mint-drafts" aria-label="Bricks in progress"><div className="mint-drafts-heading"><div><span className="eyebrow">YOUR WORKBENCH</span><h2>Bricks in progress {pending.length>0&&<span className="mint-draft-count">{pending.length}</span>}</h2><p>Pause here while approvals come in. Pick up where you left off.</p></div><button type="button" className="mint-start-button" onClick={onNew}><Plus size={22}/><span>Start a new mint<small>Build your next Brick</small></span><ArrowRight size={20}/></button></div>
   {!wallet?<p>Connect your wallet to find its saved work. <button className="text-action" type="button" onClick={onConnect}>Connect wallet</button></p>:<>{pending.map(card)}{!loading&&!error&&!pending.length&&<p className="mint-drafts-empty">No unfinished Bricks for this wallet on this device.</p>}{completed.length>0&&<details><summary>Completed on this device ({completed.length})</summary>{completed.map(card)}</details>}</>}
-  <StatusArea busy={loading&&!!wallet} label="Loading saved Bricks…" error={error} name="Saved Bricks status"/>
+  <StatusArea size="inline" busy={loading&&!!wallet} label="Loading saved Bricks…" error={error} name="Saved Bricks status"/>
+  {pending.some(row=>approvalProgress(row.state,clock).waiting>0)&&<p className="mint-drafts-local">Sign in through the notification bell to receive approval updates.</p>}
   <p className="mint-drafts-local">Saved only in this browser, including source files and recovery keys. Clearing browser data removes these drafts.</p>
  </section>;
 }
