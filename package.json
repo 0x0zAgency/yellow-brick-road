@@ -23,7 +23,7 @@
     "ipfs:smoke": "node web/scripts/ipfs-smoke.mjs",
     "dev": "node scripts/dev.cjs",
     "setup:dev": "node scripts/dev.cjs --setup",
-    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs scripts/dev-install-scripts.test.cjs scripts/dev-mnemonic.test.cjs scripts/dev-ganache-profile.test.cjs scripts/dev-network.test.cjs scripts/dev-network-profile.test.cjs scripts/deployment-budget.test.cjs scripts/dev-sepolia-rpc.test.cjs scripts/dev-sepolia-rpc-sdk.test.cjs scripts/deployment-profile-history.test.cjs",
+    "test:dev-stack": "node --test scripts/dev-stack.test.cjs scripts/dev-launcher.test.cjs scripts/dev-ganache-storage.test.cjs scripts/dev-install-scripts.test.cjs scripts/dev-mnemonic.test.cjs scripts/dev-ganache-profile.test.cjs scripts/dev-network.test.cjs scripts/dev-network-profile.test.cjs scripts/deployment-budget.test.cjs scripts/dev-sepolia-rpc.test.cjs scripts/dev-sepolia-rpc-sdk.test.cjs scripts/deployment-profile-history.test.cjs scripts/lan-node.test.cjs",
     "setup:https": "node scripts/dev.cjs --setup-https",
     "setup:wallet": "node web/scripts/wallet-gateway.mjs --setup",
     "wallet:gateway": "node web/scripts/wallet-gateway.mjs"
@@ -33,7 +33,8 @@
     "ethers": "^5.7.2",
     "hardhat": "^2.22.0",
     "ganache": "7.9.2",
-    "@openzeppelin/contracts": "5.0.2"
+    "@openzeppelin/contracts": "5.0.2",
+    "bonjour-service": "1.4.4"
   },
   "allowScripts": {
     "keccak": true,

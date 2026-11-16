@@ -95,3 +95,7 @@ The existing private encrypted-IPFS bridge remains separately operated with `npm
 ## Production boundaries
 
 This is a Ganache chain-1337 reference implementation. It doesn't adjudicate copyright, authorize commercial distribution, provide global content availability, settle royalties, or establish genuine plays. Open internet playback requires independently verified rights, production identity/permissions, hosted delivery, rate limits, signed usage records, and secure accounting. We use existing PROV-O, C2PA and music reporting standards where they apply, extending only YBR-specific gaps.
+
+## Nearby YBR nodes
+
+Press **b** in the ready terminal to open **LAN Nodes**. Enable LAN mode on both computers, choose a discovered node, inspect its identity and deployment, then connect IPFS. Manual IPv4 entry is available when multicast is blocked. This is an IPFS transport prototype; the active blockchain remains selected locally. See [LAN Nodes](LAN_NODES.md) for ports, persisted Kubo LAN permissions, and testing.

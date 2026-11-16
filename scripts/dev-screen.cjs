@@ -1,6 +1,7 @@
 'use strict';
 /** Pure terminal renderer. Motion is decoration, never invented telemetry. */
 const {stripVTControlCharacters:strip}=require('node:util');
+const {renderLanMenu}=require('./lan-node-menu.cjs');
 const {renderMnemonicMenu}=require('./dev-mnemonic-menu.cjs');
 const {renderNetworkMenu}=require('./dev-network.cjs');
 const {renderIpfsCleanupMenu}=require('./dev-ipfs-cleanup-menu.cjs');
@@ -19,6 +20,7 @@ function secret(v,visible,fallback='waiting for Player'){
  return /^[\x20-\x7e]+$/.test(v)?v:'[configured non-printable value]';
 }
 function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=false,view='home',offset=0,motion=true}={}){
+ if(state.lanMenu)return renderLanMenu(state,{columns,rows,color});
  if(state.cleanupMenu)return renderIpfsCleanupMenu(state,{columns,rows,color});
  if(state.networkMenu)return renderNetworkMenu(state,{columns,rows,color});
  if(state.mnemonicMenu)return renderMnemonicMenu(state,{columns,rows,color});
@@ -54,7 +56,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
  }
  const logMode=state.logMode==='VERBOSE'?'VERBOSE':'ESSENTIAL';
  const buttons=gold(clip(view==='logs'?'[l/Esc] home [v] verbose '+(logMode==='VERBOSE'?'ON':'OFF')+' [Up/Down] scroll [p] pause [q] quit':
-  '[c] clean [n] net [m] seed [d] info [l] logs [s] keys [p] pause [r] P [q] quit',w));
+  '[b] nodes [n] net [m] seed [c] clean [d] info [l] logs [s] keys [q] quit',w));
  const warning=state.restartConfirm?p('91',clip('Restart this checkout\'s Player? [r] confirm / [Esc] cancel. Sessions reset.',w)):
   dim(clip((remote?'SEPOLIA TESTNET / Signer key is never displayed / ':'LOCAL TEST KEYS ONLY / Never send real funds / ')+(showSecrets?'SECRETS VISIBLE':'SECRETS HIDDEN'),w));
  if(view==='logs'&&(w<70||h<22)){
@@ -93,6 +95,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
    'Wallet: '+(g.source||'pending')+' | Player: '+(a.source||'pending'),
    ...wrap(a.notice||'Player passwords: private .road-local/player-access.json',w-4)],w,gold),
    ...box('NETWORK + SERVICES',[
+    'LAN nodes: '+(state.lan?.enabled?'ON / '+state.lan.peers.filter(p=>p.status==='Connected').length+' connected':'OFF')+' / [b] discover and connect',
     'Active network: '+active.label+' / '+active.chainId+' / [n] change',
     ...wrap('Factory: '+(state.factory||'pending'),w-4),...wrap('IPFS peer: '+(state.peerId||'pending'),w-4),
     musicLine,...wrap('Test Brick: '+(music.id||'pending'),w-4),...wrap('Test playback: '+(music.mediaUrl||'pending'),w-4),

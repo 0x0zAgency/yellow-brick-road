@@ -10,6 +10,7 @@ const {renderDashboard,URLS}=require('./dev-screen.cjs');
 const {MnemonicEditor}=require('./dev-mnemonic-menu.cjs');
 const {IpfsCleanupMenu}=require('./dev-ipfs-cleanup-menu.cjs');
 const {NetworkControl,readNetwork}=require('./dev-network.cjs');
+const {LanNodeMenu}=require('./lan-node-menu.cjs');
 const LOG_LIMIT=1024*1024;
 const rpcLine=/^(?:eth|net|web3|debug|evm|miner|personal|txpool)_[A-Za-z0-9_]+$/;
 const diagnosticLine=/\b(?:error|warn(?:ing)?|fatal|exception|fail(?:ed|ure)?|unavailable|refus(?:e|ed|ing)|timed? out|timeout|revert(?:ed)?|cannot|could not)\b|^at (?:async )?/i;
@@ -40,7 +41,7 @@ function redact(text,secrets=[]){
  return clean(result);
 }
 class DevDashboard{
- constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null,networkActions={},cleanupControl=null}){
+ constructor({root,output=process.stdout,input=process.stdin,env=process.env,args=process.argv.slice(2),onQuit=()=>{},onRestartPlayer=async()=>{},mnemonicControl=null,networkActions={},cleanupControl=null,lanNode=()=>null}){
   this.output=output;this.input=input;this.env=env;this.onQuit=onQuit;this.onRestartPlayer=onRestartPlayer;this.mnemonicControl=mnemonicControl;
   this.interactive=!!(output.isTTY&&input.isTTY&&env.TERM!=='dumb'&&!env.CI&&env.YBR_DEV_PLAIN!=='1'&&!args.includes('--plain'));
   this.showSecrets=this.interactive&&env.YBR_DEV_HIDE_SECRETS!=='1';
@@ -62,6 +63,7 @@ class DevDashboard{
   this.logFd=openLog(this.logFile);this.logBytes=0;
   this.lastEssential=null;this.lastDiagnostic=null;
   this.keyHandler=(_text,key={})=>{
+   if(this.lanMenu){this.lanMenu.handle(_text,key);return;}
    if(this.cleanupMenu){this.cleanupMenu.handle(_text,key);return;}
    if(this.mnemonicEditor){this.mnemonicEditor.handle(_text,key);return;}
    if(this.networkControl.menu){this.networkControl.handle(_text,key);return;}
@@ -76,6 +78,12 @@ class DevDashboard{
       onChange:menu=>{this.state.cleanupMenu=menu;if(!menu)this.cleanupMenu=null;this.draw(true);}});
      this.cleanupMenu.publish();
     }catch(error){this.state.error=redact(error.message,this.secrets);this.draw(true);}return;
+   }
+   if(key.name==='b'&&!key.ctrl&&this.interactive){
+    const node=lanNode();
+    if(!node){this.state.error='LAN Nodes is available after startup completes.';this.draw(true);return;}
+    this.state.restartConfirm=false;
+    this.lanMenu=new LanNodeMenu({node,onChange:menu=>{this.state.lanMenu=menu;if(!menu)this.lanMenu=null;this.draw(true);}});return;
    }
    if(key.name==='n'&&this.interactive){
     if(!['READY','DEGRADED','CONFIGURATION REQUIRED'].includes(this.state.phase)){this.state.error='Network selection is available when READY.';this.draw(true);return;}
@@ -141,7 +149,7 @@ class DevDashboard{
   if(!this.interactive||this.closed||this.paused&&!force)return;
   this.state.now=Date.now();
   const lines=renderDashboard(this.state,{columns:this.output.columns||100,rows:this.output.rows||32,color:this.color,showSecrets:this.showSecrets,view:this.view,offset:this.offset,motion:this.motion});
-  if(this.paused&&!this.state.mnemonicMenu&&!this.state.networkMenu&&!this.state.cleanupMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
+  if(this.paused&&!this.state.mnemonicMenu&&!this.state.networkMenu&&!this.state.cleanupMenu&&!this.state.lanMenu)lines[1]=clip('  DISPLAY PAUSED / [p] resume live updates',Math.max(5,(this.output.columns||100)-1));
   // Repaint only changed rows; passwords and wallet text do not flicker with FX.
   let output='';
   for(let i=0;i<Math.max(lines.length,this.lastFrame.length);i++){
@@ -212,6 +220,7 @@ class DevDashboard{
  }
  close(reason='Stopped',{failed=diagnosticLine.test(reason)||/unexpectedly exited/.test(reason)}={}){
   if(this.closed)return;this.closed=true;clearInterval(this.timer);
+  this.lanMenu?.close();this.lanMenu=null;
   if(this.logFd!==null){try{fs.closeSync(this.logFd);}catch{}this.logFd=null;}
   if(this.mnemonicEditor){this.mnemonicEditor.value='';this.mnemonicEditor.candidate=null;this.mnemonicEditor=null;}this.state.mnemonicMenu=null;
   if(this.interactive){
