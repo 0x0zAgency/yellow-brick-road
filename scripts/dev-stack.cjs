@@ -8,6 +8,7 @@ const {setTimeout:sleep}=require('node:timers/promises');
 const {ethers}=require('ethers');
 const crypto=require('node:crypto');
 const {ensureIpfs,IPFS_URL,probeIpfs}=require('./dev-ipfs.cjs');
+const {LanNode}=require('./lan-node.cjs');
 const {DevDashboard}=require('./dev-dashboard.cjs');
 const {createIpfsCleanup}=require('./dev-ipfs-cleanup.cjs');
 const {verifyReadRpc}=require('./dev-rpc-health.cjs');
@@ -27,7 +28,7 @@ const {web:WEB_URL,player:PLAYER_URL}=require('./dev-https.cjs').localUrls();
 const ADDRESS=/^0x[0-9a-fA-F]{40}$/;
 const ABI=['function implementation() view returns (address)'];
 const OWNED=new Map();
-let stopping=false,dashboard=null,healthTimer=null,healthBusy=false,playerBusy=false,playerEnv=null,activeProfile=null;
+let stopping=false,dashboard=null,healthTimer=null,healthBusy=false,playerBusy=false,playerEnv=null,activeProfile=null,lanNode=null;
 const log=message=>dashboard?dashboard.log('launcher',message):console.log(message);
 function command(){return process.platform==='win32'?'npm.cmd':'npm';}
 function spawnOwned(label,executable,args,{cwd=ROOT,env=process.env,stdio=dashboard?['ignore','pipe','pipe']:'inherit'}={}){
@@ -50,6 +51,7 @@ function stopOwned(){
 }
 function shutdown(reason,code=0){
  if(stopping)return;stopping=true;clearInterval(healthTimer);
+ void lanNode?.disable().catch(()=>{});
  log(reason+'. Stopping managed processes; persistent Kubo is left running.');
  dashboard?.close(reason+'. Persistent Kubo and its pins are left intact.');stopOwned();process.exitCode=code;
 }
@@ -166,7 +168,7 @@ async function changeMnemonicHere(candidate,expectedId){
   prepareProfile(ROOT,candidate);
   await switchSelection({root:ROOT,candidate,expectedId,context:mnemonicContext()},{
    stop:async()=>{
-    stopping=true;clearInterval(healthTimer);dashboard.update({phase:'SWITCHING WALLET'});
+    stopping=true;clearInterval(healthTimer);await lanNode?.disable();dashboard.update({phase:'SWITCHING WALLET'});
     log('Stopping owned services for a confirmed Ganache wallet-profile change.');
     const children=[...OWNED.values()].map(({proc})=>proc);
     const exited=Promise.all(children.map(proc=>new Promise((resolve,reject)=>{
@@ -241,6 +243,7 @@ async function main(){
  process.on('SIGINT',()=>shutdown('Received Ctrl+C'));process.on('SIGTERM',()=>shutdown('Received termination signal'));
  try{
   dashboard=new DevDashboard({root:ROOT,onQuit:()=>shutdown('Stopped from dashboard'),onRestartPlayer:restartPlayerHere,
+   lanNode:()=>lanNode,
    cleanupControl:({peerId})=>createIpfsCleanup({root:ROOT,expectedPeer:peerId}),
    networkActions:{onReview:reviewNetworkHere,onApply:applyNetworkHere},
    mnemonicControl:{check:()=>{if(activeProfile?.network!=='ganache')throw Error('Mnemonic control is only for local Ganache. Sepolia uses a separate test signer.');changeAllowed(mnemonicContext());},current:()=>readSelection(ROOT),
@@ -288,6 +291,12 @@ async function main(){
   const proxied=await fetchJson(WEB_URL+'/api/road-ipfs/health',{timeout:6500});
   if(proxied?.ok!==true||proxied.peerId!==ipfs.peerId)throw Error('Mint Studio IPFS proxy did not reach the expected healthy Kubo node.');
   await verifyReadRpc(WEB_URL,activeProfile.chainId);
+  try{
+   lanNode=new LanNode({profile:activeProfile,peer:ipfs.peerId});
+   lanNode.on('change',state=>dashboard.update({lan:state}));
+   dashboard.update({lan:lanNode.snapshot()});
+   if(process.env.YBR_LAN_ENABLED==='1')await lanNode.enable();
+  }catch(error){log('LAN Nodes: '+error.message+' Local services remain available.');}
   await refreshWallet(source);dashboard.ready();healthTimer=setInterval(()=>void refreshHealth(),4000);healthTimer.unref();
   await new Promise((resolve,reject)=>{for(const {label,proc} of OWNED.values()){
    if(proc.exitCode!==null||proc.signalCode!==null){reject(Error(label+' exited during startup'));break;}

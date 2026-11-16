@@ -1,0 +1,38 @@
+name: YBR LAN Nodes
+on:
+  push:
+    paths:
+      - 'scripts/lan-node*'
+      - 'scripts/dev-stack.cjs'
+      - 'scripts/dev-dashboard*'
+      - 'scripts/dev-screen.cjs'
+      - 'package.json'
+      - '.github/workflows/lan-nodes.yml'
+  pull_request:
+    paths:
+      - 'scripts/lan-node*'
+      - 'scripts/dev-stack.cjs'
+      - 'scripts/dev-dashboard*'
+      - 'scripts/dev-screen.cjs'
+      - 'package.json'
+      - '.github/workflows/lan-nodes.yml'
+jobs:
+  lan-nodes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - run: node --test scripts/lan-node.test.cjs scripts/dev-dashboard.test.cjs
+      - name: Verify two isolated nodes with real discovery and IPFS transfer
+        shell: bash
+        run: |
+          set -euo pipefail
+          KUBO_IMAGE=$(docker create ipfs/kubo:v0.43.1)
+          trap 'docker rm "$KUBO_IMAGE" >/dev/null; rm -f /tmp/ybr-lan-kubo' EXIT
+          docker cp "$KUBO_IMAGE:/usr/local/bin/ipfs" /tmp/ybr-lan-kubo
+          chmod +x /tmp/ybr-lan-kubo
+          YBR_IPFS_TEST_BINARY=/tmp/ybr-lan-kubo node --test scripts/lan-node.integration.cjs

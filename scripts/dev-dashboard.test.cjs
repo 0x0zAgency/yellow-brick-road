@@ -8,11 +8,11 @@ const {DevDashboard,renderDashboard,playerCredentials,redact,clean}=require('./d
 const mnemonic='abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about';
 const privateKey='0x'+'a'.repeat(64);
 const state=()=>({startedAt:0,now:90000,phase:'READY',nodeVersion:'v24.0.0',services:{web:'UP',player:'UP',ipfs:'UP',ganache:'UP'},ganache:{source:'owned',account:'0x'+'1'.repeat(40),balance:'999.999',block:7,mnemonic,privateKey},access:{source:'owned',verified:true,listener:'listener-fixture',artist:'artist-fixture'},factory:'0x'+'2'.repeat(40),peerId:'fixture-peer',logs:['12:00:01 launcher | Ready for minting.']});
-function harness({tty=false,env={},args=[],cleanupControl=null}={}){
+function harness({tty=false,env={},args=[],cleanupControl=null,lanNode=()=>null}={}){
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'ybr-dashboard-test-'));
  const output=new PassThrough();let captured='';output.on('data',b=>captured+=b.toString());Object.assign(output,{isTTY:tty,columns:80,rows:24});
  const input=new PassThrough();input.isTTY=tty;input.isRaw=false;input.setRawMode=v=>{input.isRaw=v;};let quits=0,restarts=0;
- const dashboard=new DevDashboard({root,output,input,env,args,cleanupControl,onQuit:()=>quits++,onRestartPlayer:async()=>restarts++});
+ const dashboard=new DevDashboard({root,output,input,env,args,cleanupControl,lanNode,onQuit:()=>quits++,onRestartPlayer:async()=>restarts++});
  return {dashboard,input,output,root,captured:()=>captured,quits:()=>quits,restarts:()=>restarts,close:()=>{dashboard.close();fs.rmSync(root,{recursive:true,force:true});}};
 }
 test('80x24 keeps ASCII logo, full wallet addresses, both logins and whole mnemonic',()=>{
@@ -223,5 +223,16 @@ test('TTY resize swaps full artwork, framed-letter and compact layouts without l
   for(const value of ['listener-fixture','artist-fixture','abandon'])assert.ok(!hidden.includes(value));
   h.input.emit('keypress','p',{name:'p'});assert.match(strip(h.dashboard.lastFrame[1]),/DISPLAY PAUSED/);
   h.input.emit('keypress','p',{name:'p'});assert.match(strip(h.dashboard.lastFrame[1]),/CREATOR TOOLS/);
+ }finally{h.close();}
+});
+
+test('b opens LAN Nodes while paused; modal keys do not switch chain or expose credentials',()=>{
+ const {EventEmitter}=require('node:events');const node=new EventEmitter();
+ node.snapshot=()=>({enabled:false,peers:[],addresses:[],local:{name:'YBR fixture',peerId:'Qm'+'a'.repeat(44)},notice:''});
+ const h=harness({tty:true,lanNode:()=>node});try{
+  h.dashboard.start();h.dashboard.update(state());h.dashboard.paused=true;h.input.emit('keypress','b',{name:'b'});
+  assert.match(h.dashboard.lastFrame.join('\n'),/LAN NODES/);assert.doesNotMatch(h.dashboard.lastFrame.join('\n'),/listener-fixture|DISPLAY PAUSED/);
+  h.input.emit('keypress','n',{name:'n'});assert.equal(h.dashboard.networkControl.menu,null);
+  h.input.emit('keypress','',{name:'escape'});assert.equal(h.dashboard.lanMenu,null);assert.equal(node.listenerCount('change'),0);
  }finally{h.close();}
 });
