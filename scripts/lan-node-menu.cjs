@@ -2,7 +2,7 @@
 const {stripVTControlCharacters}=require('node:util');
 const clean=v=>stripVTControlCharacters(String(v??'')).replace(/[^\x20-\x7e]/g,'');
 class LanNodeMenu{
- constructor({node,onChange=()=>{}}){this.node=node;this.onChange=onChange;this.state={mode:'list',selected:0,error:'',input:'',node:node.snapshot()};this.listener=s=>{this.state.node=s;this.publish();};node.on('change',this.listener);this.publish();}
+ constructor({node,onChange=()=>{},size=()=>({columns:80,rows:24})}){this.node=node;this.onChange=onChange;this.size=size;this.state={mode:'list',selected:0,error:'',input:'',node:node.snapshot()};this.listener=s=>{this.state.node=s;this.publish();};node.on('change',this.listener);this.publish();}
  publish(){if(!this.closed)this.onChange({...this.state});}
  close(){this.closed=true;this.node.off('change',this.listener);this.onChange(null);}
  async run(action){
@@ -20,6 +20,9 @@ class LanNodeMenu{
    if(this.state.mode==='list')this.close();else{this.state.mode='list';this.state.review=null;this.state.input='';this.publish();}return;
   }
   if(this.state.mode==='busy')return;
+  if(key.name==='return'&&['enable','review'].includes(this.state.mode)&&(this.size().columns<80||this.size().rows<20)){
+   this.state.error='Resize to at least 80x20 to review node identity and LAN permissions.';this.publish();return;
+  }
   if(this.state.mode==='input'){
    if(key.name==='return'&&!this.pasting)void this.run(()=>this.node.review(this.state.input.trim()));
    else if(key.name==='backspace')this.state.input=this.state.input.slice(0,-1);

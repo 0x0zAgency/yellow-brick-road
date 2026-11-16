@@ -77,10 +77,10 @@ class LanNode extends EventEmitter{
    // NoAnnounce, UPnP, admin binds, and all unrelated Kubo settings unchanged.
    const filters=(await this.kubo('swarm/filters')).Strings;
    active();if(!Array.isArray(filters))throw Error('Cannot read Kubo address filters.');
-   this.server=http.createServer((req,res)=>this.serve(req,res));
-   this.server.requestTimeout=3000;this.server.headersTimeout=3000;this.server.keepAliveTimeout=1000;this.server.maxConnections=32;
-   await new Promise((resolve,reject)=>{this.server.once('error',reject);this.server.listen(this.port,'0.0.0.0',()=>{this.server.off('error',reject);resolve();});});
-   active();this.server.on('error',()=>{this.notice='LAN listener failed. Disable and re-enable LAN mode.';this.emitState();});
+   const server=this.server=http.createServer((req,res)=>this.serve(req,res));
+   server.requestTimeout=3000;server.headersTimeout=3000;server.keepAliveTimeout=1000;server.maxConnections=32;
+   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(this.port,'0.0.0.0',()=>{server.off('error',reject);resolve();});});
+   active();server.on('error',()=>{this.notice='LAN listener failed. Disable and re-enable LAN mode.';this.emitState();});
    for(const [base,bits] of PRIVATE){
     const filter='/ip4/'+base+'/ipcidr/'+bits;
     if(filters.includes(filter)&&list.some(v=>inSubnet(v.address,base,bits))){await this.kubo('swarm/filters/rm',[filter]);active();}

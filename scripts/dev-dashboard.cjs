@@ -83,7 +83,7 @@ class DevDashboard{
     const node=lanNode();
     if(!node){this.state.error='LAN Nodes is available after startup completes.';this.draw(true);return;}
     this.state.restartConfirm=false;
-    this.lanMenu=new LanNodeMenu({node,onChange:menu=>{this.state.lanMenu=menu;if(!menu)this.lanMenu=null;this.draw(true);}});return;
+    this.lanMenu=new LanNodeMenu({node,size:()=>({columns:this.output.columns||80,rows:this.output.rows||24}),onChange:menu=>{this.state.lanMenu=menu;if(!menu)this.lanMenu=null;this.draw(true);}});return;
    }
    if(key.name==='n'&&this.interactive){
     if(!['READY','DEGRADED','CONFIGURATION REQUIRED'].includes(this.state.phase)){this.state.error='Network selection is available when READY.';this.draw(true);return;}

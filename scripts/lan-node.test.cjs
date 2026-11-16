@@ -116,3 +116,8 @@ test('shutdown during enable cannot publish or change filters afterwards',async(
  let resolve;const {node,calls}=harness();node.enabled=false;node.localIdentity=()=>new Promise(r=>{resolve=r;});
  const enabling=node.enable();await node.disable();resolve();await assert.rejects(enabling,/stopped/);assert.equal(node.enabled,false);assert.equal(calls.length,0);
 });
+test('small terminals cannot confirm an unreadable peer identity or enable prompt',async()=>{
+ const {node}=harness();let enabled=0;node.enable=async()=>{enabled++;};node.enabled=false;
+ const menu=new LanNodeMenu({node,size:()=>({columns:60,rows:14})});
+ menu.handle('e',{name:'e'});menu.handle('',{name:'return'});await flush();assert.equal(enabled,0);assert.match(menu.state.error,/Resize/);menu.close();
+});

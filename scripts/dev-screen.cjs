@@ -103,6 +103,7 @@ function renderDashboard(state,{columns=100,rows=32,color=false,showSecrets=fals
     'Ciphertext: http://127.0.0.1:8080/ipfs/<CID>',
     'Public music: '+URLS.web+'/road/api/music','Health: '+URLS.web+'/api/road-ipfs/health',
     'Logs: '+logMode+' / [l] view / [v] toggle inside logs',
+    'Controls: [p] pause display / [r] restart Player / [b] LAN Nodes',
     'File: .road-local/dev-stack.log (new session on restart)',
     'Start: npm run dev | Recovery: npm run dev -- --restart-player',
     'Kubo stop: npm run ipfs:down | NEVER down -v',
