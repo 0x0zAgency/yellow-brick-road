@@ -40,6 +40,12 @@ async function readJson(response,limit=16384){
  for await(const part of response.body){size+=part.length;if(size>limit)throw Error('Node response is too large.');chunks.push(part);}
  try{return JSON.parse(Buffer.concat(chunks).toString('utf8'));}catch{throw Error('Node returned invalid JSON.');}
 }
+function peerList(value){
+ // Kubo encodes an empty Go peer slice as null, not necessarily [].
+ if(value?.Peers===null)return [];
+ if(!Array.isArray(value?.Peers))throw Error('Cannot read Kubo peers.');
+ return value.Peers;
+}
 function kuboClient(value='http://127.0.0.1:5001',fetchImpl=fetch){
  const url=new URL(value);
  if(!['http:','https:'].includes(url.protocol)||!['127.0.0.1','localhost','[::1]'].includes(url.hostname)||url.username||url.password||url.search||url.hash||!['','/'].includes(url.pathname))throw Error('LAN control requires a loopback Kubo admin RPC.');
@@ -120,7 +126,7 @@ class LanNode extends EventEmitter{
   const remote=manifest(await readJson(response));
   if(!this.enabled||generation!==this.generation)throw Error('LAN mode stopped.');
   if(remote.peerId===this.info.peerId)throw Error('This is your own IPFS node.');
-  if(old&&remote.peerId!==old.peerId)throw Error('Peer identity changed. Refresh discovery and review it again.');
+  if((old&&remote.peerId!==old.peerId)||(this.peers.has(key)&&this.peers.get(key).peerId!==remote.peerId))throw Error('Peer identity changed. Refresh discovery and review it again.');
   if(!old&&this.peers.size>=MAX_PEERS)throw Error('Node list is full. Disable LAN mode to clear it.');
   const entry={...old,...target,...remote,key,available:true,seen:Date.now(),status:old?.status||'Discovered'};
   this.peers.set(key,entry);this.emitState();
@@ -134,9 +140,10 @@ class LanNode extends EventEmitter{
    await this.localIdentity();
    if(!this.enabled||generation!==this.generation)throw Error('LAN mode stopped.');
    await this.kubo('swarm/connect',['/ip4/'+current.address+'/tcp/'+current.swarmPort+'/p2p/'+current.peerId]);
-   const peers=(await this.kubo('swarm/peers')).Peers;
+   const peers=peerList(await this.kubo('swarm/peers'));
    if(!peers?.some(p=>p.Peer===current.peerId&&p.Addr?.startsWith('/ip4/'+current.address+'/')))throw Error('Kubo did not confirm the LAN peer connection. Check TCP '+current.swarmPort+' and the peer\'s LAN mode.');
    if(!this.enabled||generation!==this.generation)return;
+   if(this.peers.get(current.key)?.peerId!==current.peerId)throw Error('Peer identity changed during connection. Review it again.');
    this.peers.get(current.key).status='Connected';this.notice='Connected to '+current.name+' through IPFS. Active deployment unchanged.';
   }catch(error){this.notice='Connection failed. Check both nodes have LAN mode enabled and TCP swarm ports allowed.';throw error;}
   finally{this.busy=false;this.emitState();}
@@ -144,7 +151,11 @@ class LanNode extends EventEmitter{
  async disconnect(key){
   if(this.busy)throw Error('A node operation is already running.');const p=this.peers.get(key);if(!p)throw Error('Choose a node first.');
   this.busy=true;this.emitState();
-  try{await this.localIdentity();await this.kubo('swarm/disconnect',['/p2p/'+p.peerId]);p.status='Disconnected';this.notice='Disconnected from '+p.name+'. IPFS may reconnect independently.';}
+  try{
+   await this.localIdentity();await this.kubo('swarm/disconnect',['/p2p/'+p.peerId]);
+   if(peerList(await this.kubo('swarm/peers')).some(v=>v.Peer===p.peerId))throw Error('Peer is still connected or has reconnected. Refresh its status.');
+   p.status='Disconnected';this.notice='Disconnected from '+p.name+'. IPFS may reconnect independently.';
+  }
   finally{this.busy=false;this.emitState();}
  }
  async refresh(){
@@ -153,7 +164,7 @@ class LanNode extends EventEmitter{
    this.browser?.expire();this.browser?.update();
    for(const service of this.browser?.services||[])this.discovered(service);
    await this.localIdentity();
-   const list=(await this.kubo('swarm/peers')).Peers;if(!Array.isArray(list))throw Error('Cannot read Kubo peers.');
+   const list=peerList(await this.kubo('swarm/peers'));
    if(generation!==this.generation)return;
    for(const p of this.peers.values()){
     if(list.some(v=>v.Peer===p.peerId&&v.Addr?.startsWith('/ip4/'+p.address+'/')))p.status='Connected';

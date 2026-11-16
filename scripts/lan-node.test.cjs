@@ -59,6 +59,11 @@ test('HTTP success alone cannot become Connected; peer loss and Kubo failure upd
  node.kubo=async cmd=>cmd==='id'?{ID:a}:{Peers:[],Strings:['connect success']};await assert.rejects(node.connect(r),/did not confirm/);
  node.peers.get(r.key).status='Connected';node.kubo=async()=>{throw Error('offline');};await node.refresh();assert.equal(node.peers.get(r.key).status,'Unknown');
 });
+test('Kubo null peer lists mean no connections, while malformed replies remain unknown',async()=>{
+ const {node}=harness();const r=await node.review('192.168.4.20');await node.connect(r);
+ node.kubo=async cmd=>cmd==='id'?{ID:a}:{Peers:null};await node.refresh();assert.equal(node.peers.get(r.key).status,'Connection lost');
+ node.peers.get(r.key).status='Connected';node.kubo=async cmd=>cmd==='id'?{ID:a}:{};await node.refresh();assert.equal(node.peers.get(r.key).status,'Unknown');
+});
 test('expired reviews and asynchronous operations cannot reconnect after LAN mode stops',async()=>{
  const {node,calls}=harness();const r=await node.review('192.168.4.20');let done;
  node.fetch=()=>new Promise(resolve=>{done=resolve;});const pending=node.connect(r);await flush();await node.disable();done(Response.json(remote));
